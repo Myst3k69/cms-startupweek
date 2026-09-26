@@ -189,7 +189,7 @@ export function QualiopiDashboard() {
 
       {/* ───── En-tête : score, audit, statuts, référents ───── */}
       <Card className="mb-6">
-        <div className="grid divide-y divide-border md:grid-cols-2 md:divide-y-0 xl:grid-cols-[auto_1fr_1.3fr_1fr] xl:divide-x">
+        <div className="grid grid-cols-1 divide-y divide-border md:grid-cols-2 md:divide-y-0 xl:grid-cols-[auto_1fr_1.3fr_1fr] xl:divide-x">
           <div className="flex items-center gap-4 p-4 sm:p-5">
             <ProgressRing value={readiness} size={112} stroke={10} label={`${readiness} %`} sublabel="préparation" />
             <div className="min-w-0">
@@ -277,7 +277,7 @@ export function QualiopiDashboard() {
       </Card>
 
       {/* ───── KPIs ───── */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Indicateurs conformes" value={`${counts.conforme}/${applicable.length}`} hint={`${counts.partiel} partiel(s) · ${counts.non_applicable} non applicable(s)`} icon={ShieldCheck} />
         <StatCard label="Non conformes ou à faire" value={counts.non_conforme + counts.a_faire} hint={`${counts.non_conforme} non conforme(s) · ${counts.a_faire} à faire`} icon={AlertTriangle} />
         <StatCard
@@ -291,7 +291,7 @@ export function QualiopiDashboard() {
 
       {/* ───── Score par critère ───── */}
       <SectionTitle title="Score par critère" description="Cliquez sur un critère pour filtrer la liste des indicateurs." />
-      <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {criteria.map((c) => (
           <button
             key={c.code}
@@ -331,7 +331,7 @@ export function QualiopiDashboard() {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         {/* ───── Indicateurs ───── */}
         <section ref={listRef} aria-labelledby="ind-title" className="min-w-0 scroll-mt-20">
           <SectionTitle title={<span id="ind-title">Les 32 indicateurs</span>} description={`${filtered.length} affiché(s) sur ${indicators.length}`} />

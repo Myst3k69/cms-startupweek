@@ -38,10 +38,15 @@ const nowMs = () => Date.now();
 
 /* ───────────────────────────── Emails ───────────────────────────── */
 
+/**
+ * Modèle d'email d'une catégorie. Avec un mot-clé, la recherche est stricte (aucun modèle
+ * ⇒ undefined, l'appelant fournit alors un sujet/corps par défaut) : jamais le mauvais email.
+ */
 export function findTemplate(category: TemplateCategory, keyword?: string): EmailTemplate | undefined {
-  const k = keyword?.toLowerCase();
   const list = crm().emailTemplates.filter((t) => t.category === category);
-  return (k ? list.find((t) => `${t.name} ${t.subject}`.toLowerCase().includes(k)) : undefined) ?? list[0];
+  if (!keyword) return list[0];
+  const k = keyword.toLowerCase();
+  return list.find((t) => `${t.name} ${t.subject}`.toLowerCase().includes(k));
 }
 
 /** Envoie (démo : journalise) un email à partir d'un template + variables échappées. */
@@ -228,13 +233,23 @@ export function sendInvoiceReminder(invoiceId: ID) {
  * - refusée / hors cible → email de refus bienveillant (manquait dans n8n) ;
  * - entretien → tâche de préparation.
  */
-export function changeApplicationStatus(applicationId: ID, status: ApplicationStatus) {
+export function changeApplicationStatus(applicationId: ID, status: ApplicationStatus): boolean {
   const s = crm();
   const app = findById("applications", applicationId);
-  if (!app || app.status === status) return;
+  if (!app || app.status === status) return false;
   const contact = findById("contacts", app.contactId);
   const ev = findById("events", app.eventId);
   const now = nowMs();
+  // « Alerte capacité » (reprise d'Airtable) : jamais plus d'inscrits que de places, quel que soit le déclencheur
+  // (glisser-déposer, paiement Stripe/Qonto reçu…). En base : trigger équivalent sur crm.applications.
+  if (status === "inscrite" && ev) {
+    const enrolled = s.applications.filter((a) => a.eventId === ev.id && a.status === "inscrite" && a.id !== app.id).length;
+    if (enrolled >= ev.capacity) {
+      s.log({ kind: "systeme", entity: "applications", entityId: app.id, summary: `Inscription bloquée : ${ev.code} est complète (${enrolled}/${ev.capacity}) — à arbitrer (liste d'attente ou autre session)` });
+      createTask({ title: `Session complète — arbitrer l'inscription de ${contactName(contact)} (${ev.code})`, kind: "admin", priority: "haute", dueInDays: 1, related: { entity: "applications", id: app.id }, automated: true });
+      return false;
+    }
+  }
   const patch: Partial<Application> = { status };
   if (["acceptee", "refusee", "hors_cible"].includes(status)) patch.decisionAt = iso(now);
   if (status === "hors_cible") patch.leadStage = "out_of_scope";
@@ -269,7 +284,8 @@ export function changeApplicationStatus(applicationId: ID, status: ApplicationSt
     }
   }
   if ((status === "refusee" || status === "hors_cible") && contact) {
-    sendEmail({ to: contact.email, template: findTemplate("candidature", "refus"), vars, related });
+    const tpl = findTemplate("candidature", "refus");
+    if (tpl) sendEmail({ to: contact.email, template: tpl, vars, related });
   }
   if (status === "entretien") {
     createTask({ title: `Préparer l'entretien — ${contactName(contact)}`, kind: "rdv", dueInDays: 2, related, automated: true });
@@ -277,6 +293,7 @@ export function changeApplicationStatus(applicationId: ID, status: ApplicationSt
   if (status === "desistee" && ev) {
     s.log({ kind: "systeme", entity: "events", entityId: ev.id, summary: `Place libérée (désistement de ${contactName(contact)})` });
   }
+  return true;
 }
 
 /** Convocation (indicateur Qualiopi 9) : email + horodatage. */
@@ -407,6 +424,11 @@ export function acknowledgeComplaint(id: ID) {
     sendEmail({
       to: contact.email,
       template: findTemplate("qualiopi", "réclamation") ?? findTemplate("accuse_reception", "réclamation"),
+      subject: findTemplate("qualiopi", "réclamation") ?? findTemplate("accuse_reception", "réclamation") ? undefined : "Votre réclamation {{numero_reclamation}} : accusé de réception",
+      body:
+        findTemplate("qualiopi", "réclamation") ?? findTemplate("accuse_reception", "réclamation")
+          ? undefined
+          : "Bonjour {{prenom}},\n\nNous accusons réception de votre réclamation {{numero_reclamation}} du {{date_reception}}. Elle est en cours d'analyse ; nous revenons vers vous rapidement.\n\nL'équipe StartupWeek",
       vars: { prenom: contact.firstName, numero_reclamation: c.number, date_reception: date(c.receivedAt) },
       related: { entity: "complaints", id: c.id },
     });

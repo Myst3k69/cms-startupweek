@@ -241,7 +241,7 @@ function InvoiceForm({ initial, existing }: { initial: InitialState; existing?: 
         description="Le numéro légal (séquentiel, sans trou) n'est attribué qu'à l'émission. Un brouillon peut être modifié ou annulé librement."
         className="mb-0"
       />
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <Card>
             <CardHeader>
@@ -249,7 +249,7 @@ function InvoiceForm({ initial, existing }: { initial: InitialState; existing?: 
             </CardHeader>
             <CardContent className="space-y-4">
               <ClientPicker value={party} onChange={onParty} error={errors.client} />
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField label="Candidature liée (facultatif)" htmlFor="inv-app" hint={personId ? undefined : "Choisissez d'abord un contact"}>
                   <Select
                     id="inv-app"
@@ -313,7 +313,7 @@ function InvoiceForm({ initial, existing }: { initial: InitialState; existing?: 
               <CardTitle>Conditions de paiement</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField label="Échéance" htmlFor="inv-due" error={errors.due} hint={`Par défaut : ${settings.paymentTermsDays} jours (acompte : 7 jours, solde : J-${settings.balanceDaysBefore})`}>
                   <Input id="inv-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
                 </FormField>
@@ -326,7 +326,7 @@ function InvoiceForm({ initial, existing }: { initial: InitialState; existing?: 
                 <Checkbox checked={hasFunder} onChange={(e) => setHasFunder(e.target.checked)} label="Prise en charge par un financeur (OPCO, France Travail…)" />
                 {hasFunder ? (
                   <>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <FormField label="Financeur" htmlFor="inv-funder" error={errors.funder}>
                         <Input id="inv-funder" list="inv-funders" value={funderName} onChange={(e) => setFunderName(e.target.value)} placeholder="OPCO Atlas, AKTO…" />
                         <datalist id="inv-funders">

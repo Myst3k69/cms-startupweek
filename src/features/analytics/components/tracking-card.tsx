@@ -50,7 +50,7 @@ export function TrackingCard() {
           <CardDescription>Intégrations de mesure de startupweek.tech et plan de marquage des conversions</CardDescription>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-6 xl:grid-cols-2">
+      <CardContent className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <ul className="space-y-2">
           {INTEGRATIONS.map((i) => (
             <li key={i.name} className="rounded-md border border-border px-3 py-2.5">

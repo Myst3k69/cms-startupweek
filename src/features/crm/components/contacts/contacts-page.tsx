@@ -171,7 +171,7 @@ export function ContactsPage({ initial }: { initial: ContactsFilters }) {
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Contacts" value={stats.total.toLocaleString("fr-FR")} icon={Users} hint={`+${stats.recent} ces 30 derniers jours`} />
         <StatCard label="Leads & prospects" value={stats.toQualify} icon={UserPlus} hint="À qualifier ou convertir" />
         <StatCard label="Opt-in marketing" value={percent(stats.total ? (stats.optIn / stats.total) * 100 : 0)} icon={MailCheck} hint={`${stats.optIn} consentements horodatés`} />

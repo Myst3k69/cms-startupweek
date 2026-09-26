@@ -74,7 +74,7 @@ export function EmargementDoc({ eventId }: { eventId: ID }) {
       <ScreenNotes notes={notes} className="max-w-[297mm]" />
       <PrintPage orientation="landscape">
         <DocHeader title="Feuille d'émargement" subtitle="Présence par demi-journée" reference={ev.code} compact />
-        <div className="my-3 grid gap-x-6 gap-y-0.5 text-[11.5px] sm:grid-cols-2 print:grid-cols-2 print:text-[8.5pt]">
+        <div className="my-3 grid grid-cols-1 gap-x-6 gap-y-0.5 text-[11.5px] sm:grid-cols-2 print:grid-cols-2 print:text-[8.5pt]">
           <p>
             <span className="text-muted-foreground">Action de formation : </span>
             <strong>{ev.name}</strong>

@@ -38,7 +38,7 @@ export function AutomationsPage() {
         description="Règles métier du CRM, points d'entrée du site et suivi de la migration depuis les 13 workflows n8n (webhooks non signés, polling Airtable)."
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Règles actives" value={`${stats.active} / ${rules.length}`} hint="accusés, relances, convocations, factures…" icon={Zap} />
         <StatCard label="Exécutions" value={compactNumber(stats.runs)} hint={`${number(stats.system)} actions automatiques journalisées`} icon={Activity} />
         <StatCard

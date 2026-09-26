@@ -99,7 +99,7 @@ export function PublishResultsModal({ open, onClose, data }: { open: boolean; on
           <div className="rounded-xl border border-border bg-surface-2/60 p-5">
             <p className="eyebrow text-accent-text">Aperçu site</p>
             <h3 className="mt-1 font-display text-xl font-semibold text-foreground">Nos résultats</h3>
-            <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {resultTiles(r).map((t) => (
                 <li key={t.label} className="rounded-lg border border-border bg-surface p-4">
                   <p className="tabular font-display text-3xl font-semibold tracking-tight text-foreground">{t.value}</p>

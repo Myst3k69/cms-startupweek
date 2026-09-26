@@ -24,7 +24,7 @@ export function LoginScreen({ next }: { next: string }) {
   const router = useRouter();
 
   return (
-    <div className="relative grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
+    <div className="relative grid grid-cols-1 min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <section className="relative hidden overflow-hidden bg-sw-black p-10 text-white lg:flex lg:flex-col">
         <div className="grid-bg absolute inset-0 opacity-40" style={{ ["--border" as string]: "rgba(255,255,255,.06)" }} />
         <div className="absolute -left-24 top-1/3 size-[420px] rounded-full bg-[radial-gradient(circle,rgba(0,245,255,.25),transparent_65%)] blur-2xl" />

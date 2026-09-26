@@ -168,7 +168,7 @@ function ComposerInner({ onClose, title = "Nouvel email", description, to: initi
           submit();
         }}
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField label="Destinataire" htmlFor="composer-to" error={errors.to} hint={contact ? `Contact : ${contactName(contact)}` : recipientSearch ? "Nom ou email d'un contact, ou adresse libre" : undefined}>
             <div className="relative">
               <Input

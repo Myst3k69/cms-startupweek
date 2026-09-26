@@ -48,7 +48,7 @@ export function QualitySection({ range, now }: { range: Range; now: number }) {
   const npsDelta = k.nps !== undefined && k.npsPrev !== undefined ? k.nps - k.npsPrev : undefined;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <Card>
         <CardHeader>
           <div>

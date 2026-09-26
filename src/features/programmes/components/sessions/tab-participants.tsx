@@ -92,7 +92,7 @@ function NoApplicationsPanel({ ev }: { ev: EventSession }) {
           </div>
         </div>
 
-        <div className="grid gap-4 border-t border-border pt-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 border-t border-border pt-4 md:grid-cols-3">
           <section>
             <h4 className="eyebrow mb-2 flex items-center gap-1.5 text-muted-foreground">
               <KanbanSquare className="size-3.5" aria-hidden="true" /> Opportunité
@@ -294,6 +294,7 @@ function ParticipantsTable({ ev, data, canEdit }: { ev: EventSession; data: Sess
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Segmented<Group>
+          className="scrollbar-thin max-w-full overflow-x-auto"
           value={group}
           onChange={setGroup}
           options={[

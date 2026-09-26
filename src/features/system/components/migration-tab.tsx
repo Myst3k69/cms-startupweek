@@ -28,7 +28,7 @@ export function MigrationTab() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Card className="p-4 md:col-span-2">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <p className="text-sm font-medium text-foreground">Couverture fonctionnelle par le CRM</p>
@@ -151,7 +151,7 @@ export function MigrationTab() {
           </div>
         </CardHeader>
         <CardContent>
-          <ol className="grid gap-3 md:grid-cols-5">
+          <ol className="grid grid-cols-1 gap-3 md:grid-cols-5">
             {CUTOVER_STEPS.map((s, i) => (
               <li key={s.title} className="rounded-md border border-border p-3">
                 <span className="tabular inline-flex size-6 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent-text">{i + 1}</span>

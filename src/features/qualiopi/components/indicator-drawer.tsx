@@ -159,7 +159,7 @@ function IndicatorDetail({ indicator, data }: { indicator: QualiopiIndicator; da
       </section>
 
       {/* Pilotage */}
-      <section className="grid gap-3 rounded-lg border border-border bg-surface-2/50 p-3 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-surface-2/50 p-3 sm:grid-cols-3">
         <FormField label="Statut" htmlFor="ind-status">
           <Select id="ind-status" value={indicator.status} onChange={(e) => setStatus(e.target.value as IndicatorStatus)} options={INDICATOR_STATUSES} disabled={readOnly} />
         </FormField>
@@ -245,7 +245,7 @@ function IndicatorDetail({ indicator, data }: { indicator: QualiopiIndicator; da
             <FormField label="Intitulé" htmlFor="evd-title" error={errors.title}>
               <Input id="evd-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex. Procédure de traitement des réclamations v2" autoFocus />
             </FormField>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField label="Type" htmlFor="evd-kind">
                 <Select id="evd-kind" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as Evidence["kind"] })} options={EVIDENCE_KINDS} />
               </FormField>

@@ -145,7 +145,7 @@ function ActionForm({
       <FormField label="Description / action à mener" htmlFor="act-desc" error={errors.description}>
         <Textarea id="act-desc" value={description} onChange={(e) => setDescription(e.target.value)} disabled={readOnly} className="min-h-20" />
       </FormField>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Origine" htmlFor="act-origin">
           <Select id="act-origin" value={origin} onChange={(e) => setOrigin(e.target.value as ActionOrigin)} options={ACTION_ORIGINS} disabled={readOnly} />
         </FormField>

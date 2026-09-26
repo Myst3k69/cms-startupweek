@@ -95,7 +95,7 @@ export function JournalView({ initialId }: { initialId?: string }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Envoyés (30 j)" value={stats.sent} icon={Send} hint={stats.scheduled ? `+ ${stats.scheduled} programmé${stats.scheduled > 1 ? "s" : ""}` : "Aucun envoi programmé"} />
         <StatCard label="Taux d'ouverture" value={percent(stats.sent ? (stats.opened / stats.sent) * 100 : 0)} icon={MailOpen} hint={`${stats.opened} ouverts sur ${stats.sent}`} />
         <StatCard label="Taux de clic" value={percent(stats.sent ? (stats.clicked / stats.sent) * 100 : 0)} icon={MousePointerClick} hint={`${stats.clicked} clics (lien de paiement, candidature…)`} />

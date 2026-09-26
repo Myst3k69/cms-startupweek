@@ -118,7 +118,7 @@ function QuoteForm({ initial, existing }: { initial: InitialState; existing?: Qu
         description="Proposition commerciale B2B (écoles, entreprises, accompagnements). Une fois acceptée, elle se convertit en facture en un clic."
         className="mb-0"
       />
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <Card>
             <CardHeader>
@@ -126,7 +126,7 @@ function QuoteForm({ initial, existing }: { initial: InitialState; existing?: Qu
             </CardHeader>
             <CardContent className="space-y-4">
               <ClientPicker id="quote-client" value={party} onChange={setParty} error={errors.client} />
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField label="Opportunité (facultatif)" htmlFor="q-deal">
                   <Select
                     id="q-deal"
@@ -158,7 +158,7 @@ function QuoteForm({ initial, existing }: { initial: InitialState; existing?: Qu
             <CardHeader>
               <CardTitle>Validité & conditions</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField label="Valable jusqu'au" htmlFor="q-valid" error={errors.valid} hint="Par défaut : 30 jours">
                 <Input id="q-valid" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
               </FormField>

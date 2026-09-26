@@ -188,7 +188,7 @@ export function IntegrationsTab() {
         ) : null}
       </Card>
 
-      <ul className="grid gap-4 md:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {items.map((it) => (
           <li key={it.key}>
             <Card className="flex h-full flex-col">

@@ -87,7 +87,7 @@ export function FunnelSection({ range }: { range: Range }) {
   const steps = FUNNEL_STEPS.map((label, i) => ({ label, value: counts[i] }));
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card>
         <CardHeader>
           <div>

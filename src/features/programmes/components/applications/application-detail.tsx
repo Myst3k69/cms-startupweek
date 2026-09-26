@@ -84,7 +84,7 @@ export function ApplicationDetail({ id }: { id: ID }) {
     const interview: ActionDef = { key: "interview", label: app.status === "entretien" ? "Replanifier l'entretien" : "Planifier l'entretien", icon: CalendarClock, to: "entretien", variant: "secondary" };
     const accept: ActionDef = { key: "accept", label: "Accepter", icon: CheckCircle2, to: "acceptee", variant: "primary" };
     const refuse: ActionDef = { key: "refuse", label: "Refuser", icon: Ban, to: "refusee", variant: "ghost", confirm: true };
-    const wait: ActionDef = { key: "wait", label: "Liste d'attente", icon: Hourglass, to: "liste_attente", variant: "ghost" };
+    const wait: ActionDef = { key: "wait", label: "Mettre en liste d'attente", icon: Hourglass, to: "liste_attente", variant: "ghost" };
     const withdraw: ActionDef = { key: "withdraw", label: "Désistement", icon: LogOut, to: "desistee", variant: "ghost", confirm: true };
     const convocation: ActionDef = {
       key: "convocation",
@@ -199,7 +199,7 @@ export function ApplicationDetail({ id }: { id: ID }) {
         </Card>
       </PageHeader>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <DossierCard app={app} project={project} />
           <ScoringCard app={app} canEdit={editable} />

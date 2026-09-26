@@ -234,7 +234,7 @@ export function ResourceDrawer({ resource, onClose }: { resource?: Resource; onC
             <FormField label="Description" htmlFor="rs-desc">
               <Textarea id="rs-desc" value={draft.description} disabled={!editable} className="min-h-20" onChange={(e) => set("description", e.target.value)} placeholder="À quoi sert ce document, pour qui, à quel moment de la session ?" />
             </FormField>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <FormField label="Catégorie" htmlFor="rs-cat">
                 <Select id="rs-cat" value={draft.category} disabled={!editable} options={RESOURCE_CATEGORIES} onChange={(e) => set("category", e.target.value as ResourceCategory)} />
               </FormField>

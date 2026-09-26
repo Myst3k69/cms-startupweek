@@ -25,7 +25,7 @@ export function ActivitySection({ now }: { now: number }) {
           demandes
         </span>
       </CardHeader>
-      <CardContent className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
+      <CardContent className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0">
           <CalendarHeatmap days={heat.days} format={(v) => `${v} demande${v > 1 ? "s" : ""}`} className="scrollbar-thin pb-2" />
           <p className="mt-2 text-xs text-muted-foreground">

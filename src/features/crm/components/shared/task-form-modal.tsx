@@ -110,7 +110,7 @@ function TaskFormInner({ onClose, related: fixedRelated, defaultTitle = "", defa
         <FormField label="Intitulé" htmlFor="task-title" error={errors.title}>
           <Input id="task-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Rappeler pour le devis Startup Village" autoFocus />
         </FormField>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <FormField label="Type" htmlFor="task-kind">
             <Select id="task-kind" value={kind} onChange={(e) => setKind(e.target.value as TaskKind)} options={TASK_KINDS} />
           </FormField>
@@ -130,7 +130,7 @@ function TaskFormInner({ onClose, related: fixedRelated, defaultTitle = "", defa
             <EntityRefLink value={fixedRelated} />
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[180px_1fr]">
             <FormField label="Rattacher à" htmlFor="task-entity">
               <Select
                 id="task-entity"

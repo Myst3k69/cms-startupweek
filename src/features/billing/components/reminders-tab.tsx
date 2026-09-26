@@ -21,7 +21,7 @@ function SequenceTimeline({ counts }: { counts: number[] }) {
   return (
     <Card className="p-4">
       <p className="mb-3 text-sm font-semibold">Séquence de relance des impayés</p>
-      <ol className="grid gap-3 sm:grid-cols-4">
+      <ol className="grid grid-cols-1 gap-3 sm:grid-cols-4">
         {steps.map((s, i) => (
           <li key={s.title} className="relative flex gap-3 sm:flex-col sm:gap-2">
             <div className="flex items-center gap-2 sm:w-full">

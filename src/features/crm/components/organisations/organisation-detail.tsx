@@ -151,7 +151,7 @@ function OrgView({ org }: { org: Organization }) {
         }
       />
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="p-4">
           <p className="text-xs text-muted-foreground">CA facturé (TTC)</p>
           <p className="tabular mt-1 text-xl font-semibold text-foreground">{money(kpis.billed)}</p>
@@ -173,7 +173,7 @@ function OrgView({ org }: { org: Organization }) {
         </Card>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
           <Block title="Informations légales & facturation" icon={Receipt}>
             <DescriptionList

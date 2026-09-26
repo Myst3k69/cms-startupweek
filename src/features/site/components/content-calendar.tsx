@@ -273,7 +273,7 @@ export function ContentCalendar({
           {unscheduled.length === 0 ? (
             <p className="text-sm text-muted-foreground">Tout est programmé.</p>
           ) : (
-            <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
               {unscheduled.slice(0, 9).map((it) => (
                 <Chip key={it.id} item={it} draggable={canDrag(it)} onDragStart={setDragId} />
               ))}

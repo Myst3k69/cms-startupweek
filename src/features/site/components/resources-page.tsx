@@ -149,7 +149,7 @@ export function ResourcesPage() {
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Ressources" value={number(resources.length)} hint={`${stats.byVis.public ?? 0} publiques · ${stats.byVis.participants ?? 0} participants · ${stats.byVis.premium ?? 0} premium`} icon={Library} />
         <StatCard label="Téléchargements" value={compactNumber(stats.downloads)} hint={stats.top ? `Top : ${truncate(stats.top.title, 34)}` : undefined} icon={Download} />
         <StatCard
@@ -224,7 +224,7 @@ export function ResourcesPage() {
           }
         />
       ) : layout === "grille" ? (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((r) => {
             const kind = urlKind(r.url);
             const linked = r.eventIds.map((id) => eventById.get(id)).filter(Boolean);

@@ -39,7 +39,7 @@ export function EndpointsTab() {
             <CardDescription>Chaque route /api/submit-* du site relaie le formulaire côté serveur, signé — les webhooks n8n publics sont supprimés.</CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-4 lg:grid-cols-2">
+        <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <ul className="space-y-2 text-sm">
             <li className="flex gap-2">
               <KeyRound className="mt-0.5 size-4 shrink-0 text-faint" aria-hidden="true" />
@@ -84,7 +84,7 @@ ${SIGNATURE_HEADER}: sha256=5f0c…e91a
                   <code className="min-w-0 flex-1 break-all rounded-md border border-border bg-surface-2 px-2.5 py-1.5 font-mono text-xs text-foreground">{url}</code>
                   <CopyButton value={url} label="Copier l'URL" />
                 </div>
-                <dl className="grid gap-3 text-xs sm:grid-cols-3">
+                <dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
                   <div>
                     <dt className="text-muted-foreground">Route du site à rebrancher</dt>
                     <dd className="mt-0.5 font-mono text-foreground">{f.siteRoute}</dd>
@@ -102,7 +102,7 @@ ${SIGNATURE_HEADER}: sha256=5f0c…e91a
                   <span className="font-medium text-foreground">À la réception : </span>
                   {f.creates}.
                 </p>
-                <div className="grid gap-4 xl:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   <div className="min-w-0">
                     <p className="mb-1.5 text-xs font-medium text-muted-foreground">Exemple de payload (clés actuelles du formulaire)</p>
                     <CodeBlock code={sample} label="le payload" />

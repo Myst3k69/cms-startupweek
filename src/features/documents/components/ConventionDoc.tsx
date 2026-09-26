@@ -88,7 +88,7 @@ export function ConventionDoc({ applicationId }: { applicationId: ID }) {
         <DocHeader reference={ref} date={app.agreementSignedAt ?? new Date(now).toISOString()} />
         <DocTitle title={title} subtitle={legalBasis} />
 
-        <section className="mb-5 grid gap-4 sm:grid-cols-2 print:grid-cols-2">
+        <section className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 print:grid-cols-2">
           <div className="rounded-md border border-border p-3">
             <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Entre l'organisme de formation</p>
             <p className="font-semibold text-foreground">{settings.legalName}</p>

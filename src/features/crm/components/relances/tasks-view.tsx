@@ -96,7 +96,7 @@ export function TasksView({ initialView, initialScope }: { initialView?: TaskVie
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="En retard" value={<span className={buckets.retard.length ? "text-danger-text" : undefined}>{buckets.retard.length}</span>} icon={AlarmClock} hint={scope === "moi" ? "Mes tâches" : "Toute l'équipe"} />
         <StatCard label="Aujourd'hui" value={buckets.aujourdhui.length} icon={CalendarCheck2} hint={`${buckets.semaine.length} sur les 7 prochains jours`} />
         <StatCard label="Automatiques ouvertes" value={stats.openAuto} icon={Bot} hint={`sur ${stats.open} tâches ouvertes — créées par les séquences`} />

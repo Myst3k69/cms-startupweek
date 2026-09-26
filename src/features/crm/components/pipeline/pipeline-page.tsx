@@ -213,7 +213,7 @@ export function PipelinePage({ initial }: { initial: PipelineFilters }) {
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Pipeline ouvert" value={moneyCompact(stats.total)} icon={KanbanSquare} hint={`${stats.openCount} opportunité${stats.openCount > 1 ? "s" : ""} en cours`} />
         <StatCard label="Pipeline pondéré" value={moneyCompact(stats.weighted)} icon={Scale} hint="Montant × probabilité de l'étape" />
         <StatCard label="Gagné ce trimestre" value={moneyCompact(stats.wonQ)} icon={Trophy} hint={`${stats.wonQCount} affaire${stats.wonQCount > 1 ? "s" : ""} signée${stats.wonQCount > 1 ? "s" : ""}`} />

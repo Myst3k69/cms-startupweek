@@ -89,6 +89,7 @@ export function Kanban<T, S extends string>({
                     onDragStart={(e) => {
                       setDragId(id);
                       e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", id); // requis par Firefox pour démarrer le glisser
                     }}
                     onDragEnd={() => {
                       setDragId(null);

@@ -100,7 +100,7 @@ function PitchCard({ p, canEdit }: { p: Project; canEdit: boolean }) {
       <CardContent>
         {draft ? (
           <form
-            className="grid gap-4 sm:grid-cols-2"
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2"
             onSubmit={(e) => {
               e.preventDefault();
               save();
@@ -141,7 +141,7 @@ function PitchCard({ p, canEdit }: { p: Project; canEdit: boolean }) {
           <div className="space-y-5">
             {p.tagline ? <p className="border-l-2 border-primary pl-3 text-base font-medium text-foreground">{p.tagline}</p> : null}
             {p.description ? <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">{p.description}</p> : <p className="text-sm text-faint">Pas encore de description.</p>}
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <section>
                 <h4 className="eyebrow mb-1 text-muted-foreground">Marché cible</h4>
                 <p className="text-sm text-foreground">{p.targetMarket || "—"}</p>
@@ -748,7 +748,7 @@ export function ProjectDetail({ id }: { id: ID }) {
         </div>
       </PageHeader>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <PitchCard p={p} canEdit={editable} />
           <MilestonesCard p={p} canEdit={editable} now={now} />

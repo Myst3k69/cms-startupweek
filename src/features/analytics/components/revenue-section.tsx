@@ -71,7 +71,7 @@ export function RevenueSection({ period, range, now }: { period: Period; range: 
   const fmt = (v: number) => moneyCompact(v);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <Card className="lg:col-span-2">
         <CardHeader className="flex-wrap">
           <div>

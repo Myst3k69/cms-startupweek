@@ -556,7 +556,7 @@ export function PaymentCard({ app, event, invoices, canEdit }: { app: Applicatio
           </div>
         ) : null}
 
-        <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
           <FormField label="Financement" htmlFor={`funding-${app.id}`}>
             <Select
               id={`funding-${app.id}`}

@@ -96,7 +96,7 @@ export function DocumentSheet({ model, settings, className }: { model: DocModel;
       </header>
 
       {/* Client + objet */}
-      <section className="grid gap-5 py-5 sm:grid-cols-2 print:grid-cols-2">
+      <section className="grid grid-cols-1 gap-5 py-5 sm:grid-cols-2 print:grid-cols-2">
         <div className="min-w-0">
           <p className="eyebrow mb-1.5 text-muted-foreground">Objet</p>
           {model.subject.length ? (
@@ -209,7 +209,7 @@ export function DocumentSheet({ model, settings, className }: { model: DocModel;
       ) : null}
 
       {/* Conditions & règlement */}
-      <section className="mt-6 grid gap-5 border-t border-border pt-4 sm:grid-cols-2 print:grid-cols-2 print:break-inside-avoid">
+      <section className="mt-6 grid grid-cols-1 gap-5 border-t border-border pt-4 sm:grid-cols-2 print:grid-cols-2 print:break-inside-avoid">
         <div className="min-w-0">
           <p className="eyebrow mb-1.5 text-muted-foreground">Conditions</p>
           <ul className="space-y-0.5">
@@ -242,7 +242,7 @@ export function DocumentSheet({ model, settings, className }: { model: DocModel;
       </section>
 
       {model.signatureBox ? (
-        <section className="mt-6 grid gap-4 sm:grid-cols-2 print:grid-cols-2 print:break-inside-avoid">
+        <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 print:grid-cols-2 print:break-inside-avoid">
           <div />
           <div className="rounded-md border border-border-strong p-3">
             <p className="font-medium">Bon pour accord</p>

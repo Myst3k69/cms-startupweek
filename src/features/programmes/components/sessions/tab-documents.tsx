@@ -51,7 +51,7 @@ export function DocumentsTab({ ev, data }: { ev: EventSession; data: SessionData
             <CardDescription>Versions imprimables / PDF générées à partir des données à jour.</CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <DocButton href={`/print/programme/${ev.id}`} icon={FileText} label="Programme de formation" state="Fiche programme Qualiopi (objectifs, J1…J7, évaluation, accessibilité)" stateTone="muted" />
           <DocButton href={`/print/emargement/${ev.id}`} icon={ClipboardList} label="Feuille d'émargement" state="Par demi-journée, signatures participants et formateurs" stateTone="muted" />
         </CardContent>
@@ -69,7 +69,7 @@ export function DocumentsTab({ ev, data }: { ev: EventSession; data: SessionData
           {people.length ? (
             <ul className="divide-y divide-border">
               {people.map((a) => (
-                <li key={a.id} className="grid gap-3 py-3 md:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,1fr))] md:items-center">
+                <li key={a.id} className="grid grid-cols-1 gap-3 py-3 md:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,1fr))] md:items-center">
                   <div className="min-w-0">
                     <ContactLink id={a.contactId} className="block truncate text-sm" />
                     <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">

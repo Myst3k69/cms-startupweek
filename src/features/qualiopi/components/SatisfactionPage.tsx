@@ -215,7 +215,7 @@ export function SatisfactionPage() {
         />
       </div>
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Note moyenne" value={fmt1(rs.avg, " /5")} hint={`${rs.count} réponse(s) · ${kindLabel.toLowerCase()}`} icon={Star} />
         <StatCard label="NPS" value={rs.nps === null ? "—" : `${rs.nps > 0 ? "+" : ""}${rs.nps}`} hint={rs.npsCount ? `% promoteurs (9-10) − % détracteurs (0-6) · ${rs.npsCount} votes` : "Aucune note de recommandation"} icon={TrendingUp} />
         <StatCard label="Taux de réponse" value={fmtPct(response.rate)} hint={response.denom ? `${response.count} / ${response.denom} ${response.unit}` : `Aucun ${response.unit.replace(/s$/, "")} concerné`} icon={Users} />
@@ -230,7 +230,7 @@ export function SatisfactionPage() {
       {kindEvals.length === 0 ? (
         <EmptyState icon={MessageSquareQuote} title={`Aucune évaluation « ${kindLabel.toLowerCase()} »`} description="Les réponses aux questionnaires envoyés automatiquement (J+1, J+60, financeurs, intervenants) apparaîtront ici." className="mb-6" />
       ) : (
-        <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
               <div>
@@ -366,7 +366,7 @@ export function SatisfactionPage() {
           <EmptyState icon={MessageSquareQuote} title="Aucun verbatim" description="Aucun commentaire pour ce filtre." />
         ) : (
           <>
-            <ul className="grid gap-3 md:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {visibleVerbatims.slice(0, shown).map(({ e, s }) => {
                 const Icon = SENTIMENT_ICON[s];
                 const ev = eventsById.get(e.eventId);

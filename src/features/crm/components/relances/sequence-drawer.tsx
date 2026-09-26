@@ -82,7 +82,7 @@ function SequenceEditor({ seq, onClose, editable }: { seq: Sequence; onClose: ()
       }
     >
       <fieldset disabled={!editable} className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField label="Nom" htmlFor="seq-name" error={errors.name} className="sm:col-span-2">
             <Input id="seq-name" value={name} onChange={(e) => setName(e.target.value)} />
           </FormField>
@@ -123,7 +123,7 @@ function SequenceEditor({ seq, onClose, editable }: { seq: Sequence; onClose: ()
                     </div>
                   ) : null}
                 </div>
-                <div className="grid gap-3 sm:grid-cols-[96px_130px_1fr]">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[96px_130px_1fr]">
                   <FormField label="Délai (J+)" htmlFor={`delay-${s.id}`} error={errors[`delay-${s.id}`]}>
                     <Input id={`delay-${s.id}`} type="number" min={0} value={Number.isFinite(s.delayDays) ? s.delayDays : ""} onChange={(e) => patchStep(s.id, { delayDays: e.target.value === "" ? NaN : Number(e.target.value) })} />
                   </FormField>

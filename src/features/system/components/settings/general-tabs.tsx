@@ -61,7 +61,7 @@ export function OrganizationTab() {
         </Card>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label="Raison sociale" htmlFor="st-legal" error={errors.legalName}>
           <Input id="st-legal" value={draft.legalName} disabled={!editable} onChange={(e) => set("legalName", e.target.value)} />
         </FormField>
@@ -78,7 +78,7 @@ export function OrganizationTab() {
       <FormField label="Adresse du siège" htmlFor="st-address" error={errors.address}>
         <Input id="st-address" value={draft.address} disabled={!editable} onChange={(e) => set("address", e.target.value)} />
       </FormField>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <FormField label="Email de contact" htmlFor="st-email" error={errors.email}>
           <Input id="st-email" type="email" value={draft.email} disabled={!editable} onChange={(e) => set("email", e.target.value)} />
         </FormField>
@@ -152,7 +152,7 @@ export function BillingTab() {
         </Card>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label="Préfixe des factures" htmlFor="st-inv" error={errors.invoicePrefix} hint="Séquence continue par année, sans trou">
           <Input id="st-inv" value={draft.invoicePrefix} disabled={!editable} onChange={(e) => set("invoicePrefix", e.target.value.toUpperCase())} className="font-mono" />
         </FormField>
@@ -160,7 +160,7 @@ export function BillingTab() {
           <Input id="st-quo" value={draft.quotePrefix} disabled={!editable} onChange={(e) => set("quotePrefix", e.target.value.toUpperCase())} className="font-mono" />
         </FormField>
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <FormField label="Acompte à l'inscription (%)" htmlFor="st-dep" error={errors.depositPercent}>
           <Input id="st-dep" type="number" min={0} max={100} value={draft.depositPercent} disabled={!editable} onChange={(e) => set("depositPercent", num(e.target.value))} />
         </FormField>
@@ -252,7 +252,7 @@ export function QualiopiTab() {
         </Card>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label="Référent qualité" htmlFor="st-ql" error={errors.qualityLeadId}>
           <Select id="st-ql" value={draft.qualityLeadId ?? ""} disabled={!editable} placeholder="À désigner" options={options} onChange={(e) => set("qualityLeadId", e.target.value || undefined)} />
         </FormField>
@@ -279,7 +279,7 @@ export function QualiopiTab() {
         </div>
         <Switch checked={draft.newcomer} onChange={(v) => set("newcomer", v)} disabled={!editable} label="Nouvel entrant" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label="Délai de réponse aux demandes (heures)" htmlFor="st-sla" error={errors.slaHours} hint="Promesse « réponse sous 48 h » du site — alertes et tâches automatiques">
           <Input id="st-sla" type="number" min={1} value={draft.slaHours} disabled={!editable} onChange={(e) => set("slaHours", num(e.target.value))} />
         </FormField>

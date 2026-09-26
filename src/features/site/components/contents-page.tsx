@@ -108,7 +108,7 @@ export function ContentsPage() {
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Publiés · 30 j" value={number(stats.pub30)} delta={stats.pubDelta} deltaLabel="vs 30 j préc." trend={stats.weekly} icon={Send} />
         <StatCard
           label="Planifiés"

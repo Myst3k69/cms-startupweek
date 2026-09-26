@@ -84,7 +84,7 @@ export function NewContentModal({ open, onClose, defaultDate }: { open: boolean;
             placeholder="Ex. : Lancer son MVP no-code en 7 jours"
           />
         </FormField>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField label="Type" htmlFor="nc-type">
             <Select
               id="nc-type"

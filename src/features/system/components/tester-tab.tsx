@@ -79,7 +79,7 @@ export function TesterTab() {
   };
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <Card>
         <CardHeader>
           <div>
@@ -90,7 +90,7 @@ export function TesterTab() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Formulaire" htmlFor="tester-form">
               <Select id="tester-form" value={form} onChange={(e) => choose(e.target.value as IntakeForm)} options={INTAKE_FORMS.map((f) => ({ value: f.form, label: `${f.label} — /api/intake/${f.form}` }))} />
             </FormField>

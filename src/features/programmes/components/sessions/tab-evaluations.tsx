@@ -141,7 +141,7 @@ export function EvaluationsTab({ ev, data, canEdit }: { ev: EventSession; data: 
         <StatCard label="Objectifs atteints" value={view.objectives === undefined ? "—" : `${fmt1(view.objectives)}/5`} icon={Target} hint="Auto-évaluation en fin de session" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <div>
@@ -210,7 +210,7 @@ export function EvaluationsTab({ ev, data, canEdit }: { ev: EventSession; data: 
         </CardHeader>
         <CardContent>
           {verbatims.length ? (
-            <ul className="grid gap-3 md:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {verbatims.map((e) => (
                 <li key={e.id} className="rounded-md border border-border bg-surface-2/40 p-3">
                   <p className="text-sm leading-relaxed text-foreground">« {e.comment} »</p>

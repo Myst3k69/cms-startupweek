@@ -126,7 +126,7 @@ export function DemandesPage({ initial }: { initial: DemandesFilters }) {
         description="Les 8 formulaires du site dans une seule boîte : candidature, contact, entreprise, accompagnement, partenariat, Digital Starter Kit, réclamation, newsletter. Engagement : réponse sous 48 h."
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Nouvelles demandes" value={stats.fresh} icon={Inbox} hint={`${stats.last24} reçue${stats.last24 > 1 ? "s" : ""} ces dernières 24 h`} />
         <StatCard
           label={`Hors délai (SLA ${settings.slaHours} h)`}

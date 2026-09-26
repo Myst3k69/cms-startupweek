@@ -262,7 +262,7 @@ function QualiopiSheetCard({ ev, canEdit }: { ev: EventSession; canEdit: boolean
             </div>
           </form>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <section>
               <h4 className="eyebrow mb-2 text-muted-foreground">Objectifs</h4>
               {ev.objectives.length ? (

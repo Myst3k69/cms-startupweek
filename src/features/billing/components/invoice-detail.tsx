@@ -140,7 +140,7 @@ export function InvoiceDetail({ id }: { id: string }) {
         className="mb-0"
       />
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="min-w-0 space-y-6 lg:col-span-2">
           <section aria-label="Aperçu du document" className="rounded-lg border border-border bg-surface p-4 shadow-sm sm:p-8">
             <InvoiceDocument invoice={inv} />

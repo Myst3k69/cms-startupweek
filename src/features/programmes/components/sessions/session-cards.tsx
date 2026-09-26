@@ -132,7 +132,7 @@ export function SessionCards({ events, applications, now, billed }: { events: Ev
     return <EmptyState icon={CalendarX2} title="Aucune session à venir" description="Aucune session à venir ne correspond à ces filtres. Consultez la vue Liste pour l'historique." />;
   }
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {events.map((ev) => (
         <SessionCard key={ev.id} ev={ev} applications={applications} now={now} billing={billed.get(ev.id)} />
       ))}

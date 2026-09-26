@@ -50,7 +50,7 @@ function PaymentForm({ invoice, now, onDone }: { invoice: Invoice; now: number; 
 
   return (
     <form id="record-payment" onSubmit={submit} className="space-y-4" noValidate>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label="Montant (€ TTC)" htmlFor="pay-amount" error={errors.amount} hint={cents !== null && cents > balance ? `Trop-perçu de ${money(cents - balance, true)}` : `Reste dû : ${money(balance, true)}`}>
           <Input id="pay-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
         </FormField>

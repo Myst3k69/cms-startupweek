@@ -110,7 +110,7 @@ export function WatchPage() {
       />
       <QualiopiNav />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {perKind.map((k) => (
           <button
             key={k.kind}
@@ -304,7 +304,7 @@ function WatchItemForm({ item, defaultKind, onClose }: { item?: WatchItem; defau
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FormField label="Type de veille" htmlFor="w-kind" className="sm:col-span-2">
           <Select id="w-kind" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as WatchKind })} options={WATCH_KINDS} />
         </FormField>
@@ -315,7 +315,7 @@ function WatchItemForm({ item, defaultKind, onClose }: { item?: WatchItem; defau
       <FormField label="Titre" htmlFor="w-title" error={errors.title}>
         <Input id="w-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex. Décret relatif au compte personnel de formation" />
       </FormField>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Source" htmlFor="w-source" error={errors.source}>
           <Input id="w-source" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="Légifrance, Centre Inffo, Agefiph…" />
         </FormField>

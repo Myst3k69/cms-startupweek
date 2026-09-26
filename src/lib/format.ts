@@ -54,6 +54,7 @@ export function dateRange(start: string, end: string): string {
   const s = toDate(start);
   const e = toDate(end);
   if (!s || !e) return "—";
+  if (s.toDateString() === e.toDateString()) return format(s, "d MMM yyyy", { locale: fr });
   if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) {
     return `${format(s, "d", { locale: fr })} → ${format(e, "d MMM yyyy", { locale: fr })}`;
   }

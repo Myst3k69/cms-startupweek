@@ -118,7 +118,7 @@ export function TemplatesView() {
   };
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[320px_1fr]">
       <Card className="h-fit">
         <div className="space-y-2 border-b border-border p-3">
           <div className="relative">
@@ -226,7 +226,7 @@ function TemplateEditor({ template, editable, usage, onDuplicated }: { template:
   };
 
   return (
-    <div className="grid min-w-0 gap-5 xl:grid-cols-2">
+    <div className="grid grid-cols-1 min-w-0 gap-5 xl:grid-cols-2">
       <Card className="min-w-0">
         <CardHeader>
           <div className="min-w-0">
@@ -243,7 +243,7 @@ function TemplateEditor({ template, editable, usage, onDuplicated }: { template:
         </CardHeader>
         <CardContent>
           <fieldset disabled={!editable} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField label="Nom" htmlFor="tpl-name" error={errors.name}>
                 <Input id="tpl-name" value={name} onChange={(e) => setName(e.target.value)} />
               </FormField>

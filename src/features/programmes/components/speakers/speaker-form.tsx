@@ -80,7 +80,7 @@ export function parseSpeakerDraft(d: SpeakerDraft): { ok: true; data: Omit<Speak
 export function SpeakerFields({ value, onChange, errors, idPrefix = "spk" }: { value: SpeakerDraft; onChange: (v: SpeakerDraft) => void; errors: Record<string, string>; idPrefix?: string }) {
   const set = <K extends keyof SpeakerDraft>(k: K, v: SpeakerDraft[K]) => onChange({ ...value, [k]: v });
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <FormField label="Prénom" htmlFor={`${idPrefix}-first`} error={errors.firstName}>
         <Input id={`${idPrefix}-first`} value={value.firstName} onChange={(e) => set("firstName", e.target.value)} />
       </FormField>

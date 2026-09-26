@@ -137,7 +137,7 @@ export function ProjectFormModal({
       }
     >
       <form
-        className="grid gap-4 sm:grid-cols-2"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2"
         onSubmit={(e) => {
           e.preventDefault();
           submit();

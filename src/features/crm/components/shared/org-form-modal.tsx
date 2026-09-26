@@ -134,7 +134,7 @@ function OrgFormInner({ onClose, organization, onSaved }: Props) {
           submit();
         }}
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField label="Nom" htmlFor="org-name" error={errors.name} className="sm:col-span-2">
             <Input id="org-name" value={v.name} onChange={(e) => set("name", e.target.value)} autoFocus />
           </FormField>

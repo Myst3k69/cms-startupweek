@@ -26,7 +26,7 @@ export function GrowthSection({ now }: { now: number }) {
   const cohorts = React.useMemo(() => alumniRebuy(applications, invoices, events, offers, now), [applications, invoices, events, offers, now]);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card>
         <CardHeader className="flex-wrap">
           <div>
@@ -81,7 +81,7 @@ export function GrowthSection({ now }: { now: number }) {
           {cohorts.alumni === 0 ? (
             <NoData>Aucune session terminée avec des inscrits.</NoData>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[280px] text-xs">
                   <thead>

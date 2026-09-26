@@ -287,13 +287,13 @@ function ContactView({ contact, initialTab }: { contact: Contact; initialTab?: s
       <Tabs value={tab} onChange={setTab} tabs={tabs} className="mb-5" />
 
       {tab === "apercu" ? (
-        <div className="grid gap-5 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Informations</CardTitle>
               <span className="text-xs text-muted-foreground">Modifiables en place</span>
             </CardHeader>
-            <CardContent className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+            <CardContent className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
               <InlineField label="Téléphone" kind="tel" value={contact.phone ?? ""} disabled={!editable} onSave={(v) => save({ phone: v || undefined }, "Téléphone modifié")} />
               <InlineField label="Fonction" value={contact.jobTitle ?? ""} disabled={!editable} onSave={(v) => save({ jobTitle: v || undefined }, "Fonction modifiée")} />
               <InlineField label="Ville" value={contact.city ?? ""} disabled={!editable} onSave={(v) => save({ city: v || undefined }, "Ville modifiée")} />
@@ -421,7 +421,7 @@ function ContactView({ contact, initialTab }: { contact: Contact; initialTab?: s
 
       {tab === "projets" ? (
         myProjects.length ? (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {myProjects.map((p) => (
               <Card key={p.id} interactive className="p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -444,7 +444,7 @@ function ContactView({ contact, initialTab }: { contact: Contact; initialTab?: s
 
       {tab === "factures" ? (
         <div className="space-y-5">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Card className="p-4">
               <p className="text-xs text-muted-foreground">Total facturé (TTC)</p>
               <p className="tabular mt-1 text-xl font-semibold text-foreground">{money(money3.billed)}</p>

@@ -220,7 +220,7 @@ function DrawerBody({ sub, onClose }: { sub: Submission; onClose: () => void }) 
           ) : null}
 
           {editable ? (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <label htmlFor="sub-assignee" className="text-xs font-medium text-muted-foreground">
                   Assignée à

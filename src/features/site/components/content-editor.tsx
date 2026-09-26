@@ -339,7 +339,7 @@ function EditorInner({ item }: { item: ContentItem }) {
         <p className="mb-4 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-muted-foreground">Lecture seule : votre rôle ne permet pas de modifier les contenus.</p>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-6">
           <Card>
             <CardContent className="space-y-4 pt-5">

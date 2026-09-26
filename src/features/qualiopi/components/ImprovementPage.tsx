@@ -105,7 +105,7 @@ export function ImprovementPage() {
       />
       <QualiopiNav />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Actions ouvertes" value={stats.open} hint={`${actions.length} au plan`} icon={ClipboardList} />
         <StatCard label="En retard" value={stats.late} hint={stats.late ? "Échéance dépassée" : "Aucune action en retard"} icon={CalendarClock} />
         <StatCard label="Réalisées (12 mois)" value={stats.doneYear} hint={stats.leadTime !== null ? `Délai moyen de réalisation : ${fmt1(stats.leadTime)} j` : undefined} icon={CheckCircle2} />

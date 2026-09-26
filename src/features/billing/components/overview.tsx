@@ -144,7 +144,7 @@ export function BillingOverview({
         <StatCard label="Frais Stripe du mois" value={money(kpis.stripeFees, true)} hint={kpis.stripeFees ? `${kpis.stripeRate.toFixed(2).replace(".", ",")} % du volume carte` : "Aucun paiement carte ce mois-ci"} icon={CreditCard} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-12">
         <Card className="lg:col-span-2 xl:col-span-6">
           <CardHeader>
             <div>

@@ -65,7 +65,7 @@ function OfferForm({ offer, onDone }: { offer?: Offer; onDone: () => void }) {
   };
 
   return (
-    <form id="offer-form" onSubmit={submit} className="grid gap-4 sm:grid-cols-2" noValidate>
+    <form id="offer-form" onSubmit={submit} className="grid grid-cols-1 gap-4 sm:grid-cols-2" noValidate>
       <FormField label="Nom de l'offre" htmlFor="of-name" error={errors.name} className="sm:col-span-2">
         <Input id="of-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
       </FormField>

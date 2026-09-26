@@ -131,7 +131,7 @@ export function MarkdownEditor({ value, onChange, disabled, id }: { value: strin
           <MarkdownPreview source={value} />
         </div>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {textarea}
           <div className="max-h-[640px] min-h-[420px] overflow-y-auto rounded-md border border-border bg-surface px-4 py-3">
             <MarkdownPreview source={value} />

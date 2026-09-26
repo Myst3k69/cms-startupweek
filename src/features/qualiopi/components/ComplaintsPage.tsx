@@ -161,7 +161,7 @@ export function ComplaintsPage() {
       />
       <QualiopiNav />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Réclamations ouvertes" value={stats.open} hint={`${stats.majorOpen} majeure(s) · ${stats.total} au registre`} icon={MessageSquareWarning} />
         <StatCard label="Délai moyen d'accusé" value={fmtHours(stats.avgAckHours)} hint={`Engagement : ${ackLimit} h`} icon={Timer} />
         <StatCard label="Délai moyen de clôture" value={fmtDays(stats.avgCloseDays)} hint={stats.satisfiedPct !== null ? `${fmtPct(stats.satisfiedPct)} de réclamants satisfaits` : "Satisfaction non renseignée"} icon={Hourglass} />

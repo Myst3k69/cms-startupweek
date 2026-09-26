@@ -96,7 +96,7 @@ function CreateForm({ onClose, onCreated }: { onClose: () => void; onCreated: (i
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Numéro" htmlFor="rec-number" hint="Attribué automatiquement">
           <Input id="rec-number" value={number} readOnly className="font-mono" />
         </FormField>

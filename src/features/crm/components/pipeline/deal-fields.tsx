@@ -89,7 +89,7 @@ export function DealFields({ value, onChange, errors, disabled, idPrefix = "deal
   const id = (k: string) => `${idPrefix}-${k}`;
 
   return (
-    <fieldset disabled={disabled} className="grid gap-4 sm:grid-cols-2">
+    <fieldset disabled={disabled} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <FormField label="Intitulé" htmlFor={id("title")} error={errors.title} className="sm:col-span-2">
         <Input id={id("title")} value={value.title} onChange={(e) => onChange({ title: e.target.value })} placeholder="Startup Village — Kedge 2027" />
       </FormField>

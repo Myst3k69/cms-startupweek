@@ -146,7 +146,7 @@ function ContactFormInner({ onClose, contact, onSaved }: Props) {
           submit();
         }}
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField label="Prénom" htmlFor="ct-first" error={errors.firstName}>
             <Input id="ct-first" value={v.firstName} onChange={(e) => set("firstName", e.target.value)} autoFocus />
           </FormField>

@@ -79,7 +79,7 @@ export function SequencesView() {
           </div>
         </CardHeader>
         <CardContent>
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {N8N_GAPS.map((g) => {
               const seqs = byTrigger.get(g.trigger) ?? [];
               const active = seqs.some((s) => s.active);
@@ -133,7 +133,7 @@ export function SequencesView() {
       {sorted.length === 0 ? (
         <EmptyState icon={Workflow} title="Aucune séquence" description="Créez une séquence pour automatiser vos relances." />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {sorted.map((s) => (
             <Card key={s.id} className={s.active ? undefined : "opacity-80"}>
               <CardHeader>

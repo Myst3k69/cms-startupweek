@@ -117,7 +117,7 @@ export function OrganisationsPage({ initial }: { initial: { type?: string; statu
           ) : null
         }
       />
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Organisations" value={stats.total} icon={Building2} hint={`${stats.schools} écoles / universités`} />
         <StatCard label="Clients" value={stats.clients} icon={Euro} hint="Au moins une vente conclue" />
         <StatCard label="Partenaires" value={stats.partners} icon={Handshake} hint="Lieux, médias, financeurs, écoles" />

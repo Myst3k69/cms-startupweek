@@ -164,7 +164,7 @@ export function DisabilityPage() {
       />
       <QualiopiNav />
 
-      <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <Card>
           <CardHeader>
             <div>
@@ -210,7 +210,7 @@ export function DisabilityPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <StatCard label="Besoins déclarés" value={rows.length} hint={`${upcomingRows.length} pour une session à venir`} icon={Accessibility} />
           <StatCard label="Traités" value={`${treated.length}/${rows.length}`} hint="Aménagements définis et tracés" icon={CheckCircle2} />
           <StatCard label="Non traités" value={rows.length - treated.length} hint={rows.length - treated.length ? "À analyser avec la personne" : "Tous les besoins sont traités"} icon={CircleAlert} />
@@ -237,7 +237,7 @@ export function DisabilityPage() {
         <p className="mt-2 text-xs text-muted-foreground">Données de santé : ne consigner que le besoin d'adaptation, jamais le diagnostic. Accès limité aux personnes habilitées.</p>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <div>

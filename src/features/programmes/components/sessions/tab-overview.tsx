@@ -208,7 +208,7 @@ function InfoCard({ ev, canEdit }: { ev: EventSession; canEdit: boolean }) {
       <CardContent>
         {draft ? (
           <form
-            className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
             onSubmit={(e) => {
               e.preventDefault();
               save();
@@ -502,7 +502,7 @@ export function OverviewTab({ ev, data, canEdit }: { ev: EventSession; data: Ses
         </ul>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <InfoCard ev={ev} canEdit={canEdit} />
         </div>

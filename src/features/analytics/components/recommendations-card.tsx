@@ -64,7 +64,7 @@ export function RecommendationsCard({ range, now }: { range: Range; now: number 
         </div>
       </CardHeader>
       <CardContent>
-        <ul className="grid gap-2 md:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
           {recos.slice(0, 8).map((r) => {
             const Icon = ICON[r.tone];
             return (

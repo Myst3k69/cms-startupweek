@@ -21,7 +21,7 @@ export function AcquisitionSection({ period, range, now }: { period: Period; ran
   const sourcesTotal = donut.reduce((s, d) => s + d.value, 0);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <Card className="lg:col-span-2">
         <CardHeader>
           <div>
