@@ -7,7 +7,7 @@ import { Badge, Button, StatusBadge } from "@/components/ui";
 import { ContactLink, OrgLink } from "@/components/shared/entity-links";
 import { INVOICE_STATUSES, QUOTE_STATUSES } from "@/lib/domain/constants";
 import { effectiveInvoiceStatus } from "@/lib/domain/selectors";
-import type { ID, Invoice, Quote } from "@/lib/domain/types";
+import type { ID, Invoice, InvoiceKind, PaymentMethod, Quote } from "@/lib/domain/types";
 import { cn } from "@/lib/utils";
 import { CONFIDENCE_LABEL, DAY, effectiveQuoteStatus, type BillingLookups, type Confidence } from "../lib";
 
@@ -19,8 +19,17 @@ export function useBillingLookups(): BillingLookups {
   return React.useMemo(() => ({ contacts, orgs, events, applications }), [contacts, orgs, events, applications]);
 }
 
-/** Client d'une pièce : organisation (B2B) avec contact en second, sinon contact (B2C). */
-export function PartyCell({ doc, className }: { doc: { orgId?: ID; contactId?: ID }; className?: string }) {
+export const KIND_SHORT: Record<InvoiceKind, string> = { facture: "Facture", acompte: "Acompte", solde: "Solde", avoir: "Avoir" };
+export const METHOD_SHORT: Record<PaymentMethod, string> = { stripe: "Stripe", virement: "Virement", opco: "OPCO", cb_terminal: "CB", cheque: "Chèque" };
+
+/**
+ * Client d'une pièce : organisation (B2B) avec contact en second, sinon contact (B2C).
+ * `compact` : une seule ligne tronquée (tables denses).
+ */
+export function PartyCell({ doc, className, compact }: { doc: { orgId?: ID; contactId?: ID }; className?: string; compact?: boolean }) {
+  if (compact) {
+    return doc.orgId ? <OrgLink id={doc.orgId} className={cn("block truncate font-medium", className)} /> : <ContactLink id={doc.contactId} className={cn("block truncate", className)} />;
+  }
   if (doc.orgId) {
     return (
       <span className={cn("block min-w-0", className)}>

@@ -6,6 +6,32 @@ import type { Evaluation, EventSession, ProgramSlot } from "@/lib/domain/types";
 
 export const DAY = 86_400_000;
 
+/**
+ * Public d'une session :
+ * - « b2c » : StartupWeek ouverte aux particuliers → candidatures individuelles, jauge, seuil minimum ;
+ * - « b2b » : session commandée par une organisation (orgId : Startup Village école, Innovation Sprint…) →
+ *   participants gérés par le client, devis / facture globale, pas de candidatures ;
+ * - « ouvert » : webinaire ou événement gratuit → inscriptions hors CRM, ni candidatures ni jauge.
+ */
+export type SessionAudience = "b2c" | "b2b" | "ouvert";
+
+export function sessionAudience(ev: Pick<EventSession, "orgId" | "kind">): SessionAudience {
+  if (ev.orgId) return "b2b";
+  if (ev.kind === "startup_week") return "b2c";
+  return "ouvert";
+}
+
+export const hasApplications = (ev: Pick<EventSession, "orgId" | "kind">) => sessionAudience(ev) === "b2c";
+
+/** Libellé court du public (« Webinaire gratuit », « Session B2B »…). */
+export function audienceLabel(ev: Pick<EventSession, "orgId" | "kind" | "priceCents">): string {
+  const a = sessionAudience(ev);
+  if (a === "b2b") return "Session B2B";
+  if (a === "b2c") return "StartupWeek";
+  if (ev.kind === "webinaire") return ev.priceCents ? "Webinaire" : "Webinaire gratuit";
+  return ev.priceCents ? "Événement" : "Événement gratuit";
+}
+
 export interface SessionDay {
   /** 1…n (J1, J2…) */
   index: number;

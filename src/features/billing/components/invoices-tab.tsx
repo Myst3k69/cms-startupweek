@@ -12,7 +12,7 @@ import { Button, DataTable, LinkButton, Segmented, useToast, type Column, type F
 import { SessionLink } from "@/components/shared/entity-links";
 import { accountingAmount, displayNumber, downloadCsv, isCollectible, isNumbered, numberingAudit, partyName } from "../lib";
 import { runReminderStep, sendDueSoonNotice } from "../actions";
-import { DueHint, InvoiceStatusBadge, PartyCell, useBillingLookups } from "./shared";
+import { DueHint, InvoiceStatusBadge, KIND_SHORT, METHOD_SHORT, PartyCell, useBillingLookups } from "./shared";
 
 export type InvoiceStatusFilter = InvoiceStatus | "tous";
 
@@ -64,11 +64,11 @@ export function InvoicesTab({ status, onStatusChange }: { status: InvoiceStatusF
       {
         key: "number",
         header: "Numéro",
-        render: (i) => <span className={i.number ? "font-mono text-xs font-medium" : "text-xs italic text-muted-foreground"}>{displayNumber(i)}</span>,
+        render: (i) => <span className={i.number ? "whitespace-nowrap font-mono text-xs font-medium" : "whitespace-nowrap text-xs italic text-muted-foreground"}>{displayNumber(i)}</span>,
         sort: (i) => i.number || "~",
       },
-      { key: "kind", header: "Type", render: (i) => <span className="text-xs text-muted-foreground">{labelOf(INVOICE_KINDS, i.kind)}</span>, sort: (i) => labelOf(INVOICE_KINDS, i.kind), hideBelow: "md" },
-      { key: "client", header: "Client", render: (i) => <PartyCell doc={i} />, sort: (i) => partyName(i, lk), className: "max-w-56" },
+      { key: "kind", header: "Type", render: (i) => <span className="whitespace-nowrap text-xs text-muted-foreground">{KIND_SHORT[i.kind]}</span>, sort: (i) => KIND_SHORT[i.kind], csv: (i) => labelOf(INVOICE_KINDS, i.kind), hideBelow: "lg" },
+      { key: "client", header: "Client", render: (i) => <PartyCell doc={i} compact />, sort: (i) => partyName(i, lk), className: "max-w-40 xl:max-w-48" },
       { key: "session", header: "Session", render: (i) => (i.eventId ? <SessionLink id={i.eventId} short /> : <span className="text-faint">—</span>), csv: (i) => (i.eventId ? lk.events.get(i.eventId)?.code ?? "" : ""), hideBelow: "lg" },
       { key: "issued", header: "Émise le", render: (i) => <span className="tabular whitespace-nowrap text-xs">{i.number ? date(i.issuedAt) : "—"}</span>, sort: (i) => i.issuedAt, csv: (i) => (i.number ? date(i.issuedAt, "dd/MM/yyyy") : ""), hideBelow: "sm" },
       {
@@ -85,20 +85,27 @@ export function InvoicesTab({ status, onStatusChange }: { status: InvoiceStatusF
         hideBelow: "md",
       },
       { key: "ttc", header: "Total TTC", align: "right", render: (i) => <span className="whitespace-nowrap font-medium">{money(invoiceTotal(i).ttc, true)}</span>, sort: (i) => invoiceTotal(i).ttc, csv: (i) => accountingAmount(invoiceTotal(i).ttc) },
-      { key: "paid", header: "Payé", align: "right", render: (i) => <span className="whitespace-nowrap text-muted-foreground">{money(i.paidCents, true)}</span>, sort: (i) => i.paidCents, csv: (i) => accountingAmount(i.paidCents), hideBelow: "xl" },
+      // Colonne « Payé » visible sur très grand écran seulement (le reste dû affiche déjà la part réglée) ; toujours exportée.
+      { key: "paid", header: "Payé", align: "right", render: (i) => <span className="whitespace-nowrap text-muted-foreground">{money(i.paidCents, true)}</span>, sort: (i) => i.paidCents, csv: (i) => accountingAmount(i.paidCents), className: "hidden 2xl:table-cell", headerClassName: "hidden 2xl:table-cell" },
       {
         key: "balance",
         header: "Reste",
         align: "right",
         render: (i) => {
           const b = i.kind === "avoir" || i.status === "annulee" ? 0 : Math.max(0, invoiceBalance(i));
-          return <span className={b > 0 ? "whitespace-nowrap font-medium" : "text-faint"}>{b > 0 ? money(b, true) : "—"}</span>;
+          if (b <= 0) return <span className="text-faint">—</span>;
+          return (
+            <span className="whitespace-nowrap">
+              <span className="font-medium">{money(b, true)}</span>
+              {i.paidCents > 0 ? <span className="block text-xs text-muted-foreground 2xl:hidden">payé {money(i.paidCents)}</span> : null}
+            </span>
+          );
         },
         sort: (i) => (i.kind === "avoir" || i.status === "annulee" ? 0 : invoiceBalance(i)),
         csv: (i) => accountingAmount(i.kind === "avoir" || i.status === "annulee" ? 0 : Math.max(0, invoiceBalance(i))),
       },
       { key: "status", header: "Statut", render: (i) => <InvoiceStatusBadge inv={i} now={now} />, sort: (i) => STATUS_ORDER.indexOf(effectiveInvoiceStatus(i, now)), csv: (i) => labelOf(INVOICE_STATUSES, effectiveInvoiceStatus(i, now)) },
-      { key: "method", header: "Moyen", render: (i) => <span className="text-xs text-muted-foreground">{labelOf(PAYMENT_METHODS, i.preferredMethod)}</span>, sort: (i) => labelOf(PAYMENT_METHODS, i.preferredMethod), hideBelow: "xl" },
+      { key: "method", header: "Moyen", render: (i) => <span className="whitespace-nowrap text-xs text-muted-foreground" title={labelOf(PAYMENT_METHODS, i.preferredMethod)}>{METHOD_SHORT[i.preferredMethod]}</span>, sort: (i) => METHOD_SHORT[i.preferredMethod], csv: (i) => labelOf(PAYMENT_METHODS, i.preferredMethod), hideBelow: "xl" },
     ],
     [lk, now],
   );
