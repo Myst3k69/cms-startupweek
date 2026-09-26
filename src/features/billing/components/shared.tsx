@@ -46,10 +46,11 @@ export function PartyCell({ doc, className, compact }: { doc: { orgId?: ID; cont
 }
 
 export function InvoiceStatusBadge({ inv, now, className }: { inv: Invoice; now: number; className?: string }) {
-  if (inv.kind === "avoir" && inv.status === "emise") {
+  if (inv.kind === "avoir" && inv.status !== "brouillon") {
+    const [label, tone] = inv.status === "payee" ? (["Avoir soldé", "success"] as const) : inv.status === "annulee" ? (["Avoir annulé", "neutral"] as const) : (["Avoir émis", "violet"] as const);
     return (
-      <Badge tone="violet" dot className={className}>
-        Avoir émis
+      <Badge tone={tone} dot className={className}>
+        {label}
       </Badge>
     );
   }

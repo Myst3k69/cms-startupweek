@@ -36,10 +36,21 @@ function reply(status: number, body: Record<string, unknown>, headers: Record<st
   return Response.json(body, { status, headers: { ...headers, ...extra, "Cache-Control": "no-store" } });
 }
 
+/** Origines autorisées + l'origine du back-office lui-même (testeur de formulaire de /automatisations). */
+function allowedFor(request: Request): string[] {
+  const own = new Set<string>([new URL(request.url).origin]);
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (host) {
+    own.add(`https://${host}`);
+    own.add(`http://${host}`);
+  }
+  return [...allowedOrigins(), ...own];
+}
+
 /** Pré-vol CORS (appel direct depuis le navigateur ; le site passe normalement par ses routes serveur). */
 export async function OPTIONS(request: Request): Promise<Response> {
   const origin = request.headers.get("origin");
-  const allowed = allowedOrigins();
+  const allowed = allowedFor(request);
   if (!isOriginAllowed(origin, allowed)) return new Response(null, { status: 403, headers: { Vary: "Origin" } });
   return new Response(null, { status: 204, headers: corsHeaders(origin, allowed) });
 }
@@ -47,7 +58,7 @@ export async function OPTIONS(request: Request): Promise<Response> {
 export async function POST(request: Request, { params }: Ctx): Promise<Response> {
   const { form } = await params;
   const origin = request.headers.get("origin");
-  const allowed = allowedOrigins();
+  const allowed = allowedFor(request);
   const cors = corsHeaders(origin, allowed);
 
   if (!isIntakeForm(form)) return reply(404, { ok: false, error: "UNKNOWN_FORM" }, cors);

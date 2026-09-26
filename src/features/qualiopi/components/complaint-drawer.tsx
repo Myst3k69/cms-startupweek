@@ -146,10 +146,12 @@ function ComplaintDetail({ complaint }: { complaint: Complaint }) {
               <span>
                 {now > ackLimit ? (
                   <>
-                    <strong>Accusé de réception en retard</strong> — échéance dépassée {relative(new Date(ackLimit).toISOString(), now)} (engagement {settings.complaintAckHours} h).
+                    <strong>Accusé de réception en retard</strong> — échéance du {dateTime(new Date(ackLimit).toISOString())} dépassée de {fmtHours((now - ackLimit) / HOUR)} (engagement {settings.complaintAckHours} h).
                   </>
                 ) : (
-                  <>Accusé de réception à envoyer {relative(new Date(ackLimit).toISOString(), now)} (engagement {settings.complaintAckHours} h).</>
+                  <>
+                    Accusé de réception à envoyer avant le {dateTime(new Date(ackLimit).toISOString())} — reste {fmtHours((ackLimit - now) / HOUR)} (engagement {settings.complaintAckHours} h).
+                  </>
                 )}
                 {!complaint.contactId ? <span className="block text-xs text-muted-foreground">Réclamant non identifié : l'accusé sera seulement horodaté.</span> : null}
               </span>

@@ -109,13 +109,18 @@ export function LineChart({
   const [hover, setHover] = React.useState<number | null>(null);
   const pad = { l: 44, r: 12, t: 12, b: 24 };
   const n = labels.length;
-  const rawMax = Math.max(0, ...series.flatMap((s) => s.values));
-  const { max, step } = niceMax(rawMax);
+  const all = series.flatMap((s) => s.values);
+  const rawMax = Math.max(0, ...all);
+  const rawMin = Math.min(0, ...all);
+  // Échelle unique incluant zéro ; gère les valeurs négatives (ex : NPS).
+  const { step } = niceMax(Math.max(rawMax, -rawMin, rawMax - rawMin));
+  const max = Math.max(step, Math.ceil(rawMax / step) * step);
+  const min = rawMin < 0 ? Math.floor(rawMin / step) * step : 0;
   const iw = Math.max(0, width - pad.l - pad.r);
   const ih = height - pad.t - pad.b;
   const x = (i: number) => pad.l + (n <= 1 ? iw / 2 : (i / (n - 1)) * iw);
-  const y = (v: number) => pad.t + ih - (v / max) * ih;
-  const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => i * step);
+  const y = (v: number) => pad.t + ih - ((v - min) / (max - min)) * ih;
+  const ticks = Array.from({ length: Math.round((max - min) / step) + 1 }, (_, i) => min + i * step);
   const labelEvery = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(iw / 64))));
 
   const onMove = (e: React.MouseEvent<SVGRectElement>) => {
@@ -450,7 +455,7 @@ export function Funnel({ steps, className, format = defaultFmt }: { steps: { lab
 
 export function CalendarHeatmap({ days, className, format = defaultFmt }: { days: { date: string; value: number }[]; className?: string; format?: (v: number) => string }) {
   const max = Math.max(1, ...days.map((d) => d.value));
-  const steps = ["var(--surface-2)", "#b7d3f6", "#86b6ef", "#5598e7", "#2a78d6", "#1c5cab"];
+  const steps = ["var(--surface-2)", "var(--seq-1)", "var(--seq-2)", "var(--seq-3)", "var(--seq-4)", "var(--seq-5)"];
   const weeks: { date: string; value: number }[][] = [];
   days.forEach((d, i) => {
     if (i % 7 === 0) weeks.push([]);

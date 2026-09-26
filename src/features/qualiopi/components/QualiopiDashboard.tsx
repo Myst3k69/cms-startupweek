@@ -230,7 +230,7 @@ export function QualiopiDashboard() {
             </p>
           </div>
 
-          <div className="p-4 sm:p-5">
+          <div className="p-4 sm:p-5 md:border-t md:border-border xl:border-t-0">
             <p className="eyebrow text-muted-foreground">Répartition des 32 indicateurs</p>
             <div className="mt-3 flex h-3 w-full overflow-hidden rounded-full bg-surface-2" role="img" aria-label={INDICATOR_STATUSES.map((s) => `${s.label} ${counts[s.value]}`).join(", ")}>
               {INDICATOR_STATUSES.map((s) =>
@@ -258,7 +258,7 @@ export function QualiopiDashboard() {
             </ul>
           </div>
 
-          <div className="space-y-3 p-4 sm:p-5 md:border-l md:border-border xl:border-l-0">
+          <div className="space-y-3 p-4 sm:p-5 md:border-l md:border-t md:border-border xl:border-l-0 xl:border-t-0">
             <p className="eyebrow text-muted-foreground">Référents</p>
             {[
               { role: "Référent qualité", user: qualityLead },

@@ -8,7 +8,7 @@ import { ACTIVE_PIPELINE, contactName, isRunning, isUpcoming } from "@/lib/domai
 import type { Application } from "@/lib/domain/types";
 import { date, money, percent } from "@/lib/format";
 import { useCollection, useLookup, useNow, useSession } from "@/lib/hooks";
-import { DAY } from "../../lib/sessions";
+import { DAY, hasApplications } from "../../lib/sessions";
 import { replaceQuery } from "../../lib/url";
 import { ApplicationBoard, type BoardSort } from "./application-board";
 import { ApplicationList } from "./application-list";
@@ -47,7 +47,7 @@ export function ApplicationsPage({ initialView, initialSession, initialPersona, 
   const [sort, setSort] = React.useState<BoardSort>("recent");
 
   const upcomingEvents = React.useMemo(
-    () => eventsList.filter((e) => isUpcoming(e, now) || isRunning(e, now)).sort((a, b) => a.startAt.localeCompare(b.startAt)),
+    () => eventsList.filter((e) => hasApplications(e) && (isUpcoming(e, now) || isRunning(e, now))).sort((a, b) => a.startAt.localeCompare(b.startAt)),
     [eventsList, now],
   );
   const upcomingIds = React.useMemo(() => new Set(upcomingEvents.map((e) => e.id)), [upcomingEvents]);

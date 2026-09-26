@@ -13,12 +13,14 @@ import { crm, findById } from "@/lib/store";
 import type {
   Application,
   ApplicationStatus,
+  Contact,
   EmailTemplate,
   EntityRef,
   ID,
   Invoice,
   InvoiceKind,
   LineItem,
+  Organization,
   PaymentMethod,
   Priority,
   Submission,
@@ -314,7 +316,7 @@ export function ensureContactFromSubmission(sub: Submission): ID {
       email,
       phone: sub.phone,
       lifecycle: "lead",
-      source: (({ candidature: "site_candidature", contact: "site_contact", entreprise: "site_entreprise", accompagnement: "site_accompagnement", partenariat: "site_partenariat", digital_starter_kit: "digital_starter_kit", reclamation: "site_contact", newsletter: "newsletter" }) as const)[sub.type],
+      source: SOURCE_BY_TYPE[sub.type],
       utm: sub.utm,
       tags: sub.type === "digital_starter_kit" ? ["Digital Starter Kit"] : sub.type === "newsletter" ? ["Newsletter"] : [],
       consent: sub.consent,
@@ -326,13 +328,47 @@ export function ensureContactFromSubmission(sub: Submission): ID {
   return c.id;
 }
 
-/** Qualifie une demande : contact + opportunité (entreprise / partenariat / accompagnement). */
+const SOURCE_BY_TYPE: Record<Submission["type"], Contact["source"]> = {
+  candidature: "site_candidature",
+  contact: "site_contact",
+  entreprise: "site_entreprise",
+  accompagnement: "site_accompagnement",
+  partenariat: "site_partenariat",
+  digital_starter_kit: "digital_starter_kit",
+  reclamation: "site_contact",
+  newsletter: "newsletter",
+};
+
+const orgKey = (name: string) =>
+  name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\b(sas|sasu|sarl|eurl|sa)\b/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+/** Retrouve une organisation par nom normalisé (« ACME SAS » = « Acmé ») ou la crée. */
+export function ensureOrganization(name: string, type: Organization["type"]): ID {
+  const s = crm();
+  const key = orgKey(name);
+  const existing = s.organizations.find((o) => orgKey(o.name) === key);
+  if (existing) return existing.id;
+  return s.create("organizations", { name: name.trim(), type, status: "prospect", tags: [], ownerId: s.sessionUserId }, { log: "Organisation créée depuis une demande entrante" }).id;
+}
+
+/** Qualifie une demande : contact + opportunité (entreprise / partenariat / accompagnement), organisation rattachée. */
 export function convertSubmission(subId: ID, to: "contact" | "deal") {
   const s = crm();
   const sub = findById("submissions", subId);
   if (!sub) return;
   const contactId = sub.contactId ?? ensureContactFromSubmission(sub);
-  const patch: Partial<Submission> = { contactId, status: "convertie", answeredAt: sub.answeredAt ?? iso(nowMs()) };
+  const orgId = sub.orgId ?? (sub.company ? ensureOrganization(sub.company, sub.type === "partenariat" ? "autre" : "entreprise") : undefined);
+  if (orgId) {
+    const c = findById("contacts", contactId);
+    if (c && !c.orgId) s.update("contacts", c.id, { orgId });
+  }
+  const patch: Partial<Submission> = { contactId, orgId, status: "convertie", answeredAt: sub.answeredAt ?? iso(nowMs()) };
   if (to === "deal" && !sub.dealId) {
     const type = sub.type === "partenariat" ? "partenariat" : sub.type === "accompagnement" ? "accompagnement" : "entreprise";
     const deal = s.create(
@@ -344,8 +380,9 @@ export function convertSubmission(subId: ID, to: "contact" | "deal") {
         amountCents: 0,
         probability: 20,
         contactId,
-        ownerId: s.sessionUserId,
-        source: "site_entreprise",
+        orgId,
+        ownerId: sub.assigneeId ?? s.sessionUserId,
+        source: SOURCE_BY_TYPE[sub.type],
         submissionId: sub.id,
         nextStep: "Appel de découverte",
       },
