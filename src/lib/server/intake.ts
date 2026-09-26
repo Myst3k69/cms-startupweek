@@ -1559,13 +1559,10 @@ async function upsertApplication(
     const { data } = await db.from("offers").select("id, code, name").or(`code.ilike.${escapeFilter(draft.offer)},name.ilike.${escapeFilter(draft.offer)}`).limit(1).maybeSingle();
     offerId = ((data as Row | null)?.id as ID | undefined) ?? undefined;
   }
-  const projectId = draft.project ? await createProject(db, draft.project, contactId, session?.id) : undefined;
-
   const application: Partial<Application> = {
     id: newId("app"),
     eventId: session?.id,
     contactId,
-    projectId,
     offerId,
     status: draft.status,
     leadStage: draft.leadStage,
@@ -1584,15 +1581,27 @@ async function upsertApplication(
     idempotencyKey: draft.idempotencyKey,
     utm: draft.utm,
   };
-  const { data, error } = await db.from("applications").insert(toRow(application)).select("id, number").single();
-  if (isUniqueViolation(error) && draft.idempotencyKey) {
+  let { data, error } = await db.from("applications").insert(toRow(application)).select("id, number").single();
+  if (isUniqueViolation(error) && draft.idempotencyKey && /idempotency/.test(error?.message ?? "")) {
     // Deux envois simultanés du même leadId : on relit la candidature gagnante.
     const { data: again, error: againErr } = await db.from("applications").select("id, number").eq("idempotency_key", draft.idempotencyKey).single();
     fail("application.reselect", againErr);
     return { id: (again as Row).id as ID, number: (again as Row).number as number, created: false };
   }
+  if (isUniqueViolation(error) && /number/.test(error?.message ?? "")) {
+    // Numéro déjà pris (séquence en retard sur un numéro saisi à la main) : la base
+    // réaligne sa séquence (trigger applications_number_sync) ; une seconde tentative suffit.
+    ({ data, error } = await db.from("applications").insert(toRow(application)).select("id, number").single());
+  }
   fail("application.insert", error);
-  return { id: (data as Row).id as ID, number: (data as Row).number as number, created: true };
+  const id = (data as Row).id as ID;
+  // Projet créé seulement une fois la candidature enregistrée (pas de projet orphelin en cas d'échec).
+  if (draft.project) {
+    const projectId = await createProject(db, draft.project, contactId, session?.id);
+    const { error: linkErr } = await db.from("applications").update({ project_id: projectId }).eq("id", id);
+    fail("application.project", linkErr);
+  }
+  return { id, number: (data as Row).number as number, created: true };
 }
 
 /** Échappe une valeur pour un filtre PostgREST `.or()` (virgules / parenthèses). */
