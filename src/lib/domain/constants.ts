@@ -419,6 +419,7 @@ export const RESOURCE_FORMATS = opts<ResourceFormat>({
   video: "Vidéo",
   lien: "Lien",
   zip: "Archive",
+  texte: "Texte",
 });
 
 export const VISIBILITIES = opts<Visibility>({
