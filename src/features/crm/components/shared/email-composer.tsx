@@ -22,6 +22,9 @@ export interface EmailComposerProps {
   contactId?: ID;
   related?: EntityRef;
   templateId?: ID;
+  /** Objet / corps par défaut si aucun template n'est fourni. */
+  defaultSubject?: string;
+  defaultBody?: string;
   vars?: Record<string, string | number | undefined>;
   /** Champ destinataire avec recherche de contact (sinon destinataire figé mais modifiable). */
   recipientSearch?: boolean;
@@ -40,7 +43,7 @@ export function EmailComposer(props: EmailComposerProps) {
   return <ComposerInner {...props} />;
 }
 
-function ComposerInner({ onClose, title = "Nouvel email", description, to: initialTo = "", contactId: initialContactId, related, templateId: initialTemplateId, vars: extraVars, recipientSearch, onSent }: EmailComposerProps) {
+function ComposerInner({ onClose, title = "Nouvel email", description, to: initialTo = "", contactId: initialContactId, related, templateId: initialTemplateId, defaultSubject = "", defaultBody = "", vars: extraVars, recipientSearch, onSent }: EmailComposerProps) {
   const templates = useCrm((s) => s.emailTemplates);
   const contacts = useCrm((s) => s.contacts);
   const organizations = useCrm((s) => s.organizations);
@@ -54,8 +57,8 @@ function ComposerInner({ onClose, title = "Nouvel email", description, to: initi
   const [to, setTo] = React.useState(initialTo);
   const [pickedContactId, setPickedContactId] = React.useState<ID | undefined>(initialContactId);
   const [templateId, setTemplateId] = React.useState<string>(initialTpl?.id ?? "");
-  const [subject, setSubject] = React.useState(initialTpl?.subject ?? "");
-  const [body, setBody] = React.useState(initialTpl?.body ?? "");
+  const [subject, setSubject] = React.useState(initialTpl?.subject ?? defaultSubject);
+  const [body, setBody] = React.useState(initialTpl?.body ?? defaultBody);
   const [mode, setMode] = React.useState<"now" | "later">("now");
   const [scheduledAt, setScheduledAt] = React.useState(() => toDateTimeInput(startOfDay(now) + DAY + 9 * 3_600_000));
   const [view, setView] = React.useState<"edit" | "preview">("edit");
