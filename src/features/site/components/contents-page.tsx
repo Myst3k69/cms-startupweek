@@ -67,8 +67,8 @@ export function ContentsPage() {
 
   const moveTo = (item: ContentItem, to: ContentStatus) => {
     if (!editable || item.status === to) return;
+    const kind = siteKind(item.type, item.channel);
     if (to === "publie" || to === "planifie") {
-      const kind = siteKind(item.type, item.channel);
       const missing = kind === "faq" && !item.category ? "la catégorie de FAQ" : kind === "blog" && !item.slug ? "le slug" : null;
       if (missing) {
         toast({ title: "Publication impossible", description: `Renseignez ${missing} dans l'éditeur.`, tone: "danger" });
@@ -81,7 +81,9 @@ export function ContentsPage() {
       const d = new Date(Date.now() + DAY);
       d.setHours(9, 0, 0, 0);
       patch.scheduledAt = d.toISOString();
-      description = `Mise en ligne automatique le ${dateTime(patch.scheduledAt)} (modifiable dans l'éditeur).`;
+      description = kind
+        ? `Mise en ligne automatique le ${dateTime(patch.scheduledAt)} (modifiable dans l'éditeur).`
+        : `Tâche de rappel le ${dateTime(patch.scheduledAt)} (modifiable dans l'éditeur).`;
     }
     if (to === "publie" && !item.publishedAt) patch.publishedAt = new Date().toISOString();
     update("contents", item.id, patch, { log: `Statut : ${labelOf(CONTENT_STATUSES, item.status)} → ${labelOf(CONTENT_STATUSES, to)}`, kind: "statut" });

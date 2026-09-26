@@ -296,13 +296,42 @@ Migration `20260926184846_crm_contents_site_sync.sql`, **appliquée en productio
 | Type « Article de blog », canal **Blog**, slug renseigné | statut **Publié** | `public.blog_post` | `/blog` et `/blog/<slug>` |
 | Type « FAQ » (question = titre, réponse = corps) | statut **Publié** | `public.faq_item` | `/faq` (catégorie + ordre) |
 
-- Tout autre statut (rédaction, relecture, planifié, archivé) ou la suppression retire la ligne publique. La **planification** n'est pas encore automatique : un contenu « Planifié » ne passe pas seul en « Publié » (cron à écrire).
+- Tout autre statut (rédaction, relecture, planifié, archivé) ou la suppression retire la ligne publique. **Planification** : un article de blog ou une question de FAQ « Planifié » passe seul en « Publié » à l'heure prévue (§ 5 ter).
+- **Changement de canal, de type ou de slug** d'un contenu en ligne : l'éditeur demande confirmation (l'article sort du site, ou son ancienne adresse `/blog/<slug>` ne répond plus). Même chose pour « Repasser en rédaction ». Un contenu = un canal : pour annoncer un article sur LinkedIn, créer un second contenu « Post LinkedIn » (bouton *Dupliquer*).
 - Deux articles publiés avec le même slug : le second n'est pas publié, un incident `systeme` l'indique dans le journal ; il est repris dès que le slug se libère.
 - `crm.contents` gagne `category` (rubrique du blog / clé de catégorie FAQ), `sort_order` et `meta` (jsonb : temps de lecture, auteur, points clés, FAQ de l'article, appel à l'action, articles liés, sommaire, image mobile). Éditeur : panneau « Article du blog » / « Page FAQ du site ».
 - **Format du corps** (Markdown étendu, converti en blocs par le site — `lib/blog/markdown.ts` du site) : `## Titre {#h2-ancre}`, paragraphes, `**gras**`, liens `[texte](/url)`, listes `- `, citations `> `, encadrés `> [!info|warning|success|tip] texte`, tableaux `| a | b |`, images `![légende](/image.webp)`.
 - `public.blog_post` / `public.faq_item` : RLS active sans policy, droits retirés à `anon` / `authenticated` ; seul le serveur du site (service_role) les lit.
 - **Repli du site** : tant que la table est vide, non configurée ou en erreur, le site affiche les articles et questions livrés avec son code.
 - **Reprise initiale** : `npx tsx scripts/export-content-for-crm.ts` (dépôt du site) exporte les 34 articles et 41 questions actuels en lignes `crm.contents` (identifiants `cnt_blog_<slug>` / `cnt_faq_<id>`, import rejouable). Vérifié en local (PostgreSQL 16 + PostgREST, site construit sur la base) : 34 articles et la FAQ rendus **à l'identique** (HTML comparé page à page) ; seule la liste `/blog` change l'ordre de deux cartes, désormais triée strictement par date (l'article du 19/08 était placé après celui du 18/08).
+
+## 5 ter. Planificateur (Supabase Cron)
+
+Migration `20260926205030_crm_scheduler.sql`, **appliquée en production le 26/09/2026** : définitions des 4 fonctions identiques (empreintes) à la base de test locale ; première exécution automatique réussie ; scénario rejoué sur la vraie base dans un bloc annulé (article publié et recopié dans `public.blog_post`, post LinkedIn resté « Planifié » avec sa tâche de rappel, rien de conservé) ; aucun nouvel avertissement des *advisors*.
+
+| Tâche `cron.job` | Fréquence (UTC) | Rôle |
+| --- | --- | --- |
+| `crm-scheduler` | chaque minute | `select crm.run_scheduler()` — point d'entrée unique des traitements périodiques du CRM |
+| `crm-cron-purge` | 03:23 chaque jour | efface l'historique `cron.job_run_details` de plus de 7 jours (pg_cron ne purge jamais seul) |
+
+Traitements de `crm.run_scheduler()` (contenus « Planifié » dont l'heure est passée) :
+
+- `crm.publish_due_contents()` — **article de blog (canal Blog) et FAQ**, les seuls contenus que le CRM met lui-même en ligne : statut → « Publié », date de publication = date programmée ; le trigger `contents_site_sync` les recopie vers le site (visible sous 60 s, soit ~2 min au plus après l'heure prévue). Une FAQ sans catégorie ou un article sans slug repasse en « Relecture » avec une trace `systeme` (l'éditeur l'empêche déjà).
+- `crm.remind_due_contents()` — **tous les autres** (LinkedIn, Instagram, newsletter, études de cas…), que le CRM ne publie pas : tâche « Publier sur LinkedIn : « titre » » (priorité haute, assignée à l'auteur, rattachée au contenu, échéance = heure prévue) ; le contenu reste « Planifié » jusqu'à ce qu'on le marque « Publié ». Un seul rappel ouvert par contenu : reprogrammé, le rappel suit la nouvelle date ; publié, archivé, repassé en rédaction ou supprimé, le rappel est clos automatiquement.
+
+Chaque traitement est isolé (un échec n'empêche pas les autres) ; un échec est journalisé dans `crm.activities` (`automations` / `crm-scheduler`), une fois par heure au plus. Coût : une requête indexée par minute, sans appel réseau ni facturation à l'usage ; seul l'historique pg_cron occupe de la place (purgé chaque nuit).
+
+**Ajouter un traitement** (ex. envoi des emails programmés, § 12) : écrire sa fonction dans une nouvelle migration et l'appeler dans `crm.run_scheduler()` (même bloc `begin … exception` que les autres, avec `crm.scheduler_failure('<nom>', sqlerrm, sqlstate)`). Un traitement qui doit appeler l'application (Resend…) passe par `pg_net` (déjà actif) vers une route API protégée.
+
+**Surveiller** (SQL Editor, ou *Integrations → Cron* dans le Dashboard) :
+
+```sql
+select jobname, schedule, active from cron.job;
+select start_time, status, return_message from cron.job_run_details order by start_time desc limit 20;
+select at, summary, meta from crm.activities where entity_id = 'crm-scheduler' order by at desc limit 20;
+```
+
+Si les exécutions s'arrêtent (processus « pg_cron scheduler » absent de `pg_stat_activity`), Supabase recommande un redémarrage rapide du projet (*Settings → General*).
 
 ## 6. Brancher Stripe
 
@@ -442,6 +471,7 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 | Formulaires | Remettre les URLs `N8N_WEBHOOK_*` dans le site et réactiver les 8 workflows. Effet immédiat. |
 | Synchro site | `alter table crm.sessions disable trigger sessions_site_sync; alter table crm.resources disable trigger resources_site_sync; alter table crm.applications disable trigger applications_capacity;` puis réactiver le polling n8n (il réécrit `public.event` depuis Airtable). |
 | Paiements | Désactiver l'endpoint dans Stripe ; retirer le cron Qonto de `vercel.json`. |
+| Planificateur | `select cron.unschedule('crm-scheduler');` (plus de publication ni de rappel automatiques ; les contenus « Planifié » attendent) ; `select cron.unschedule('crm-cron-purge');` ; `drop extension pg_cron;` supprime toutes les tâches. |
 | Tout le CRM | `drop schema crm cascade;` — supprime tables, fonctions et triggers du CRM ; **aucune table `public.*` n'est modifiée structurellement** (seules leurs lignes ont pu être mises à jour par la synchro). Puis `supabase migration repair --status reverted 20260926103012 20260926103117 20260926103336 20260926103516`. |
 | Données | Restauration du backup / PITR pris avant la migration (§ 2.1). |
 
@@ -465,6 +495,7 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 - Envoi réel des emails déclenchés depuis l'interface (§ 3.4) et modèles d'emails en base (`crm.email_templates` vide).
 - Numérotation des factures attribuée par la base plutôt que par l'interface (supprime le risque de doublon simultané, § 3.4).
 - Synchronisation en temps réel entre collègues (Supabase Realtime) — aujourd'hui : bouton *Recharger depuis la base*.
-- Envoi des emails programmés (`crm.email_messages` au statut `programme`, ex. séquence Digital Starter Kit) : un cron d'envoi reste à écrire ; seuls les accusés de réception sont envoyés immédiatement.
+- Envoi des emails programmés (`crm.email_messages` au statut `programme`, ex. séquence Digital Starter Kit) : traitement à ajouter au planificateur (§ 5 ter) ; seuls les accusés de réception sont envoyés immédiatement.
+- Publication réelle sur LinkedIn / Instagram (aujourd'hui : tâche de rappel, § 5 ter) — via n8n ou les API des réseaux (LinkedIn exige une application validée pour publier sur une page entreprise).
 - Types TypeScript générés (`supabase gen types typescript --schema crm`) pour supprimer les casts du client service_role.
 - Phase 2 : formulaires du site → CRM (§ 5, § 9) ; d'ici là, les candidatures arrivent dans Airtable.

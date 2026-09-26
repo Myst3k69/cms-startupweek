@@ -146,6 +146,7 @@ function EditorInner({ item }: { item: ContentItem }) {
   const [slugManual, setSlugManual] = React.useState(() => item.slug !== slugify(item.title));
   const [errors, setErrors] = React.useState<Partial<Record<keyof Draft, string>>>({});
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [confirmSite, setConfirmSite] = React.useState<{ title: string; message: string; action: string; run: () => void } | null>(null);
 
   const saved = React.useMemo(() => toDraft(item), [item]);
   const dirty = React.useMemo(() => JSON.stringify(saved) !== JSON.stringify(draft), [saved, draft]);
@@ -177,6 +178,16 @@ function EditorInner({ item }: { item: ContentItem }) {
   );
 
   const kind = siteKind(draft.type, draft.channel);
+  /** Page du site où le contenu enregistré est en ligne (blog / FAQ), sinon null. */
+  const onSite = item.status === "publie" ? siteKind(item.type, item.channel) : null;
+  /** Ce que l'enregistrement du brouillon retirerait du site (null = rien). */
+  const siteLoss = !onSite
+    ? null
+    : kind !== onSite
+      ? `« ${item.title} » ne sera plus affiché sur le site (${onSite === "blog" ? `/blog/${item.slug}` : "/faq"}).`
+      : onSite === "blog" && draft.slug.trim() !== item.slug
+        ? `L'adresse /blog/${item.slug} ne fonctionnera plus : l'article passera sur /blog/${draft.slug.trim()}.`
+        : null;
   const blogSlugs = React.useMemo(
     () => contents.filter((c) => c.id !== item.id && c.type === "article" && c.channel === "blog" && c.slug).map((c) => c.slug).sort(),
     [contents, item.id],
@@ -206,7 +217,11 @@ function EditorInner({ item }: { item: ContentItem }) {
 
   const save = () => {
     if (!dirty) return;
-    if (persist()) toast({ title: "Modifications enregistrées" });
+    const run = () => {
+      if (persist()) toast({ title: "Modifications enregistrées" });
+    };
+    if (siteLoss) setConfirmSite({ title: kind === onSite ? "Changer l'adresse de l'article ?" : "Retirer ce contenu du site ?", message: siteLoss, action: "Enregistrer", run });
+    else run();
   };
 
   const toReview = () => {
@@ -226,19 +241,27 @@ function EditorInner({ item }: { item: ContentItem }) {
       return;
     }
     if (persist({ status: "planifie", scheduledAt: iso }, `Planifié pour le ${dateTime(iso)}`, "statut")) {
-      toast({ title: "Publication programmée", description: `Mise en ligne automatique le ${dateTime(iso)}.` });
+      toast(
+        kind
+          ? { title: "Publication programmée", description: `Mise en ligne automatique le ${dateTime(iso)}.` }
+          : { title: "Rappel programmé", description: `Le ${dateTime(iso)}, une tâche « Publier sur ${labelOf(CHANNELS, draft.channel)} » sera créée : le CRM ne publie pas ce contenu lui-même.` },
+      );
     }
   };
 
   const publish = () => {
     const at = new Date().toISOString();
     if (persist({ status: "publie", publishedAt: at }, `Publié sur ${labelOf(CHANNELS, draft.channel)}`, "statut")) {
-      toast({ title: "Contenu publié", description: path ? `En ligne sur ${host}${path} (revalidation du site sous 60 s).` : `Marqué publié sur ${labelOf(CHANNELS, draft.channel)}.` });
+      toast({ title: "Contenu publié", description: kind && path ? `En ligne sur ${host}${path} (revalidation du site sous 60 s).` : `Marqué publié sur ${labelOf(CHANNELS, draft.channel)}.` });
     }
   };
 
   const backToDraft = () => {
-    if (persist({ status: "redaction" }, `Statut : ${labelOf(CONTENT_STATUSES, item.status)} → Rédaction`, "statut")) toast({ title: "Repassé en rédaction", tone: "info" });
+    const run = () => {
+      if (persist({ status: "redaction" }, `Statut : ${labelOf(CONTENT_STATUSES, item.status)} → Rédaction`, "statut")) toast({ title: "Repassé en rédaction", tone: "info" });
+    };
+    if (onSite) setConfirmSite({ title: "Retirer ce contenu du site ?", message: `Repasser en rédaction retire « ${item.title} » du site.`, action: "Repasser en rédaction", run });
+    else run();
   };
 
   const archive = () => {
@@ -307,9 +330,11 @@ function EditorInner({ item }: { item: ContentItem }) {
             {labelOf(CONTENT_TYPES, item.type)} · {labelOf(CHANNELS, item.channel)} · modifié {relative(item.updatedAt, now)}
             {isPublished && item.publishedAt ? ` · publié le ${dateTime(item.publishedAt)}` : ""}
             {item.status === "planifie" && item.scheduledAt
-              ? new Date(item.scheduledAt).getTime() <= now
-                ? " · mise en ligne en cours (rechargez la page d'ici une minute)"
-                : ` · programmé le ${dateTime(item.scheduledAt)}`
+              ? new Date(item.scheduledAt).getTime() > now
+                ? ` · programmé le ${dateTime(item.scheduledAt)}`
+                : siteKind(item.type, item.channel)
+                  ? " · mise en ligne en cours (rechargez la page d'ici une minute)"
+                  : " · heure passée : à publier puis marquer « Publié » (tâche de rappel créée)"
               : ""}
           </>
         }
@@ -461,7 +486,16 @@ function EditorInner({ item }: { item: ContentItem }) {
               <FormField label="Auteur" htmlFor="ct-author">
                 <Select id="ct-author" value={draft.authorId} disabled={!editable} placeholder="Non attribué" options={users.map((u) => ({ value: u.id, label: u.name }))} onChange={(e) => set("authorId", e.target.value)} />
               </FormField>
-              <FormField label="Programmation" htmlFor="ct-when" error={errors.scheduledAt} hint="Mise en ligne automatique à cette heure (fuseau local), à la minute près, via « Planifier ».">
+              <FormField
+                label="Programmation"
+                htmlFor="ct-when"
+                error={errors.scheduledAt}
+                hint={
+                  kind
+                    ? "Mise en ligne automatique à cette heure (fuseau local), à la minute près, via « Planifier »."
+                    : "À cette heure, une tâche de rappel est créée pour l'auteur : le CRM ne publie pas ce contenu lui-même."
+                }
+              >
                 <Input id="ct-when" type="datetime-local" value={draft.scheduledAt} disabled={!editable} onChange={(e) => set("scheduledAt", e.target.value)} />
               </FormField>
               <FormField label="Session liée" htmlFor="ct-event" hint="Affiche le contenu sur la page de la session et trace les leads générés.">
@@ -487,7 +521,7 @@ function EditorInner({ item }: { item: ContentItem }) {
                   ? "Publication automatique : un article de blog « Publié » est en ligne sur startupweek.tech/blog sous 60 s ; le repasser en rédaction ou l'archiver le retire."
                   : kind === "faq"
                     ? "Publication automatique : une question « Publiée » apparaît sur startupweek.tech/faq sous 60 s."
-                    : "Seuls les articles (canal Blog) et les questions de FAQ sont publiés automatiquement sur le site. Les autres contenus servent au planning éditorial."}
+                    : "Seuls les articles (canal Blog) et les questions de FAQ sont publiés automatiquement sur le site. Les autres contenus servent au planning éditorial : planifiés, ils créent une tâche de rappel à l'heure prévue."}
               </p>
             </CardContent>
           </Card>
@@ -584,6 +618,33 @@ function EditorInner({ item }: { item: ContentItem }) {
         }
       >
         <p className="text-sm text-foreground">« {item.title} »</p>
+      </Modal>
+
+      <Modal
+        open={confirmSite !== null}
+        onClose={() => setConfirmSite(null)}
+        title={confirmSite?.title ?? ""}
+        description={confirmSite?.message}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmSite(null)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => {
+                confirmSite?.run();
+                setConfirmSite(null);
+              }}
+            >
+              {confirmSite?.action}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          Le site se met à jour sous 60 s. C&apos;est réversible : rétablir le canal, le type ou le slug d&apos;origine avec le statut « Publié » le remet en ligne.
+        </p>
       </Modal>
     </div>
   );
