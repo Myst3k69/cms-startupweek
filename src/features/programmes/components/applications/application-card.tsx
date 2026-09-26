@@ -7,7 +7,7 @@ import { UserChip } from "@/components/shared/entity-links";
 import { APPLICATION_STATUSES, FUNDING_SOURCES, PERSONAS, labelOf, toneOf } from "@/lib/domain/constants";
 import { contactName } from "@/lib/domain/selectors";
 import type { Application, ApplicationStatus, Contact, EventSession } from "@/lib/domain/types";
-import { dateTime, daysFrom, money } from "@/lib/format";
+import { dateTime, money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui";
 import { ScorePill } from "../bits";
@@ -15,12 +15,21 @@ import type { MoveTarget } from "./use-mover";
 
 const PERSONA_SHORT: Record<Application["persona"], string> = { tech: "Tech", non_tech: "Non-tech", reconversion: "Reconversion" };
 
+const HOUR = 3_600_000;
+
+/** Âge compact d'une candidature (« 5 h », « 3 j », « 2 mois »). */
 export function ageLabel(iso: string, now: number): string {
-  const d = -daysFrom(iso, now);
-  if (d <= 0) return "aujourd'hui";
+  const h = Math.floor((now - Date.parse(iso)) / HOUR);
+  if (h < 1) return "< 1 h";
+  if (h < 24) return `${h} h`;
+  const d = Math.floor(h / 24);
   if (d < 31) return `${d} j`;
-  const m = Math.floor(d / 30);
-  return `${m} mois`;
+  return `${Math.floor(d / 30)} mois`;
+}
+
+/** Nouvelle candidature non traitée depuis plus de 48 h (engagement de réponse du site). */
+export function isStale(app: Pick<Application, "status" | "submittedAt">, now: number) {
+  return app.status === "nouvelle" && now - Date.parse(app.submittedAt) >= 48 * HOUR;
 }
 
 /** Sélecteur natif discret « Déplacer vers… » (clavier, mobile, lecteurs d'écran). */
@@ -76,8 +85,7 @@ export function ApplicationCard({
   onMove: (to: MoveTarget) => void;
   compact?: boolean;
 }) {
-  const age = -daysFrom(app.submittedAt, now);
-  const stale = app.status === "nouvelle" && age >= 2;
+  const stale = isStale(app, now);
   const showCapacity = sessionFull && ["nouvelle", "qualifiee", "entretien", "acceptee", "liste_attente"].includes(app.status);
   const remaining = Math.max(0, app.amountDueCents - app.amountPaidCents);
   const name = contactName(contact);

@@ -5,9 +5,9 @@ import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
 import { Dot } from "@/components/ui";
 import { APPLICATION_EXITS, APPLICATION_PIPELINE, APPLICATION_STATUSES, labelOf, toneOf, type Tone } from "@/lib/domain/constants";
 import type { Application, ApplicationStatus, Contact, EventSession, ID } from "@/lib/domain/types";
-import { daysFrom, money } from "@/lib/format";
+import { money } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { ApplicationCard } from "./application-card";
+import { ApplicationCard, isStale } from "./application-card";
 import type { MoveTarget } from "./use-mover";
 
 export type BoardSort = "recent" | "ancien" | "score";
@@ -181,7 +181,7 @@ export function ApplicationBoard({
   const footerFor = (st: ApplicationStatus, list: Application[]): React.ReactNode => {
     if (!list.length) return null;
     if (st === "nouvelle") {
-      const stale = list.filter((a) => -daysFrom(a.submittedAt, now) >= 2).length;
+      const stale = list.filter((a) => isStale(a, now)).length;
       return stale ? <span className="font-medium text-warning-text">{stale} en attente depuis plus de 48 h</span> : "Toutes traitées dans les délais";
     }
     if (st === "qualifiee") {

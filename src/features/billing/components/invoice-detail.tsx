@@ -57,7 +57,7 @@ export function InvoiceDetail({ id }: { id: string }) {
   const overdue = status === "en_retard";
   const info = reminderInfo(inv, now);
   const paidPct = total.ttc > 0 ? (inv.paidCents / total.ttc) * 100 : 0;
-  const title = draft ? `Brouillon · ${kindTitle(inv).toLowerCase()}` : `${kindTitle(inv)} ${inv.number}`;
+  const title = draft ? kindTitle(inv) : `${kindTitle(inv)} ${inv.number}`;
 
   const send = () => {
     if (overdue) {
