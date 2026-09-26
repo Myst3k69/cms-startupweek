@@ -8,6 +8,7 @@ import { useSession } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import { FORM_META, INTAKE_FORMS, SIGNATURE_HEADER, signBody, type IntakeForm } from "../lib/intake";
 import { simulateIntake, type SimResult } from "../lib/simulate";
+import { DATA_MODE } from "@/lib/data/supabase";
 
 interface HttpResult {
   status: number;
@@ -114,7 +115,7 @@ export function TesterTab() {
             <Button onClick={send} disabled={!parsed.ok} loading={sending}>
               <Send /> Envoyer
             </Button>
-            {editable ? (
+            {editable && DATA_MODE === "demo" ? (
               <Button variant="secondary" onClick={simulate} disabled={!parsed.ok}>
                 <FlaskConical /> Simuler la réception
               </Button>
@@ -124,7 +125,9 @@ export function TesterTab() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            « Envoyer » appelle <code className="font-mono">POST /api/intake/{form}</code> : en démo (sans base configurée) la route répond <code className="font-mono">dryRun: true</code> avec l'objet normalisé, sans rien écrire. « Simuler la réception » rejoue le flux dans les données de démo (demande, contact, objet métier, accusé, tâche).
+            « Envoyer » appelle <code className="font-mono">POST /api/intake/{form}</code> : en démo (sans base configurée) la route répond <code className="font-mono">dryRun: true</code> avec l'objet normalisé, sans rien écrire. {DATA_MODE === "demo"
+              ? "« Simuler la réception » rejoue le flux dans les données de démo (demande, contact, objet métier, accusé, tâche)."
+              : "La simulation est désactivée en production : elle écrirait de fausses demandes dans la base réelle."}
           </p>
         </CardContent>
       </Card>
