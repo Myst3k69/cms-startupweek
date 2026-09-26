@@ -336,7 +336,7 @@ Si les exécutions s'arrêtent (processus « pg_cron scheduler » absent de `pg_
 
 ## 5 quater. Envoi des emails
 
-Migration `20260926230000_crm_email_delivery.sql` (**à appliquer** — voir l'état en tête de section une fois appliquée).
+Migration `20260926215925_crm_email_delivery.sql`, **appliquée en production le 26/09/2026** : définitions des 6 fonctions, contenu des 25 modèles, séquence, colonnes et triggers identiques (empreintes) à la base de test locale ; aucun nouvel avertissement des *advisors*. URL et secret de la route rangés dans Vault (`crm_email_dispatch_url`, `crm_email_dispatch_secret`) le même jour.
 
 **Principe.** Tout email du CRM passe par la file `crm.email_messages` :
 
@@ -368,12 +368,11 @@ Migration `20260926230000_crm_email_delivery.sql` (**à appliquer** — voir l'�
    EMAIL_BCC=aurelien.chiren@gmail.com   # facultatif : copie de chaque email (n8n mettait cette adresse en copie)
    PUBLIC_APP_URL=https://…              # facultatif : domaine des liens envoyés (défaut : URL de production Vercel)
    ```
-2. Supabase → SQL Editor (une fois) — URL de la route et secret partagé, rangés dans Vault :
+2. Secret partagé : créé dans Vault le 26/09/2026 (valeur aléatoire tirée par la base, jamais écrite ailleurs). Pour le lire et le copier dans `EMAIL_DISPATCH_SECRET` : Supabase → SQL Editor :
    ```sql
-   select vault.create_secret('https://cms-startupweek.vercel.app/api/emails/dispatch', 'crm_email_dispatch_url');
-   select vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'crm_email_dispatch_secret');
-   select decrypted_secret from vault.decrypted_secrets where name = 'crm_email_dispatch_secret';  -- à copier dans EMAIL_DISPATCH_SECRET
+   select decrypted_secret from vault.decrypted_secrets where name = 'crm_email_dispatch_secret';
    ```
+   (Nouvel environnement : `select vault.create_secret('<URL>/api/emails/dispatch', 'crm_email_dispatch_url');` et `select vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'crm_email_dispatch_secret');`.)
 3. *Paramètres → Intégrations* : « Emails transactionnels » doit afficher les voyants email et route d'envoi au vert ; *Emails → Modèles → Envoyer un test*.
 4. *Paramètres → Organisation* : SIRET, adresse, téléphone, n° de déclaration d'activité et **IBAN** (mentions des factures, règlement par virement dans les emails). *Paramètres → Qualiopi* : lien du questionnaire de satisfaction (sinon l'envoi du questionnaire à chaud est bloqué).
 
