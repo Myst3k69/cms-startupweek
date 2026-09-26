@@ -25,7 +25,7 @@ interface ResSpec {
   since: string;
 }
 
-const EXT: Record<ResourceFormat, string> = { pdf: ".pdf", docx: ".docx", xlsx: ".xlsx", figma: ".fig", notion: "", video: "", lien: "", zip: ".zip" };
+const EXT: Record<ResourceFormat, string> = { pdf: ".pdf", docx: ".docx", xlsx: ".xlsx", figma: ".fig", notion: "", video: "", lien: "", zip: ".zip", texte: ".txt" };
 
 const SPECS: ResSpec[] = [
   // Kits et templates participants

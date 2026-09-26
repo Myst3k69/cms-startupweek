@@ -617,7 +617,7 @@ export interface BankTransaction extends BaseEntity {
 /* ───────────────────────────── Ressources & contenus ───────────────────────────── */
 
 export type ResourceCategory = "business_plan" | "pitch_deck" | "maquette" | "financier" | "administratif" | "digital" | "pedagogique" | "qualiopi" | "juridique" | "autre";
-export type ResourceFormat = "pdf" | "docx" | "xlsx" | "figma" | "notion" | "video" | "lien" | "zip";
+export type ResourceFormat = "pdf" | "docx" | "xlsx" | "figma" | "notion" | "video" | "lien" | "zip" | "texte";
 export type Visibility = "public" | "participants" | "premium" | "interne";
 
 export interface Resource extends BaseEntity {
