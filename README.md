@@ -66,7 +66,7 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 ```
 
 - **Données** : `src/lib/domain/types.ts` est le contrat unique, traduit 1-pour-1 en SQL (camelCase ↔ snake_case).
-- **Mode production** : `NEXT_PUBLIC_CRM_DATA_MODE=supabase` → chaque mutation est répercutée dans le schéma `crm` (RLS avec la session utilisateur). Voir **[docs/SUPABASE.md](docs/SUPABASE.md)** — les migrations n'ont **pas** été appliquées sur le projet Supabase de production.
+- **Mode production** : `NEXT_PUBLIC_CRM_DATA_MODE=supabase` → chaque mutation est répercutée dans le schéma `crm` (RLS avec la session utilisateur). Voir **[docs/SUPABASE.md](docs/SUPABASE.md)** — les migrations sont appliquées sur le projet Supabase de production depuis le 26/09/2026 (schéma `crm` vide), mais le back-office n'est **pas encore basculé** : il reste en mode démo tant que la connexion Supabase Auth n'est pas codée.
 - **Conventions de code** : **[docs/CONVENTIONS.md](docs/CONVENTIONS.md)**.
 
 ## Statut
@@ -76,7 +76,8 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 | Interface complète (18 sections, 35 pages back-office, 7 documents imprimables, 4 routes API) | ✅ fonctionnelle en mode démo |
 | Automatisations (acompte à l'acceptation, inscription au paiement, solde, emails, tâches, convocations, accusés de réclamation, garde de capacité) | ✅ exécutées côté client en démo — chaîne complète vérifiée dans le navigateur |
 | Qualité | ✅ `pnpm typecheck`, `pnpm lint`, `pnpm build` sans erreur ; 53 écrans vérifiés en clair / sombre / mobile 390 px (aucune erreur console, aucun débordement) |
-| Schéma SQL, RLS, triggers, vues | ✍️ écrits et testés sur un PostgreSQL local jetable — **non appliqués** sur le projet Supabase de production |
+| Schéma SQL, RLS, triggers, vues | ✅ appliqués sur le projet Supabase « startupweek » le 26/09/2026 et vérifiés sur la vraie base (empreintes identiques au test local, tables du site inchangées, scénario facture / paiement / synchro `public.event` / droits exécuté puis annulé) — schéma `crm` vide |
+| Bascule du back-office sur Supabase | ⏳ connexion Supabase Auth (lien magique) à coder, schéma `crm` à exposer dans *Data API*, variables Vercel à renseigner, comptes équipe à créer |
 | Endpoints `/api/intake`, Stripe, Qonto | ✍️ écrits et testés en local (*dry-run* sans variables d'environnement) — à tester en préproduction avec les vraies API |
 | Envoi réel des emails (Resend) | ⏳ prévu côté serveur (intake) ; les emails déclenchés depuis l'interface sont journalisés en démo |
 | Documents légaux (convention, CGV, attestation) | ⚠️ modèles à faire valider juridiquement (voir le point L.6353-6 dans la proposition) |

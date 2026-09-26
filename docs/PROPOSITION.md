@@ -81,7 +81,7 @@ StartupWeek OS (Next.js) ◄──► Supabase (auth + RLS)  ; emails via Resend
 
 **Limites et coûts à assumer (objectivement)**
 - **Maintenance** : un outil custom se maintient (mises à jour Next/Supabase, évolutions). Compter du temps de dev récurrent ; Airtable offrait de la flexibilité sans code.
-- **Ce dépôt est un socle fonctionnel en mode démo** : l'UI complète tourne sur des données fictives stockées dans le navigateur. Le schéma SQL, les politiques RLS, les triggers et les routes API sont écrits mais **n'ont pas été appliqués ni testés contre la vraie base** (volontairement, en attente de ton feu vert).
+- **Ce dépôt est un socle fonctionnel en mode démo** : l'UI complète tourne sur des données fictives stockées dans le navigateur. Le schéma SQL, les politiques RLS et les triggers ont été **appliqués sur le projet Supabase « startupweek » le 26/09/2026** (après ton feu vert) et vérifiés sur la vraie base ; le schéma `crm` est vide et l'interface n'y est pas encore branchée (connexion Supabase Auth à coder). Les routes API n'ont été testées qu'en local, avec Stripe, Qonto et Resend simulés.
 - **Emails** : en démo ils sont journalisés, pas envoyés. En production : brancher Resend (déjà utilisé par le site) côté serveur.
 - **Documents** : convention, attestation, CGV générées sont des **modèles à faire valider** juridiquement.
 - **Qualiopi** : l'outil structure et prouve ; il ne remplace ni l'organisme certificateur ni les procédures à rédiger (réclamations, handicap, charte formateurs…). La liste des indicateurs « nouvel entrant » est à confirmer avec le certificateur.
@@ -92,7 +92,7 @@ StartupWeek OS (Next.js) ◄──► Supabase (auth + RLS)  ; emails via Resend
 | Étape | Contenu | Durée indicative |
 |---|---|---|
 | 0 | Validation de l'UI en démo (ce dépôt) + arbitrages (offres, grille mentorat, CGV/CPF) | 1 semaine |
-| 1 | Appliquer les migrations sur une **branche Supabase**, créer les comptes équipe, basculer le CRM en `NEXT_PUBLIC_CRM_DATA_MODE=supabase` | 2-3 jours |
+| 1 | ~~Appliquer les migrations~~ (fait le 26/09/2026, directement sur le projet : les branches Supabase exigent l'offre Pro) ; coder la connexion Supabase Auth, exposer le schéma `crm`, créer les comptes équipe, basculer le CRM en `NEXT_PUBLIC_CRM_DATA_MODE=supabase` | 2-3 jours |
 | 2 | Brancher les formulaires du site sur `/api/intake/*` (signature HMAC) **en double écriture** avec n8n pendant 2 semaines | 1 semaine |
 | 3 | Import Airtable nettoyé (mapping dans `docs/SUPABASE.md`), activation du trigger `crm.sessions → public.event`, arrêt du polling | 2-3 jours |
 | 4 | Stripe (webhook) + Qonto (cron) + Resend ; premières factures réelles | 1 semaine |

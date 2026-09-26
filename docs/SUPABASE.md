@@ -2,15 +2,17 @@
 
 Ce document décrit comment passer le back-office du mode démo (données dans le navigateur) à Supabase, brancher le site, Stripe et Qonto, migrer les données Airtable et arrêter les workflows n8n. Il est volontairement opérationnel : chaque étape est vérifiable et réversible.
 
-> **Statut des tests (lire avant toute mise en production)**
+> **État au 26/09/2026 (lire avant toute mise en production)**
 >
-> Validé **localement uniquement**, sur une base jetable :
-> - les 4 migrations appliquées sur PostgreSQL 16, avec émulation Supabase (rôles `anon` / `authenticated` / `service_role` BYPASSRLS, `auth.users`, `auth.uid()`) et **répliques** de `public.event`, `public.template`, `public.administrative_resource`, `public.administrative_resource_event` (colonnes et enums relevés via le MCP Supabase en lecture le 26/09/2026, projet « startupweek ») ;
-> - scénarios SQL : RLS par rôle (formateur, commercial, lecture, admin, utilisateur Auth non rattaché, anon), numérotation F/D/REC sans trou, immuabilité et non-suppression des factures émises, paiements → statut facture, places restantes et bascule `inscriptions_ouvertes ↔ complet`, synchro vers `public.event` / `template` / `administrative_resource(_event)`, vues d'analytics ;
-> - matrice `crm.section_access()` comparée à `PERMISSIONS` (`src/lib/auth/permissions.ts`) : **90/90 combinaisons identiques** ;
-> - les 4 routes (`/api/intake/[form]`, `/api/stripe/webhook`, `/api/qonto/sync`, `/api/health`) exécutées de bout en bout avec supabase-js contre **PostgREST 12.2.3** local ; les API Stripe, Qonto et Resend étaient **simulées**.
+> **Migrations appliquées sur le projet Supabase « startupweek »** (production, PostgreSQL 17), directement et non sur une branche (les branches exigent l'offre Pro ; l'organisation est en offre gratuite) — versions `20260926103012`, `20260926103117`, `20260926103336`, `20260926103516`. Le schéma `crm` est **vide** (hors référentiel Qualiopi et ligne `settings`) et le back-office tourne toujours en **mode démo** : rien n'écrit encore dans `crm`, donc rien n'est synchronisé vers le site. Vérifications faites sur la vraie base :
+> - avant : colonnes, enums et contrainte `event_code` de `public.event` / `template` / `administrative_resource(_event)` identiques à ce qu'attend la migration 3 ; empreinte des tables `public.*` du site relevée ;
+> - après : empreintes des objets `crm` (colonnes, contraintes, index, triggers, fonctions, policies, vues, RLS, droits `anon` / `authenticated` / `service_role`, données du référentiel) **identiques** à celles d'une base locale ayant reçu les mêmes fichiers ; tables, triggers, policies et fonctions du schéma `public` inchangés (seules les lignes de `public.event` ont bougé, réécrites par le workflow n8n `mRWu02E5EofDrUf2` qui tourne toutes les 5 min) ;
+> - scénario exécuté dans un bloc annulé (aucune écriture conservée) : normalisation d'un contact, facture `F-2026-0001` attribuée à l'émission, paiement → `payee`, renumérotation d'une facture émise refusée, session publiée → ligne `public.event` créée (`publie`, places, lieu, format) puis dépubliée → `brouillon`, aucun incident de synchro ; utilisateur `authenticated` non rattaché : 0 ligne, insertion et appel de `crm.next_document_number()` refusés ; `anon` : accès au schéma refusé ;
+> - *advisors* : sécurité — seulement `rls_enabled_no_policy` (INFO) sur `crm.document_counters` et `crm.site_links`, voulu (accès par fonctions `SECURITY DEFINER` / service_role uniquement) ; performance — clés étrangères sans index et index inutilisés (INFO, tables vides), politiques permissives multiples en lecture sur `team_members` / `offers` / `settings` (WARN, tables de quelques lignes).
 >
-> **Non testé** : la vraie base Supabase (PostgreSQL 17, propriétaire réel des tables `public.*`, schéma des enums, clés `sb_secret_…`, exposition du schéma `crm`), les vraies API Qonto / Stripe / Resend, le runtime Next.js (`next dev` / `next build` : les handlers ont été appelés directement dans Node), l'import Airtable (aucun script fourni). Voir « Points à vérifier sur la vraie base » plus bas.
+> Validé **localement** auparavant, sur une base jetable avec émulation Supabase : RLS par rôle (formateur, commercial, lecture, admin, utilisateur Auth non rattaché, anon), numérotation F/D/REC sans trou, paiements, places restantes et bascule `inscriptions_ouvertes ↔ complet`, synchro ressources, vues d'analytics ; matrice `crm.section_access()` comparée à `PERMISSIONS` (**90/90 combinaisons identiques**) ; les 4 routes API exécutées avec supabase-js contre PostgREST 12.2.3 local (Stripe, Qonto et Resend **simulés**).
+>
+> **Non testé** : clés `sb_secret_…`, exposition du schéma `crm` à l'API (§ 2.4, pas encore faite), connexion Supabase Auth dans l'interface (pas encore codée), vraies API Qonto / Stripe / Resend, runtime Next.js des routes API, import Airtable (aucun script fourni).
 
 ---
 
@@ -29,10 +31,12 @@ Site ◄──────────────── lit ──────�
 
 | Fichier | Rôle |
 | --- | --- |
-| `supabase/migrations/20260926000001_crm_schema.sql` | Schéma `crm` (1 table par collection de `src/lib/data/sync.ts` + `activities`, `settings`, `traffic_days`), CHECK, FK, index, `updated_at`, audit |
-| `supabase/migrations/20260926000002_crm_rls.sql` | `team_members.auth_user_id`, `crm.current_role()`, `crm.has_access(section, level)`, RLS + policies |
-| `supabase/migrations/20260926000003_crm_functions.sql` | Numérotation légale, paiements, places restantes, synchro CRM → site, vues |
-| `supabase/migrations/20260926000004_qualiopi_referentiel.sql` | 32 indicateurs Qualiopi |
+| `supabase/migrations/20260926103012_crm_schema.sql` | Schéma `crm` (1 table par collection de `src/lib/data/sync.ts` + `activities`, `settings`, `traffic_days`), CHECK, FK, index, `updated_at`, audit |
+| `supabase/migrations/20260926103117_crm_rls.sql` | `team_members.auth_user_id`, `crm.current_role()`, `crm.has_access(section, level)`, RLS + policies |
+| `supabase/migrations/20260926103336_crm_functions.sql` | Numérotation légale, paiements, places restantes, synchro CRM → site, vues |
+| `supabase/migrations/20260926103516_qualiopi_referentiel.sql` | 32 indicateurs Qualiopi |
+
+Les noms de fichiers reprennent les versions enregistrées dans l'historique distant (`supabase_migrations.schema_migrations`) lors de l'application du 26/09/2026 : la CLI les reconnaît comme déjà appliquées. Toute évolution passe par une **nouvelle** migration.
 | `src/lib/server/*.ts` | Client service_role, sécurité (HMAC, Stripe, rate-limit, honeypot, CORS), intake |
 | `src/app/api/**/route.ts` | Route Handlers |
 
@@ -49,7 +53,9 @@ Ce que remplacent les triggers SQL (plus aucun polling) :
 
 ## 2. Appliquer les migrations
 
-### 2.1 Toujours sur une branche d'abord
+> ✅ **Fait le 26/09/2026** sur le projet « startupweek » (voir l'état en tête de document). Les § 2.1 à 2.3 restent la procédure de référence pour un autre environnement (projet de test, reconstruction) ; il reste à faire le § 2.4 au moment de la bascule.
+
+### 2.1 Sur une branche d'abord (offre Pro requise)
 
 1. Sauvegarde : Dashboard → Database → Backups (vérifier qu'un backup récent existe) ou `supabase db dump --linked -f backup-avant-crm.sql`.
 2. Créer une branche : Dashboard → Branches → *Create branch* (ou CLI `supabase branches create crm-test`).
@@ -66,7 +72,7 @@ supabase link --project-ref <project-ref>
 # L'historique distant contient 3 migrations absentes de ce repo : les récupérer d'abord,
 # sinon `db push` refuse (« Remote migration versions not found in local migrations directory »).
 supabase migration fetch            # télécharge les migrations de l'historique distant dans supabase/migrations
-supabase db push --dry-run          # doit lister uniquement les 4 fichiers 20260926…
+supabase db push --dry-run          # sur « startupweek » : rien à appliquer (les 4 migrations CRM y sont déjà)
 supabase db push
 ```
 
@@ -74,11 +80,11 @@ supabase db push
 
 ### 2.3 Avec le SQL Editor
 
-Coller et exécuter **dans l'ordre** les 4 fichiers `20260926000001` → `20260926000004`. Chaque fichier est autonome ; la migration 4 est ré-exécutable (upsert des libellés, sans toucher aux statuts saisis).
+Coller et exécuter **dans l'ordre** les 4 fichiers `20260926103012` → `20260926103516`. Chaque fichier est autonome ; la migration 4 est ré-exécutable (upsert des libellés, sans toucher aux statuts saisis).
 
 ### 2.4 Exposer le schéma `crm` à l'API
 
-Dashboard → Project Settings → **Data API** → *Exposed schemas* : ajouter `crm`. Sans cela, supabase-js reçoit `PGRST106 The schema must be one of the following…`.
+Dashboard → Project Settings → **Data API** → *Exposed schemas* : ajouter `crm`. Sans cela, supabase-js reçoit `PGRST106 The schema must be one of the following…`. **Pas encore fait** : à faire juste avant la bascule (§ 3). Exposer le schéma ne l'ouvre pas au public : `anon` n'a aucun droit sur `crm` et un compte connecté non rattaché à `crm.team_members` ne voit aucune ligne (vérifié sur la base réelle).
 
 ### 2.5 Vérifications après migration
 
@@ -341,7 +347,7 @@ order by 1;
 
 Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le retour arrière.
 
-1. **Phase 0 — migrations** (§ 2) : aucun impact sur le site tant que `crm` est vide.
+1. **Phase 0 — migrations** (§ 2) : ✅ faite le 26/09/2026 ; aucun impact sur le site tant que `crm.sessions` / `crm.resources` / `crm.applications` sont vides.
 2. **Phase 1 — sessions & ressources** (le CRM devient la source de vérité du site) :
    1. geler les modifications dans Airtable *Events* / *Ressources* ;
    2. désactiver « Sync Airtable -> Supabase (polling, remplace automatisations Airtable) » (`mRWu02E5EofDrUf2`) — sinon Airtable et le CRM écrivent tous deux `public.event` ;
@@ -361,16 +367,16 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 | Formulaires | Remettre les URLs `N8N_WEBHOOK_*` dans le site et réactiver les 8 workflows. Effet immédiat. |
 | Synchro site | `alter table crm.sessions disable trigger sessions_site_sync; alter table crm.resources disable trigger resources_site_sync; alter table crm.applications disable trigger applications_capacity;` puis réactiver le polling n8n (il réécrit `public.event` depuis Airtable). |
 | Paiements | Désactiver l'endpoint dans Stripe ; retirer le cron Qonto de `vercel.json`. |
-| Tout le CRM | `drop schema crm cascade;` — supprime tables, fonctions et triggers du CRM ; **aucune table `public.*` n'est modifiée structurellement** (seules leurs lignes ont pu être mises à jour par la synchro). Puis `supabase migration repair --status reverted 20260926000001 20260926000002 20260926000003 20260926000004`. |
+| Tout le CRM | `drop schema crm cascade;` — supprime tables, fonctions et triggers du CRM ; **aucune table `public.*` n'est modifiée structurellement** (seules leurs lignes ont pu être mises à jour par la synchro). Puis `supabase migration repair --status reverted 20260926103012 20260926103117 20260926103336 20260926103516`. |
 | Données | Restauration du backup / PITR pris avant la migration (§ 2.1). |
 
 ---
 
 ## 11. Points à vérifier sur la vraie base
 
-1. **Propriétaire / RLS des tables du site** : les fonctions de synchro sont `SECURITY DEFINER` (propriétaire = rôle qui applique la migration, normalement `postgres`). Elles écrivent `public.event` & co en contournant la RLS **si** ce rôle en est propriétaire (ou a `BYPASSRLS`) et si `relforcerowsecurity = false` (requête § 2.5). Sinon, l'échec est journalisé dans `crm.activities` (kind `systeme`) sans bloquer le CRM.
-2. **Enums** : les casts utilisent `public.event_format`, `public.event_type`, `public.event_status`, `public.template_format`, `public.template_category`, `public.subscription_tier`, `public.administrative_document_*` (schéma supposé `public`, requête § 2.5).
-3. **Contrainte `event_code ~ '^SW-[0-9]{4}$'`** (NOT VALID) : les sessions dont le code ne respecte pas ce format ne sont pas publiées (trace `systeme`).
+1. ✅ **Propriétaire / RLS des tables du site** (vérifié le 26/09/2026 : une session publiée crée bien sa ligne `public.event`, sans incident `systeme`). Les fonctions de synchro sont `SECURITY DEFINER` (propriétaire = rôle qui applique la migration, normalement `postgres`) ; si les droits changent côté site, l'échec est journalisé dans `crm.activities` (kind `systeme`) sans bloquer le CRM.
+2. ✅ **Enums** (vérifié le 26/09/2026) : `public.event_format`, `public.event_type`, `public.event_status`, `public.template_format`, `public.template_category`, `public.subscription_tier`, `public.administrative_document_*` existent dans `public` avec les valeurs attendues.
+3. ✅ **Contrainte `event_code ~ '^SW-[0-9]{4}$'`** (NOT VALID, présente) : les sessions dont le code ne respecte pas ce format ne sont pas publiées (trace `systeme`).
 4. **Correspondances de valeurs vers le site** (limitations des enums du site) : `format` `journee` / `mois` → `semaine` ; `mode` `hybride` → `presentiel` ; statut `brouillon` / `prevu` ou `published_on_site = false` → `brouillon` ; `inscriptions_ouvertes` / `complet` / `en_cours` → `publie`. Ressources : catégories business_plan / pitch_deck / maquette / financier / digital → `public.template` ; les autres → `public.administrative_resource` (n8n n'envoyait que `digital` vers `template`) ; `juridique` → catégorie `contrat`.
 5. **Clés `sb_secret_…`** avec supabase-js (testé uniquement avec un JWT service_role local).
 6. **Qonto v2** : champs `id`, `amount_cents`, `side`, `settled_at`, `reference`, pagination `meta.next_page` et filtre `status[]=completed` (d'après la documentation ; non appelés réellement).
