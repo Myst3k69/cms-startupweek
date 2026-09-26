@@ -1,25 +1,19 @@
 "use client";
 
+/**
+ * Pages imprimables facture / devis. Rendues sous src/app/print/layout.tsx (RequireSession + PrintShell :
+ * thème clair forcé, barre « Imprimer / PDF », @page A4) ; la feuille est le PrintPage partagé.
+ */
 import * as React from "react";
-import { ArrowLeft, FileX2, Lock, Printer } from "lucide-react";
-import { useEntity, useHydrated, useSession } from "@/lib/hooks";
-import { Button, EmptyState, LinkButton, Skeleton } from "@/components/ui";
+import { FileX2, Lock } from "lucide-react";
+import { useEntity, useSession } from "@/lib/hooks";
+import { EmptyState, LinkButton } from "@/components/ui";
+import { PrintPage } from "@/features/documents/components/print-kit";
+import { INVOICE_KINDS, labelOf } from "@/lib/domain/constants";
 import { displayNumber } from "../../lib";
 import { InvoiceDocument, QuoteDocument } from "./billing-documents";
-import { INVOICE_KINDS, labelOf } from "@/lib/domain/constants";
 
-/** Un document imprimé est toujours « papier » : thème clair forcé tant que la page est ouverte. */
-function useForceLightTheme() {
-  React.useEffect(() => {
-    const el = document.documentElement;
-    const prev = el.dataset.theme;
-    el.dataset.theme = "light";
-    return () => {
-      if (prev) el.dataset.theme = prev;
-    };
-  }, []);
-}
-
+/** Titre de l'onglet = nom de fichier proposé par « Enregistrer en PDF ». */
 function useDocumentTitle(title: string | undefined) {
   React.useEffect(() => {
     if (!title) return;
@@ -31,62 +25,12 @@ function useDocumentTitle(title: string | undefined) {
   }, [title]);
 }
 
-/**
- * Cadre d'impression autonome (barre « Imprimer / PDF » + feuille A4). Si la page est rendue sous le
- * PrintShell partagé (src/app/print/layout.tsx → `.print-root`), la barre et le fond sont masqués
- * pour ne pas doublonner ceux du layout.
- */
-function PrintFrame({ backHref, label, children }: { backHref: string; label: string; children: React.ReactNode }) {
+function Restricted() {
   return (
-    <div className="min-h-dvh bg-surface-2 [.print-root_&]:min-h-0 [.print-root_&]:bg-transparent print:bg-transparent">
-      <style>{"@page { size: A4; margin: 12mm; }"}</style>
-      <div className="no-print sticky top-0 z-10 border-b border-border bg-surface/90 backdrop-blur [.print-root_&]:hidden">
-        <div className="mx-auto flex w-full max-w-[210mm] items-center justify-between gap-2 px-4 py-2">
-          <LinkButton href={backHref} variant="ghost" size="sm">
-            <ArrowLeft aria-hidden="true" /> Retour
-          </LinkButton>
-          <span className="hidden truncate text-sm text-muted-foreground sm:inline">{label}</span>
-          <Button size="sm" onClick={() => window.print()}>
-            <Printer aria-hidden="true" /> Imprimer / PDF
-          </Button>
-        </div>
-      </div>
-      <main className="mx-auto w-full max-w-[210mm] bg-surface px-4 py-6 shadow-md sm:my-6 sm:rounded-sm sm:p-[14mm] print:m-0 print:max-w-none print:rounded-none print:p-0 print:shadow-none">
-        {children}
-      </main>
+    <div className="mx-auto max-w-lg p-8">
+      <EmptyState icon={Lock} title="Accès restreint" description="Ce document est réservé aux profils ayant accès à la facturation." action={<LinkButton href="/" size="sm" variant="secondary">Retour au tableau de bord</LinkButton>} />
     </div>
   );
-}
-
-function PrintGate({ children, next }: { children: React.ReactNode; next: string }) {
-  const hydrated = useHydrated();
-  const { can, user } = useSession();
-  if (!hydrated) {
-    return (
-      <div className="mx-auto max-w-[210mm] space-y-4 p-8" aria-busy="true" aria-label="Chargement du document">
-        <Skeleton className="h-16" />
-        <Skeleton className="h-40" />
-        <Skeleton className="h-64" />
-      </div>
-    );
-  }
-  if (!user || !can("facturation")) {
-    return (
-      <div className="mx-auto max-w-lg p-8">
-        <EmptyState
-          icon={Lock}
-          title="Accès restreint"
-          description="Ce document est réservé aux profils ayant accès à la facturation."
-          action={
-            <LinkButton href={`/connexion?next=${encodeURIComponent(next)}`} size="sm">
-              Se connecter
-            </LinkButton>
-          }
-        />
-      </div>
-    );
-  }
-  return <>{children}</>;
 }
 
 function NotFound({ what, backHref }: { what: string; backHref: string }) {
@@ -97,44 +41,30 @@ function NotFound({ what, backHref }: { what: string; backHref: string }) {
   );
 }
 
-function InvoicePrint({ id }: { id: string }) {
+export function InvoicePrintView({ id }: { id: string }) {
   const inv = useEntity("invoices", id);
+  const { can } = useSession();
   const label = inv ? `${inv.kind === "avoir" ? "Avoir" : labelOf(INVOICE_KINDS, inv.kind)} ${displayNumber(inv)}` : undefined;
   useDocumentTitle(label ? `${label} — StartupWeek` : undefined);
+  if (!can("facturation")) return <Restricted />;
   if (!inv) return <NotFound what="Facture" backHref="/facturation" />;
   return (
-    <PrintFrame backHref={`/facturation/factures/${inv.id}`} label={label ?? ""}>
+    <PrintPage>
       <InvoiceDocument invoice={inv} />
-    </PrintFrame>
-  );
-}
-
-function QuotePrint({ id }: { id: string }) {
-  const q = useEntity("quotes", id);
-  const label = q ? `Devis ${displayNumber(q)}` : undefined;
-  useDocumentTitle(label ? `${label} — StartupWeek` : undefined);
-  if (!q) return <NotFound what="Devis" backHref="/facturation?onglet=devis" />;
-  return (
-    <PrintFrame backHref={`/facturation/devis/${q.id}`} label={label ?? ""}>
-      <QuoteDocument quote={q} />
-    </PrintFrame>
-  );
-}
-
-export function InvoicePrintView({ id }: { id: string }) {
-  useForceLightTheme();
-  return (
-    <PrintGate next={`/print/facture/${id}`}>
-      <InvoicePrint id={id} />
-    </PrintGate>
+    </PrintPage>
   );
 }
 
 export function QuotePrintView({ id }: { id: string }) {
-  useForceLightTheme();
+  const q = useEntity("quotes", id);
+  const { can } = useSession();
+  const label = q ? `Devis ${displayNumber(q)}` : undefined;
+  useDocumentTitle(label ? `${label} — StartupWeek` : undefined);
+  if (!can("facturation")) return <Restricted />;
+  if (!q) return <NotFound what="Devis" backHref="/facturation?onglet=devis" />;
   return (
-    <PrintGate next={`/print/devis/${id}`}>
-      <QuotePrint id={id} />
-    </PrintGate>
+    <PrintPage>
+      <QuoteDocument quote={q} />
+    </PrintPage>
   );
 }

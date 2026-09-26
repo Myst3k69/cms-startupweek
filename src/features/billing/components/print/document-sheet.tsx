@@ -59,7 +59,7 @@ export function DocumentSheet({ model, settings, className }: { model: DocModel;
       ) : null}
 
       {/* En-tête : émetteur + identification de la pièce */}
-      <header className="flex flex-col gap-5 border-b-2 border-foreground pb-5 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col gap-5 border-b-2 border-foreground pb-5 sm:flex-row sm:items-start sm:justify-between print:flex-row print:items-start print:justify-between">
         <div className="min-w-0 space-y-0.5">
           <div className="mb-2 flex items-center gap-2.5">
             <span className="inline-flex size-10 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-border">
@@ -81,12 +81,12 @@ export function DocumentSheet({ model, settings, className }: { model: DocModel;
             {settings.email} · {settings.phone}
           </p>
         </div>
-        <div className="shrink-0 sm:text-right">
+        <div className="shrink-0 sm:text-right print:text-right">
           <p className="font-display text-2xl font-semibold uppercase tracking-tight">{model.title}</p>
           <p className="mt-0.5 font-mono text-sm font-medium">N° {model.number}</p>
           <dl className="mt-3 space-y-0.5">
             {model.meta.map((m) => (
-              <div key={m.label} className="flex gap-2 sm:justify-end">
+              <div key={m.label} className="flex gap-2 sm:justify-end print:justify-end">
                 <dt className="text-muted-foreground">{m.label} :</dt>
                 <dd className="font-medium">{m.value}</dd>
               </div>
@@ -96,7 +96,7 @@ export function DocumentSheet({ model, settings, className }: { model: DocModel;
       </header>
 
       {/* Client + objet */}
-      <section className="grid gap-5 py-5 sm:grid-cols-2">
+      <section className="grid gap-5 py-5 sm:grid-cols-2 print:grid-cols-2">
         <div className="min-w-0">
           <p className="eyebrow mb-1.5 text-muted-foreground">Objet</p>
           {model.subject.length ? (
@@ -158,7 +158,7 @@ export function DocumentSheet({ model, settings, className }: { model: DocModel;
       </div>
 
       {/* Totaux */}
-      <section className="mt-4 flex justify-end">
+      <section className="mt-4 flex justify-end print:break-inside-avoid">
         <dl className="w-full max-w-xs space-y-1">
           <div className="flex justify-between gap-4">
             <dt className="text-muted-foreground">Total HT</dt>
@@ -209,7 +209,7 @@ export function DocumentSheet({ model, settings, className }: { model: DocModel;
       ) : null}
 
       {/* Conditions & règlement */}
-      <section className="mt-6 grid gap-5 border-t border-border pt-4 sm:grid-cols-2">
+      <section className="mt-6 grid gap-5 border-t border-border pt-4 sm:grid-cols-2 print:grid-cols-2 print:break-inside-avoid">
         <div className="min-w-0">
           <p className="eyebrow mb-1.5 text-muted-foreground">Conditions</p>
           <ul className="space-y-0.5">
@@ -242,7 +242,7 @@ export function DocumentSheet({ model, settings, className }: { model: DocModel;
       </section>
 
       {model.signatureBox ? (
-        <section className="mt-6 grid gap-4 sm:grid-cols-2">
+        <section className="mt-6 grid gap-4 sm:grid-cols-2 print:grid-cols-2 print:break-inside-avoid">
           <div />
           <div className="rounded-md border border-border-strong p-3">
             <p className="font-medium">Bon pour accord</p>
