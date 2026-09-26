@@ -4,7 +4,9 @@ Ce document décrit comment passer le back-office du mode démo (données dans l
 
 > **État au 26/09/2026 (lire avant toute mise en production)**
 >
-> **Migrations appliquées sur le projet Supabase « startupweek »** (production, PostgreSQL 17), directement et non sur une branche (les branches exigent l'offre Pro ; l'organisation est en offre gratuite) — versions `20260926103012`, `20260926103117`, `20260926103336`, `20260926103516`. Le schéma `crm` est **vide** (hors référentiel Qualiopi et ligne `settings`) et le back-office tourne toujours en **mode démo** : rien n'écrit encore dans `crm`, donc rien n'est synchronisé vers le site. Vérifications faites sur la vraie base :
+> **Bascule effectuée le 26/09/2026** : le back-office de production (https://cms-startupweek.vercel.app) tourne en mode `supabase`. Première connexion réelle par lien magique réussie (email reçu, retour sur `/auth/callback`, compte rattaché à son membre `crm.team_members`). Administrateurs créés : Aurélien Chiren (rattaché) et Caroline Borja (rattachée automatiquement à sa première connexion). Le schéma `crm` ne contient pas encore de données métier : **import Airtable à faire (§ 8)**.
+>
+> **Migrations appliquées sur le projet Supabase « startupweek »** (production, PostgreSQL 17), directement et non sur une branche (les branches exigent l'offre Pro ; l'organisation est en offre gratuite) — versions `20260926103012`, `20260926103117`, `20260926103336`, `20260926103516`. Au moment de la migration, le schéma `crm` était **vide** (hors référentiel Qualiopi et ligne `settings`). Vérifications faites sur la vraie base :
 > - avant : colonnes, enums et contrainte `event_code` de `public.event` / `template` / `administrative_resource(_event)` identiques à ce qu'attend la migration 3 ; empreinte des tables `public.*` du site relevée ;
 > - après : empreintes des objets `crm` (colonnes, contraintes, index, triggers, fonctions, policies, vues, RLS, droits `anon` / `authenticated` / `service_role`, données du référentiel) **identiques** à celles d'une base locale ayant reçu les mêmes fichiers ; tables, triggers, policies et fonctions du schéma `public` inchangés (seules les lignes de `public.event` ont bougé, réécrites par le workflow n8n `mRWu02E5EofDrUf2` qui tourne toutes les 5 min) ;
 > - scénario exécuté dans un bloc annulé (aucune écriture conservée) : normalisation d'un contact, facture `F-2026-0001` attribuée à l'émission, paiement → `payee`, renumérotation d'une facture émise refusée, session publiée → ligne `public.event` créée (`publie`, places, lieu, format) puis dépubliée → `brouillon`, aucun incident de synchro ; utilisateur `authenticated` non rattaché : 0 ligne, insertion et appel de `crm.next_document_number()` refusés ; `anon` : accès au schéma refusé ;
@@ -14,7 +16,7 @@ Ce document décrit comment passer le back-office du mode démo (données dans l
 >
 > **Connexion par lien magique (§ 3)** : codée et testée de bout en bout **en local** — PostgreSQL 16 avec les 5 migrations, PostgREST 12.2.3, un faux service Supabase Auth (flux PKCE, jetons signés, codes d'erreur identiques) et Chromium. Scénarios validés : demande de lien (`create_user=false`, adresse normalisée, redirection `/auth/callback?next=…`), échange du code, rattachement automatique par email (migration 5) et repli sans migration 5, chargement des données, création d'un contact écrite en base avec une seule activité, refus RLS annulé à l'écran, rechargement, lien déjà utilisé, lien ouvert dans un autre navigateur, lien expiré, adresse inconnue (réponse neutre, aucun compte créé), compte hors équipe (session fermée), déconnexion, `next=//site-externe` ignoré, enchaînement acceptation → acompte → inscription → solde (écritures liées dans l'ordre, numéros cohérents, rien publié sur le site) ; mode démo inchangé.
 >
-> **Non testé** : le vrai service Supabase Auth (envoi réel de l'email, modèle *Magic Link*, URL de redirection autorisées — § 3.2), clés `sb_secret_…`, vraies API Qonto / Stripe / Resend, runtime Next.js des routes API, import Airtable (aucun script fourni). Migration `20260926122058` (5) **appliquée en production le 26/09/2026** : empreintes identiques au test local, tables du site inchangées, rattachement / membre désactivé / anonyme / journal sans doublon vérifiés dans un bloc annulé sur la vraie base.
+> **Testé en production le 26/09/2026** : le vrai service Supabase Auth (envoi réel de l'email, modèle *Magic Link*, URL de redirection autorisée — § 3.2). **Non testé** : clés `sb_secret_…`, vraies API Qonto / Stripe / Resend, runtime Next.js des routes API, import Airtable (aucun script fourni). Migration `20260926122058` (5) **appliquée en production le 26/09/2026** : empreintes identiques au test local, tables du site inchangées, rattachement / membre désactivé / anonyme / journal sans doublon vérifiés dans un bloc annulé sur la vraie base.
 
 ---
 
@@ -134,15 +136,14 @@ Lancer aussi les *advisors* Supabase (Dashboard → Advisors : Security et Perfo
 ### 3.2 Réglages Supabase (Dashboard du projet « startupweek »)
 
 1. ✅ **Data API → Exposed schemas** : ajouter `crm` (§ 2.4) — fait le 26/09/2026.
-2. **Authentication → URL Configuration → Redirect URLs** : ajouter l'adresse de retour du CRM — toujours exactement `<adresse du CRM>/auth/callback` (la page à rouvrir après connexion est mémorisée dans le navigateur, pas dans l'URL). **Ne pas modifier le *Site URL*** (c'est celui du site).
+2. ✅ **Authentication → URL Configuration → Redirect URLs** : ajouter l'adresse de retour du CRM — toujours exactement `<adresse du CRM>/auth/callback` (la page à rouvrir après connexion est mémorisée dans le navigateur, pas dans l'URL). **Ne pas modifier le *Site URL*** (c'est celui du site). Fait le 26/09/2026 :
    ```
    https://cms-startupweek.vercel.app/auth/callback        # adresse du CRM retenue (production Vercel)
-   https://cms-startupweek-*-myst3k69s-projects.vercel.app/auth/callback   # aperçus Vercel (facultatif)
    http://localhost:3000/auth/callback                     # développement (facultatif)
    ```
-   Sans cela, Supabase renvoie le lien vers le *Site URL* (le site public) et la connexion échoue. Un sous-domaine (ex. `crm.startupweek.tech`) pourra être ajouté plus tard : l'ajouter au projet Vercel (Settings → Domains) et à cette liste, sans rien changer au code.
-3. **Authentication → Emails → SMTP** : le serveur d'envoi par défaut de Supabase n'envoie qu'aux **membres de l'organisation Supabase** (« Email address not authorized » sinon), avec un plafond horaire bas. Configurer un SMTP personnalisé (ex. Resend, déjà utilisé par le site) — puis ajuster *Rate Limits* si besoin (30 emails / heure par défaut avec un SMTP personnalisé). Si le site envoie déjà ses emails Auth par un SMTP personnalisé, rien à faire.
-4. **Authentication → Emails → Templates → Magic Link** : le modèle doit utiliser `{{ .ConfirmationURL }}` (modèle par défaut). S'il a été personnalisé pour le site avec une URL fixe (`{{ .SiteURL }}/…`), les liens du CRM arriveraient sur le site : utiliser `{{ .RedirectTo }}`, ou `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=magiclink` (géré par `/auth/callback`, fonctionne alors depuis n'importe quel navigateur).
+   Sans cela, Supabase renvoie le lien vers le *Site URL* (le site public, `https://www.startupweek.tech/?code=…`) et la connexion échoue. **Même effet si le CRM est ouvert depuis une autre adresse** que celle de la liste — par exemple l'adresse propre à un déploiement (`cms-startupweek-<hash>-….vercel.app`, bouton *Visit* de Vercel) : l'adresse de retour est construite à partir de l'adresse affichée dans le navigateur. Toujours ouvrir `https://cms-startupweek.vercel.app/connexion`. Éviter d'autoriser les aperçus par un joker (`cms-startupweek-*….vercel.app`) : n'importe quel compte Vercel peut créer un projet dont l'adresse correspond au motif. Un sous-domaine (ex. `crm.startupweek.tech`) pourra être ajouté plus tard : l'ajouter au projet Vercel (Settings → Domains) et à cette liste, sans rien changer au code.
+3. **Authentication → Emails → SMTP** (email reçu par le premier admin le 26/09/2026 ; à confirmer pour les membres qui ne font pas partie de l'organisation Supabase — première connexion de Caroline Borja) : le serveur d'envoi par défaut de Supabase n'envoie qu'aux **membres de l'organisation Supabase** (« Email address not authorized » sinon), avec un plafond horaire bas. Configurer un SMTP personnalisé (ex. Resend, déjà utilisé par le site) — puis ajuster *Rate Limits* si besoin (30 emails / heure par défaut avec un SMTP personnalisé). Si le site envoie déjà ses emails Auth par un SMTP personnalisé, rien à faire.
+4. ✅ **Authentication → Emails → Templates → Magic Link** (vérifié le 26/09/2026 : le lien passe bien par `/auth/v1/verify`) : le modèle doit utiliser `{{ .ConfirmationURL }}` (modèle par défaut). S'il a été personnalisé pour le site avec une URL fixe (`{{ .SiteURL }}/…`), les liens du CRM arriveraient sur le site : utiliser `{{ .RedirectTo }}`, ou `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=magiclink` (géré par `/auth/callback`, fonctionne alors depuis n'importe quel navigateur).
 5. ✅ Migration `20260926122058_crm_auth_membership.sql` (rattachement automatique + journal sans doublon) — appliquée le 26/09/2026.
 
 ### 3.3 Variables Vercel (Production, et Preview si besoin)
@@ -154,7 +155,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…
 SUPABASE_SECRET_KEY=sb_secret_…          # serveur uniquement (routes /api/*)
 ```
 
-Les variables `NEXT_PUBLIC_*` sont intégrées **au build** : redéployer après les avoir modifiées.
+✅ Renseignées en Production le 26/09/2026 (`SUPABASE_SECRET_KEY` pas encore : routes `/api/*` inactives). Les variables `NEXT_PUBLIC_*` sont intégrées **au build** : redéployer après les avoir modifiées. Saisir la **valeur** (`https://…supabase.co`), pas le nom de la variable : une adresse invalide affiche désormais un message explicite sur `/connexion` et `supabasePublic: false` dans `/api/health` (auparavant : page « This page couldn't load »).
 
 ### 3.4 Limites connues du mode `supabase` (à lire avant usage réel)
 
@@ -172,7 +173,7 @@ Les variables `NEXT_PUBLIC_*` sont intégrées **au build** : redéployer après
 Le projet Supabase héberge aussi les comptes des participants du site : le rôle `authenticated` inclut donc des personnes extérieures. La RLS ne donne accès au schéma `crm` **qu'aux utilisateurs présents et actifs dans `crm.team_members`** (vérifié sur la base réelle : un compte Auth non rattaché voit 0 ligne).
 
 1. **Compte Auth** de chaque membre (la page de connexion n'en crée pas) : Dashboard → Authentication → Users → *Add user* → *Create new user* (email, « Auto Confirm User » coché, mot de passe aléatoire jamais utilisé) — ou *Invite user*. NB : le trigger `handle_new_user` du site crée aussi un profil côté site pour ce compte.
-2. **Premier administrateur** (personne ne peut encore utiliser *Paramètres → Équipe*) — SQL Editor :
+2. ✅ **Premier administrateur** (fait le 26/09/2026 : Aurélien Chiren et Caroline Borja, rôle `admin`) — SQL Editor :
    ```sql
    insert into crm.team_members (name, email, role, title, auth_user_id)
    select 'Prénom Nom', u.email, 'admin', 'Fondateur', u.id

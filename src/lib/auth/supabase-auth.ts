@@ -42,7 +42,7 @@ export async function requestMagicLink(rawEmail: string, next: string): Promise<
   if (!parsed.success) return { ok: false, message: "Adresse email invalide." };
   const email = parsed.data;
   const supabase = getSupabase();
-  if (!supabase) return { ok: false, message: "Supabase n'est pas configuré sur ce déploiement (variables NEXT_PUBLIC_SUPABASE_*)." };
+  if (!supabase) return { ok: false, message: "Supabase n'est pas configuré sur ce déploiement : NEXT_PUBLIC_SUPABASE_URL (adresse https://…supabase.co) ou NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY absente ou invalide dans Vercel." };
 
   try {
     localStorage.setItem(NEXT_KEY, safeNext(next));

@@ -6,6 +6,7 @@
  * migrations appliquées, clé service_role valide).
  */
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/server/supabase-admin";
+import { isValidSupabaseUrl } from "@/lib/data/supabase";
 
 export const runtime = "nodejs";
 
@@ -34,7 +35,8 @@ export async function GET(): Promise<Response> {
       database,
       services: {
         supabaseAdmin: supabase,
-        supabasePublic: Boolean(env.NEXT_PUBLIC_SUPABASE_URL && env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),
+        /** URL publique au format https://…supabase.co ET clé publiable présentes (une variable mal saisie → false). */
+        supabasePublic: isValidSupabaseUrl(env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),
         intakeSignature: Boolean(env.INTAKE_SIGNING_SECRET),
         allowedOriginsCustom: Boolean(env.ALLOWED_ORIGINS),
         stripeWebhook: Boolean(env.STRIPE_WEBHOOK_SECRET),

@@ -14,8 +14,19 @@ export const DATA_MODE: "demo" | "supabase" = process.env.NEXT_PUBLIC_CRM_DATA_M
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-/** Mode supabase demandé ET variables présentes. */
-export const supabaseConfigured = DATA_MODE === "supabase" && Boolean(URL && KEY);
+/** Adresse d'API valide (https://<ref>.supabase.co) — protège d'une variable mal saisie (ex. son nom collé comme valeur). */
+export function isValidSupabaseUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const u = new globalThis.URL(value);
+    return u.protocol === "https:" || u.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+/** Mode supabase demandé ET variables présentes et valides. */
+export const supabaseConfigured = DATA_MODE === "supabase" && isValidSupabaseUrl(URL) && Boolean(KEY);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- schéma `crm` non typé (types générés à venir : supabase gen types)
 export type CrmClient = SupabaseClient<any, "crm">;
