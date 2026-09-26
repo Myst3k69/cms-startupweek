@@ -11,7 +11,7 @@ pnpm install
 pnpm dev          # http://localhost:3000
 ```
 
-Aucune variable d'environnement n'est requise : l'application démarre en **mode démo** (données fictives réalistes générées localement et persistées dans le navigateur — réinitialisables dans *Paramètres → Données*).
+Aucune variable d'environnement n'est requise : l'application démarre en **mode démo** (données fictives réalistes générées localement et persistées dans le navigateur — réinitialisables dans *Paramètres → Données*). En mode `supabase` (`NEXT_PUBLIC_CRM_DATA_MODE=supabase`), `/connexion` demande l'email et envoie un **lien magique** ; voir [docs/SUPABASE.md](docs/SUPABASE.md).
 
 Sur `/connexion`, choisissez un profil pour voir les droits changer :
 
@@ -77,7 +77,8 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 | Automatisations (acompte à l'acceptation, inscription au paiement, solde, emails, tâches, convocations, accusés de réclamation, garde de capacité) | ✅ exécutées côté client en démo — chaîne complète vérifiée dans le navigateur |
 | Qualité | ✅ `pnpm typecheck`, `pnpm lint`, `pnpm build` sans erreur ; 53 écrans vérifiés en clair / sombre / mobile 390 px (aucune erreur console, aucun débordement) |
 | Schéma SQL, RLS, triggers, vues | ✅ appliqués sur le projet Supabase « startupweek » le 26/09/2026 et vérifiés sur la vraie base (empreintes identiques au test local, tables du site inchangées, scénario facture / paiement / synchro `public.event` / droits exécuté puis annulé) — schéma `crm` vide |
-| Bascule du back-office sur Supabase | ⏳ connexion Supabase Auth (lien magique) à coder, schéma `crm` à exposer dans *Data API*, variables Vercel à renseigner, comptes équipe à créer |
+| Connexion de l'équipe (mode `supabase`) | ✅ lien magique Supabase Auth (PKCE), chargement des données depuis la base, écritures ordonnées avec annulation si la base refuse — testé de bout en bout en local (PostgREST + faux service Auth + Chromium) ; migration `20260926150000` (rattachement automatique des membres) écrite et testée, **non appliquée** |
+| Bascule effective sur Supabase | ⏳ réglages Supabase (schéma `crm` exposé, URL de redirection, SMTP), variables Vercel, premier admin — voir [docs/SUPABASE.md § 3-4](docs/SUPABASE.md) ; emails déclenchés depuis l'interface pas encore réellement envoyés |
 | Endpoints `/api/intake`, Stripe, Qonto | ✍️ écrits et testés en local (*dry-run* sans variables d'environnement) — à tester en préproduction avec les vraies API |
 | Envoi réel des emails (Resend) | ⏳ prévu côté serveur (intake) ; les emails déclenchés depuis l'interface sont journalisés en démo |
 | Documents légaux (convention, CGV, attestation) | ⚠️ modèles à faire valider juridiquement (voir le point L.6353-6 dans la proposition) |

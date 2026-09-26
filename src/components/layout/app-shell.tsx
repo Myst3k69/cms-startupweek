@@ -12,6 +12,8 @@ import { useCrm } from "@/lib/store";
 import { computeAlerts } from "@/lib/domain/alerts";
 import { ROLES, labelOf } from "@/lib/domain/constants";
 import { Avatar, Badge, Kbd } from "@/components/ui";
+import { DATA_MODE } from "@/lib/data/supabase";
+import { signOutAndClear } from "@/lib/store/remote-session";
 import { setTheme, useThemePref, type ThemePref } from "./theme";
 import { CommandPalette } from "./command-palette";
 
@@ -155,31 +157,44 @@ function UserSwitcher() {
       </button>
       {open ? (
         <div className="absolute bottom-full left-0 right-0 z-40 mb-1 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-lg">
-          <p className="eyebrow px-3 pb-1 pt-1.5 text-faint">Changer de profil (démo)</p>
-          {users
-            .filter((u) => u.active)
-            .map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={() => {
-                  login(u.id);
-                  setOpen(false);
-                  router.push("/");
-                }}
-                className={cn("flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-2", u.id === user.id && "bg-accent-soft")}
-              >
-                <Avatar name={u.name} color={u.color} size="sm" />
-                <span className="min-w-0 flex-1 truncate">{u.name}</span>
-                <span className="text-[10px] text-muted-foreground">{labelOf(ROLES, u.role)}</span>
-              </button>
-            ))}
+          {DATA_MODE === "supabase" ? (
+            <p className="truncate px-3 pb-1.5 pt-1 text-xs text-muted-foreground" title={user.email}>
+              {user.email}
+            </p>
+          ) : (
+            <>
+              <p className="eyebrow px-3 pb-1 pt-1.5 text-faint">Changer de profil (démo)</p>
+              {users
+                .filter((u) => u.active)
+                .map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => {
+                      login(u.id);
+                      setOpen(false);
+                      router.push("/");
+                    }}
+                    className={cn("flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-2", u.id === user.id && "bg-accent-soft")}
+                  >
+                    <Avatar name={u.name} color={u.color} size="sm" />
+                    <span className="min-w-0 flex-1 truncate">{u.name}</span>
+                    <span className="text-[10px] text-muted-foreground">{labelOf(ROLES, u.role)}</span>
+                  </button>
+                ))}
+            </>
+          )}
           <div className="my-1 h-px bg-border" />
           <button
             type="button"
             onClick={() => {
-              logout();
-              router.push("/connexion");
+              setOpen(false);
+              if (DATA_MODE === "supabase") {
+                void signOutAndClear().then(() => router.push("/connexion"));
+              } else {
+                logout();
+                router.push("/connexion");
+              }
             }}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-danger-text hover:bg-surface-2"
           >

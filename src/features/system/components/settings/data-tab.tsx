@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Database, Download, RotateCcw, TriangleAlert, Upload } from "lucide-react";
+import { Database, Download, RefreshCw, RotateCcw, TriangleAlert, Upload } from "lucide-react";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Modal, useToast } from "@/components/ui";
 import { ID_PREFIX, useCrm, type CrmState } from "@/lib/store";
 import { remoteSync } from "@/lib/data/sync";
+import { reloadWorkspace } from "@/lib/store/remote-session";
 import { useSession, useSettings } from "@/lib/hooks";
 import type { EntityName } from "@/lib/domain/types";
 import { number } from "@/lib/format";
@@ -99,6 +100,14 @@ export function DataTab() {
     setPending(null);
   };
 
+  const [reloading, setReloading] = React.useState(false);
+  const reload = async () => {
+    setReloading(true);
+    const res = await reloadWorkspace();
+    setReloading(false);
+    toast(res.ok ? { title: "Données rechargées", description: "Contenu à jour avec la base." } : { title: "Rechargement impossible", description: res.message, tone: "danger" });
+  };
+
   const reset = () => {
     useCrm.getState().resetDemo();
     setConfirmReset(false);
@@ -121,7 +130,14 @@ export function DataTab() {
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           {remoteSync.mode === "supabase" ? (
-            <p>Chaque modification est écrite dans le schéma <code className="font-mono text-foreground">crm</code> avec les droits de votre rôle (RLS). {remoteSync.errors.length ? <span className="text-danger-text">{remoteSync.errors.length} erreur(s) de synchronisation depuis l'ouverture.</span> : "Aucune erreur de synchronisation."}</p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <p className="min-w-0 flex-1">
+                Chaque modification est écrite dans le schéma <code className="font-mono text-foreground">crm</code> avec les droits de votre rôle (RLS) ; les modifications refusées par la base sont annulées à l'écran. {remoteSync.errors.length ? <span className="text-danger-text">{remoteSync.errors.length} erreur(s) de synchronisation depuis l'ouverture.</span> : "Aucune erreur de synchronisation."}
+              </p>
+              <Button variant="secondary" size="sm" loading={reloading} onClick={() => void reload()}>
+                <RefreshCw /> Recharger depuis la base
+              </Button>
+            </div>
           ) : (
             <p>
               Toutes les données vivent dans ce navigateur (stockage local) et sont générées par le jeu de démonstration — aucune donnée réelle, rien n'est envoyé. Paramètre enregistré : <span className="font-medium text-foreground">{settings.dataMode}</span>.

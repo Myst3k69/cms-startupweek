@@ -8,6 +8,8 @@ import { useHydrated } from "@/lib/hooks";
 import { Avatar, Badge, Skeleton } from "@/components/ui";
 import { ROLES, labelOf, toneOf } from "@/lib/domain/constants";
 import { PERMISSIONS } from "@/lib/auth/permissions";
+import { DATA_MODE } from "@/lib/data/supabase";
+import { MagicLinkPanel } from "./magic-link-panel";
 
 const ROLE_PITCH: Record<string, string> = {
   admin: "Accès complet : finance, paramètres, équipe.",
@@ -36,11 +38,6 @@ const STATS: [string, string][] = [
 ];
 
 export function LoginScreen({ next }: { next: string }) {
-  const hydrated = useHydrated();
-  const users = useCrm((s) => s.users);
-  const login = useCrm((s) => s.login);
-  const router = useRouter();
-
   return (
     <div className="relative grid grid-cols-1 min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <section className="relative hidden overflow-hidden bg-sw-black px-10 py-7 text-white lg:flex lg:flex-col xl:px-16">
@@ -97,48 +94,61 @@ export function LoginScreen({ next }: { next: string }) {
               <Image src="/logo-sw-v4.webp" alt="" width={34} height={34} />
             </span>
           </div>
-          <h2 className="text-xl font-semibold tracking-tight">Connexion</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Mode démo : choisissez un profil. En production, connexion Supabase Auth (lien magique) et droits appliqués en base (RLS).
-          </p>
-          <ul className="mt-6 space-y-2">
-            {!hydrated
-              ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16" />)
-              : users
-                  .filter((u) => u.active)
-                  .map((u) => {
-                    const sections = Object.values(PERMISSIONS[u.role]).filter((a) => a !== "none").length;
-                    return (
-                      <li key={u.id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            login(u.id);
-                            router.push(next);
-                          }}
-                          className="group flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-3 text-left shadow-sm transition-colors hover:border-ring/50 hover:bg-accent-soft"
-                        >
-                          <Avatar name={u.name} color={u.color} size="lg" />
-                          <span className="min-w-0 flex-1">
-                            <span className="flex items-center gap-2">
-                              <span className="truncate text-sm font-medium">{u.name}</span>
-                              <Badge tone={toneOf(ROLES, u.role)}>{labelOf(ROLES, u.role)}</Badge>
-                            </span>
-                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                              {u.title} · {ROLE_PITCH[u.role]} ({sections} sections)
-                            </span>
-                          </span>
-                          <ArrowRight className="size-4 text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-accent-text" />
-                        </button>
-                      </li>
-                    );
-                  })}
-          </ul>
-          <p className="mt-6 flex items-center gap-2 text-xs text-faint">
-            <ShieldCheck className="size-4" /> Données de démonstration fictives, stockées uniquement dans ce navigateur.
-          </p>
+          {DATA_MODE === "supabase" ? <MagicLinkPanel next={next} /> : <DemoProfiles next={next} />}
         </div>
       </section>
     </div>
+  );
+}
+
+/** Mode démo : choix d'un profil fictif (aucune authentification). */
+function DemoProfiles({ next }: { next: string }) {
+  const hydrated = useHydrated();
+  const users = useCrm((s) => s.users);
+  const login = useCrm((s) => s.login);
+  const router = useRouter();
+  return (
+    <>
+      <h2 className="text-xl font-semibold tracking-tight">Connexion</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Mode démo : choisissez un profil. En production, connexion par lien magique (Supabase Auth) et droits appliqués en base (RLS).
+      </p>
+      <ul className="mt-6 space-y-2">
+        {!hydrated
+          ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16" />)
+          : users
+              .filter((u) => u.active)
+              .map((u) => {
+                const sections = Object.values(PERMISSIONS[u.role]).filter((a) => a !== "none").length;
+                return (
+                  <li key={u.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        login(u.id);
+                        router.push(next);
+                      }}
+                      className="group flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-3 text-left shadow-sm transition-colors hover:border-ring/50 hover:bg-accent-soft"
+                    >
+                      <Avatar name={u.name} color={u.color} size="lg" />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium">{u.name}</span>
+                          <Badge tone={toneOf(ROLES, u.role)}>{labelOf(ROLES, u.role)}</Badge>
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                          {u.title} · {ROLE_PITCH[u.role]} ({sections} sections)
+                        </span>
+                      </span>
+                      <ArrowRight className="size-4 text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-accent-text" />
+                    </button>
+                  </li>
+                );
+              })}
+      </ul>
+      <p className="mt-6 flex items-center gap-2 text-xs text-faint">
+        <ShieldCheck className="size-4" /> Données de démonstration fictives, stockées uniquement dans ce navigateur.
+      </p>
+    </>
   );
 }

@@ -12,7 +12,9 @@ Ce document décrit comment passer le back-office du mode démo (données dans l
 >
 > Validé **localement** auparavant, sur une base jetable avec émulation Supabase : RLS par rôle (formateur, commercial, lecture, admin, utilisateur Auth non rattaché, anon), numérotation F/D/REC sans trou, paiements, places restantes et bascule `inscriptions_ouvertes ↔ complet`, synchro ressources, vues d'analytics ; matrice `crm.section_access()` comparée à `PERMISSIONS` (**90/90 combinaisons identiques**) ; les 4 routes API exécutées avec supabase-js contre PostgREST 12.2.3 local (Stripe, Qonto et Resend **simulés**).
 >
-> **Non testé** : clés `sb_secret_…`, exposition du schéma `crm` à l'API (§ 2.4, pas encore faite), connexion Supabase Auth dans l'interface (pas encore codée), vraies API Qonto / Stripe / Resend, runtime Next.js des routes API, import Airtable (aucun script fourni).
+> **Connexion par lien magique (§ 3)** : codée et testée de bout en bout **en local** — PostgreSQL 16 avec les 5 migrations, PostgREST 12.2.3, un faux service Supabase Auth (flux PKCE, jetons signés, codes d'erreur identiques) et Chromium. Scénarios validés : demande de lien (`create_user=false`, adresse normalisée, redirection `/auth/callback?next=…`), échange du code, rattachement automatique par email (migration 5) et repli sans migration 5, chargement des données, création d'un contact écrite en base avec une seule activité, refus RLS annulé à l'écran, rechargement, lien déjà utilisé, lien ouvert dans un autre navigateur, lien expiré, adresse inconnue (réponse neutre, aucun compte créé), compte hors équipe (session fermée), déconnexion, `next=//site-externe` ignoré, enchaînement acceptation → acompte → inscription → solde (écritures liées dans l'ordre, numéros cohérents, rien publié sur le site) ; mode démo inchangé.
+>
+> **Non testé** : le vrai service Supabase Auth (envoi réel de l'email, modèle *Magic Link*, URL de redirection autorisées — § 3.2), clés `sb_secret_…`, exposition du schéma `crm` à l'API (§ 2.4, pas encore faite), vraies API Qonto / Stripe / Resend, runtime Next.js des routes API, import Airtable (aucun script fourni). La migration `20260926150000` n'est **pas appliquée** en production.
 
 ---
 
@@ -35,6 +37,9 @@ Site ◄──────────────── lit ──────�
 | `supabase/migrations/20260926103117_crm_rls.sql` | `team_members.auth_user_id`, `crm.current_role()`, `crm.has_access(section, level)`, RLS + policies |
 | `supabase/migrations/20260926103336_crm_functions.sql` | Numérotation légale, paiements, places restantes, synchro CRM → site, vues |
 | `supabase/migrations/20260926103516_qualiopi_referentiel.sql` | 32 indicateurs Qualiopi |
+| `supabase/migrations/20260926150000_crm_auth_membership.sql` | `crm.claim_team_membership()` (rattachement du compte Auth au membre de même email vérifié) ; audit automatique limité aux écritures hors session d'un membre — **non appliquée en production** |
+| `src/lib/data/supabase.ts`, `src/lib/data/sync.ts` | Client navigateur (PKCE, schéma `crm`) ; chargement paginé et écritures ordonnées avec annulation en cas de refus |
+| `src/lib/auth/supabase-auth.ts`, `src/lib/store/remote-session.ts` | Lien magique, retour `/auth/callback`, membre de l'équipe, ouverture / fermeture de l'espace de travail |
 
 Les noms de fichiers reprennent les versions enregistrées dans l'historique distant (`supabase_migrations.schema_migrations`) lors de l'application du 26/09/2026 : la CLI les reconnaît comme déjà appliquées. Toute évolution passe par une **nouvelle** migration.
 | `src/lib/server/*.ts` | Client service_role, sécurité (HMAC, Stripe, rate-limit, honeypot, CORS), intake |
@@ -117,7 +122,30 @@ Lancer aussi les *advisors* Supabase (Dashboard → Advisors : Security et Perfo
 
 ## 3. Basculer le back-office en mode Supabase
 
-Variables (voir `.env.example`) :
+### 3.1 Ce que fait l'interface en mode `supabase`
+
+- **Connexion par lien magique** (`/connexion` → email → lien → `/auth/callback`), flux PKCE de Supabase Auth, sans mot de passe. `shouldCreateUser: false` : la page de connexion du CRM ne crée **jamais** de compte (le projet héberge aussi les comptes du site). Une adresse inconnue reçoit le même message qu'une adresse valide (on ne révèle pas qui est membre). Le lien ne fonctionne que dans le navigateur où il a été demandé (le vérificateur PKCE y est stocké).
+- Après connexion, le compte doit correspondre à un **membre actif** de `crm.team_members` (sinon : message explicite et session fermée). Avec la migration `20260926150000_crm_auth_membership.sql`, un membre créé dans *Paramètres → Équipe* est **rattaché automatiquement** à sa première connexion (même email, email vérifié). Sans cette migration, le rattachement se fait en SQL (§ 4).
+- **Données** : chargées depuis la base à la connexion (pagination par 1 000 lignes), rien n'est conservé dans le navigateur (seule la session Supabase y est stockée, clé `sw-crm-auth`). Pas de jeu de démo.
+- **Écritures** : exécutées une par une dans l'ordre (les clés étrangères sont respectées pour les enchaînements « acceptation → facture d'acompte → tâche ») ; création = INSERT, modification = UPDATE des seuls champs modifiés (un champ vidé devient NULL) ; la ligne renvoyée par la base (numéro, statut recalculé par trigger) remplace la ligne affichée. **Si la base refuse** (droits RLS, contrainte), la modification est annulée à l'écran et une notification l'explique.
+- Journal d'activité et paramètres (`crm.activities`, `crm.settings`) lus et écrits en base ; *Paramètres → Données → Recharger depuis la base* pour voir les modifications des collègues (pas de temps réel).
+- Déconnexion : menu utilisateur → *Se déconnecter* (ce navigateur uniquement).
+
+### 3.2 Réglages Supabase (Dashboard du projet « startupweek »)
+
+1. **Data API → Exposed schemas** : ajouter `crm` (§ 2.4).
+2. **Authentication → URL Configuration → Redirect URLs** : ajouter les adresses de retour du CRM. **Ne pas modifier le *Site URL*** (c'est celui du site).
+   ```
+   https://<domaine-du-crm>/auth/callback
+   https://cms-startupweek-*-myst3k69s-projects.vercel.app/**      # aperçus Vercel (facultatif)
+   http://localhost:3000/auth/callback                             # développement (facultatif)
+   ```
+   Sans cela, Supabase renvoie le lien vers le *Site URL* (le site public) et la connexion échoue.
+3. **Authentication → Emails → SMTP** : le serveur d'envoi par défaut de Supabase n'envoie qu'aux **membres de l'organisation Supabase** (« Email address not authorized » sinon), avec un plafond horaire bas. Configurer un SMTP personnalisé (ex. Resend, déjà utilisé par le site) — puis ajuster *Rate Limits* si besoin (30 emails / heure par défaut avec un SMTP personnalisé). Si le site envoie déjà ses emails Auth par un SMTP personnalisé, rien à faire.
+4. **Authentication → Emails → Templates → Magic Link** : le modèle doit utiliser `{{ .ConfirmationURL }}` (modèle par défaut). S'il a été personnalisé pour le site avec une URL fixe (`{{ .SiteURL }}/…`), les liens du CRM arriveraient sur le site : utiliser `{{ .RedirectTo }}`, ou `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=magiclink` (géré par `/auth/callback`, fonctionne alors depuis n'importe quel navigateur).
+5. Appliquer la migration `20260926150000_crm_auth_membership.sql` (rattachement automatique + journal sans doublon ; testée localement, voir § 11).
+
+### 3.3 Variables Vercel (Production, et Preview si besoin)
 
 ```
 NEXT_PUBLIC_CRM_DATA_MODE=supabase
@@ -126,28 +154,33 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…
 SUPABASE_SECRET_KEY=sb_secret_…          # serveur uniquement (routes /api/*)
 ```
 
-⚠️ **Pré-requis côté interface (hors périmètre de ce lot)** : en mode `supabase`, `src/lib/data/sync.ts` utilise la clé publiable ; toutes les lectures/écritures passent par la RLS et **ne renvoient rien sans session Supabase Auth**. La connexion de démo (`login(userId)` du store) ne suffit pas : l'écran de connexion doit ouvrir une vraie session (`supabase.auth.signInWithOtp` / `signInWithPassword`) avant `loadAll()`.
+Les variables `NEXT_PUBLIC_*` sont intégrées **au build** : redéployer après les avoir modifiées.
 
-Autres points à connaître :
-- **Numéros de facture** : en mode Supabase, laisser `number` vide sur les brouillons ; la base attribue `F-AAAA-NNNN` au passage du statut `brouillon` → autre chose, dans la même transaction (sans trou). Un numéro fourni explicitement est accepté et le compteur est réaligné (`crm.sync_document_counter`). Une facture émise ne peut plus changer de numéro ni être supprimée (émettre un avoir).
-- `invoices.paid_cents` / `status` et `applications.amount_paid_cents` sont recalculés par trigger à chaque paiement : l'interface peut les lire, inutile de les écrire.
-- Les sessions passent seules de `inscriptions_ouvertes` à `complet` (et inversement) quand les candidatures `inscrite` ou la capacité changent, comme l'ancien schedule n8n. Une session sans place libre ne peut pas être (ré)ouverte. Pour **fermer manuellement** les inscriptions alors qu'il reste des places, avancer la date limite (`registration_deadline`) : aucune réouverture automatique n'a lieu après cette date.
+### 3.4 Limites connues du mode `supabase` (à lire avant usage réel)
+
+- **Emails déclenchés depuis l'interface** (acceptation, refus, relances, convocations…) : enregistrés dans `crm.email_messages` et le journal, **mais pas envoyés** — aucun envoi réel n'est branché côté interface (seuls les accusés de réception de `/api/intake` passent par Resend). À brancher avant de s'y fier. Par ailleurs `crm.email_templates` est **vide** en base (les modèles n'existent que dans le jeu de démo) : à créer dans *Emails → Modèles* ou à importer.
+- **Numéros de facture** : l'interface calcule le prochain numéro à partir des factures chargées et la base l'accepte en réalignant son compteur. Deux personnes émettant une facture au même instant obtiendraient le même numéro : la seconde est refusée par la base (doublon, index unique) et annulée à l'écran — à réémettre. Une facture émise ne peut plus changer de numéro ni être supprimée (émettre un avoir).
+- `invoices.paid_cents` / `status` et `applications.amount_paid_cents` sont recalculés par trigger à chaque paiement.
+- Les sessions passent seules de `inscriptions_ouvertes` à `complet` (et inversement) quand les candidatures `inscrite` ou la capacité changent. Pour **fermer manuellement** les inscriptions alors qu'il reste des places, avancer la date limite (`registration_deadline`).
+- Pas de synchronisation en temps réel entre collègues : bouton *Recharger depuis la base*.
+- L'import JSON (*Paramètres → Données*) ne modifie que l'affichage local.
 
 ---
 
 ## 4. Créer les comptes de l'équipe
 
-Le projet Supabase héberge aussi les comptes des participants du site : le rôle `authenticated` inclut donc des personnes extérieures. La RLS ne donne accès au schéma `crm` **qu'aux utilisateurs présents et actifs dans `crm.team_members`** (vérifié : un compte Auth non rattaché voit 0 ligne).
+Le projet Supabase héberge aussi les comptes des participants du site : le rôle `authenticated` inclut donc des personnes extérieures. La RLS ne donne accès au schéma `crm` **qu'aux utilisateurs présents et actifs dans `crm.team_members`** (vérifié sur la base réelle : un compte Auth non rattaché voit 0 ligne).
 
-1. Dashboard → Authentication → Users → *Invite user* (email de la personne).
-2. Rattacher le compte à un membre et un rôle (`admin`, `commercial`, `pedagogie`, `formateur`, `lecture`) :
+1. **Compte Auth** de chaque membre (la page de connexion n'en crée pas) : Dashboard → Authentication → Users → *Add user* → *Create new user* (email, « Auto Confirm User » coché, mot de passe aléatoire jamais utilisé) — ou *Invite user*. NB : le trigger `handle_new_user` du site crée aussi un profil côté site pour ce compte.
+2. **Premier administrateur** (personne ne peut encore utiliser *Paramètres → Équipe*) — SQL Editor :
    ```sql
    insert into crm.team_members (name, email, role, title, auth_user_id)
    select 'Prénom Nom', u.email, 'admin', 'Fondateur', u.id
-   from auth.users u where u.email = 'prenom@startupweek.tech';
+   from auth.users u where lower(u.email) = 'prenom@startupweek.tech';
    ```
-3. Désactiver un accès : `update crm.team_members set active = false where email = '…';` (effet immédiat).
-4. Renseigner les référents dans `crm.settings` (`quality_lead_id`, `disability_lead_id`, `siret`, `nda`, `iban`, `address`).
+3. **Autres membres** : avec la migration `20260926150000`, l'admin les ajoute dans *Paramètres → Équipe* (nom, email, rôle) ; leur compte est rattaché à leur première connexion. Sans cette migration : même requête SQL qu'au point 2 avec le bon rôle (`admin`, `commercial`, `pedagogie`, `formateur`, `lecture`).
+4. Désactiver un accès : *Paramètres → Équipe* ou `update crm.team_members set active = false where email = '…';` (effet à la prochaine requête).
+5. Renseigner les référents dans *Paramètres* (`quality_lead_id`, `disability_lead_id`, `siret`, `nda`, `iban`, `address`).
 
 ---
 
@@ -382,10 +415,13 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 6. **Qonto v2** : champs `id`, `amount_cents`, `side`, `settled_at`, `reference`, pagination `meta.next_page` et filtre `status[]=completed` (d'après la documentation ; non appelés réellement).
 7. **Rate-limit** en mémoire : par instance serverless (suffisant contre le spam ; pas une limite globale).
 8. Jours fériés non gérés dans le calcul « 48 h ouvrées » des réclamations (samedi/dimanche seulement).
+9. **Migration `20260926150000`** (non appliquée) : testée localement — compte à email vérifié rattaché au membre de même email (casse ignorée), email non vérifié / membre désactivé / compte sans membre → rien, `anon` refusé ; écriture d'un membre connecté → pas d'audit automatique (l'interface journalise), écriture service_role → audit conservé. `auth.users.email_confirmed_at` est supposée présente (colonne standard de Supabase Auth).
 
 ## 12. Reste à faire (hors de ce lot)
 
-- Écran de connexion Supabase Auth dans le back-office (§ 3).
+- Envoi réel des emails déclenchés depuis l'interface (§ 3.4) et modèles d'emails en base (`crm.email_templates` vide).
+- Numérotation des factures attribuée par la base plutôt que par l'interface (supprime le risque de doublon simultané, § 3.4).
+- Synchronisation en temps réel entre collègues (Supabase Realtime) — aujourd'hui : bouton *Recharger depuis la base*.
 - Envoi des emails programmés (`crm.email_messages` au statut `programme`, ex. séquence Digital Starter Kit) : un cron d'envoi reste à écrire ; seuls les accusés de réception sont envoyés immédiatement.
 - Types TypeScript générés (`supabase gen types typescript --schema crm`) pour supprimer les casts du client service_role.
 - Script d'import Airtable (§ 8).
