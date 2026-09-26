@@ -656,6 +656,41 @@ export interface ContentItem extends BaseEntity {
   scheduledAt?: ISODate;
   publishedAt?: ISODate;
   metrics: { views: number; clicks: number; leads: number };
+  /** Blog : rubrique affichée (« Méthodologie »…). FAQ : clé de catégorie (FAQ_CATEGORIES). */
+  category?: string;
+  /** Ordre d'affichage (FAQ : dans sa catégorie ; blog : départage à date égale). */
+  sortOrder?: number;
+  /** Champs propres aux articles du blog (colonne jsonb `meta`). */
+  meta?: ContentMeta;
+}
+
+export interface BlogAuthor {
+  name: string;
+  role: string;
+  image: string;
+  bio: string;
+}
+
+export interface BlogCta {
+  title: string;
+  description: string;
+  primaryLabel: string;
+  primaryHref: string;
+  secondaryLabel?: string;
+  secondaryHref?: string;
+}
+
+/** Données d'un article du blog lues par le site (public.blog_post.meta). */
+export interface ContentMeta {
+  readTime?: string;
+  author?: BlogAuthor;
+  keyPoints?: string[];
+  faq?: { question: string; answer: string }[];
+  cta?: BlogCta;
+  relatedPosts?: string[];
+  /** Sommaire explicite (sinon déduit des titres ##). */
+  toc?: { id: string; title: string; level: number }[];
+  mobileImage?: string;
 }
 
 /* ───────────────────────────── Analytics & automatisations ───────────────────────────── */

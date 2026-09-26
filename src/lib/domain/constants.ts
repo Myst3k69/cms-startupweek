@@ -457,6 +457,24 @@ export const CHANNELS = opts<Channel>({
   newsletter: "Newsletter",
 });
 
+/** Catégories de la page FAQ du site (clé stockée dans `contents.category`, libellé et icône côté site). */
+export const FAQ_CATEGORIES: { value: string; label: string }[] = [
+  { value: "general", label: "Questions générales" },
+  { value: "formations", label: "Programme & formats" },
+  { value: "sessions", label: "Sessions & réservations" },
+  { value: "pratique", label: "Aspects pratiques" },
+  { value: "resultats", label: "Résultats & garanties" },
+  { value: "technique", label: "Aspects techniques" },
+  { value: "accessibilite", label: "Accessibilité & inclusion" },
+];
+
+/** Rubriques déjà utilisées par le blog (suggestions ; saisie libre possible). */
+export const BLOG_CATEGORIES = [
+  "Méthodologie", "Méthode", "Stratégie", "Bootcamp", "Formation", "Formation IA", "MVP IA", "Outils", "Développement",
+  "Budget", "Financement", "Concepts", "Comparatif", "Guide", "Case Study", "Analytics", "Communication",
+  "Automatisation IA", "Actualité IA", "Métier", "Reconversion",
+];
+
 /** Les 7 critères du Référentiel National Qualité (Qualiopi). */
 export const QUALIOPI_CRITERIA: { code: number; title: string; short: string }[] = [
   { code: 1, short: "Information du public", title: "Conditions d'information du public sur les prestations, les délais d'accès et les résultats obtenus" },
