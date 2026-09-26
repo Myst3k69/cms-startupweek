@@ -21,7 +21,8 @@ import { QUALIOPI_REFERENTIEL } from "@/lib/data/qualiopi-referentiel";
 import type { ID, Resource, ResourceCategory, ResourceFormat, Visibility } from "@/lib/domain/types";
 import { date, number, relative } from "@/lib/format";
 import { cn, uid } from "@/lib/utils";
-import { bumpVersion, fileSize, formatFromExt, storageUrl, urlKind, VISIBILITY_HINT } from "../lib/resource";
+import { bumpVersion, fileSize, formatFromExt, storagePath, uploadRefusal, urlKind, VISIBILITY_HINT } from "../lib/resource";
+import { discardResourceFiles, uploadResourceFile } from "../lib/resource-storage";
 import { FileDropzone, type DroppedFile } from "./file-dropzone";
 
 interface Draft {
@@ -86,6 +87,18 @@ export function ResourceDrawer({ resource, onClose }: { resource?: Resource; onC
   const [errors, setErrors] = React.useState<{ title?: string; url?: string }>({});
   const [eventQuery, setEventQuery] = React.useState("");
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  // Fichiers envoyés pendant cette édition : ceux qui ne sont pas enregistrés sont retirés du stockage.
+  const uploads = React.useRef<{ open: boolean; files: { path: string; url: string }[] }>({ open: true, files: [] });
+
+  React.useEffect(() => {
+    const u = uploads.current;
+    u.open = true;
+    return () => {
+      u.open = false;
+      discardResourceFiles(u.files.splice(0).map((f) => f.path));
+    };
+  }, []);
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
@@ -95,14 +108,34 @@ export function ResourceDrawer({ resource, onClose }: { resource?: Resource; onC
     return sortedEvents.filter((e) => !q || `${e.code} ${e.name} ${e.city}`.toLowerCase().includes(q));
   }, [sortedEvents, eventQuery]);
 
-  const onFile = (f: DroppedFile, replace: boolean) => {
-    setDraft((d) => {
-      const version = replace ? bumpVersion(d.version) : d.version;
-      const title = d.title || f.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
-      return { ...d, title, sizeKb: f.sizeKb, format: formatFromExt(f.ext) ?? d.format, url: storageUrl(f.name, `v${version.replace(/[^0-9a-z]+/gi, "-")}-${uid("f").slice(2, 7)}`), version };
-    });
+  const onFile = async (f: DroppedFile, replace: boolean) => {
+    const refusal = uploadRefusal({ name: f.name, ext: f.ext, bytes: f.file.size });
+    if (refusal) {
+      toast({ title: "Fichier refusé", description: refusal, tone: "danger" });
+      return;
+    }
+    const version = replace ? bumpVersion(draft.version) : draft.version;
+    // Chemin jamais réutilisé (version + aléa) : l'URL d'une version publiée ne change pas.
+    const path = storagePath(f.name, `v${version.replace(/[^0-9a-z]+/gi, "-")}-${uid("f").slice(2)}`);
+    setUploading(true);
+    let url: string;
+    try {
+      url = await uploadResourceFile(f.file, path, f.ext);
+    } catch (e) {
+      toast({ title: "Envoi impossible", description: e instanceof Error ? e.message : "Erreur inconnue.", tone: "danger" });
+      return;
+    } finally {
+      setUploading(false);
+    }
+    const u = uploads.current;
+    if (!u.open) {
+      discardResourceFiles([path]); // formulaire fermé pendant l'envoi
+      return;
+    }
+    u.files.push({ path, url });
+    setDraft((d) => ({ ...d, title: d.title || f.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "), sizeKb: f.sizeKb, format: formatFromExt(f.ext) ?? d.format, url, version }));
     setErrors((e) => ({ ...e, url: undefined }));
-    toast({ title: replace ? "Nouvelle version prête" : "Fichier prêt", description: `${f.name} · ${fileSize(f.sizeKb)} — enregistrez pour publier.`, tone: "info" });
+    toast({ title: replace ? "Nouvelle version envoyée" : "Fichier envoyé", description: `${f.name} · ${fileSize(f.sizeKb)} — enregistrez pour publier.`, tone: "info" });
   };
 
   const toggleEvent = (id: ID) => set("eventIds", draft.eventIds.includes(id) ? draft.eventIds.filter((x) => x !== id) : [...draft.eventIds, id]);
@@ -110,6 +143,7 @@ export function ResourceDrawer({ resource, onClose }: { resource?: Resource; onC
     set("indicatorCodes", draft.indicatorCodes.includes(code) ? draft.indicatorCodes.filter((x) => x !== code) : [...draft.indicatorCodes, code].sort((a, b) => a - b));
 
   const save = () => {
+    if (uploading) return;
     const next: typeof errors = {};
     if (draft.title.trim().length < 3) next.title = "Titre requis (3 caractères minimum).";
     if (!/^https:\/\/\S+$/.test(draft.url.trim())) next.url = "Déposez un fichier ou saisissez une URL https.";
@@ -138,6 +172,7 @@ export function ResourceDrawer({ resource, onClose }: { resource?: Resource; onC
       syncEventLinks(resource.id, resource.eventIds, data.eventIds);
       toast({ title: "Ressource enregistrée" });
     }
+    discardResourceFiles(uploads.current.files.splice(0).filter((f) => f.url !== data.url).map((f) => f.path));
     onClose();
   };
 
@@ -179,7 +214,9 @@ export function ResourceDrawer({ resource, onClose }: { resource?: Resource; onC
               <Button variant="secondary" onClick={onClose}>
                 Annuler
               </Button>
-              <Button onClick={save}>{isNew ? "Ajouter" : "Enregistrer"}</Button>
+              <Button onClick={save} disabled={uploading}>
+                {isNew ? "Ajouter" : "Enregistrer"}
+              </Button>
             </>
           ) : (
             <Button variant="secondary" onClick={onClose}>
@@ -192,7 +229,7 @@ export function ResourceDrawer({ resource, onClose }: { resource?: Resource; onC
           {/* Fichier */}
           <section className="space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fichier</h3>
-            {isNew && !draft.url ? <FileDropzone onFile={(f) => onFile(f, false)} disabled={!editable} /> : null}
+            {isNew && !draft.url ? <FileDropzone onFile={(f) => void onFile(f, false)} disabled={!editable} busy={uploading} /> : null}
             {draft.url ? (
               <div className="space-y-2 rounded-md border border-border bg-surface-2/50 p-3">
                 <div className="flex items-center gap-2">
@@ -216,12 +253,12 @@ export function ResourceDrawer({ resource, onClose }: { resource?: Resource; onC
                     Les pièces jointes Airtable expirent après quelques heures : redéposez le fichier pour obtenir une URL stable.
                   </p>
                 ) : null}
-                {editable ? <FileDropzone compact onFile={(f) => onFile(f, !isNew)} /> : null}
+                {editable ? <FileDropzone compact onFile={(f) => void onFile(f, !isNew)} busy={uploading} /> : null}
               </div>
             ) : null}
             {editable ? (
               <FormField label="URL (fichier ou lien Notion / Figma / vidéo)" htmlFor="rs-url" error={errors.url}>
-                <Input id="rs-url" value={draft.url} onChange={(e) => { set("url", e.target.value); setErrors((x) => ({ ...x, url: undefined })); }} placeholder="https://storage.startupweek.tech/ressources/…" className="font-mono text-xs" />
+                <Input id="rs-url" value={draft.url} disabled={uploading} onChange={(e) => { set("url", e.target.value); setErrors((x) => ({ ...x, url: undefined })); }} placeholder="https://…" className="font-mono text-xs" />
               </FormField>
             ) : null}
           </section>
