@@ -14,12 +14,18 @@ export type Inline =
   | { t: "code"; v: string }
   | { t: "link"; href: string; external: boolean; c: Inline[] };
 
+/** Encadrés du blog (`> [!info] texte`), rendus en couleur sur le site. */
+export type CalloutKind = "info" | "warning" | "success" | "tip";
+
 export type Block =
   | { t: "h"; level: 1 | 2 | 3 | 4; c: Inline[] }
   | { t: "p"; c: Inline[] }
   | { t: "ul"; items: Inline[][] }
   | { t: "ol"; start: number; items: Inline[][] }
   | { t: "quote"; c: Inline[] }
+  | { t: "callout"; kind: CalloutKind; c: Inline[] }
+  | { t: "table"; headers: Inline[][]; rows: Inline[][][] }
+  | { t: "image"; src: string; caption: string }
   | { t: "hr" }
   | { t: "code"; v: string };
 
@@ -91,7 +97,26 @@ export function parseMarkdown(src: string): Block[] {
     const h = /^(#{1,4})\s+(.+?)\s*#*\s*$/.exec(line);
     if (h) {
       flush();
-      blocks.push({ t: "h", level: h[1].length as 1 | 2 | 3 | 4, c: parseInline(h[2]) });
+      blocks.push({ t: "h", level: h[1].length as 1 | 2 | 3 | 4, c: parseInline(stripAnchor(h[2])) });
+      continue;
+    }
+    const img = /^!\[((?:[^\]\\]|\\.)*)\]\((\S*)\)\s*$/.exec(line.trim());
+    if (img) {
+      flush();
+      blocks.push({ t: "image", src: img[2], caption: img[1].replace(/\\\]/g, "]") });
+      continue;
+    }
+    if (line.startsWith("|")) {
+      flush();
+      const rowsSrc: string[] = [];
+      while (i < lines.length && lines[i].startsWith("|")) rowsSrc.push(lines[i++]);
+      i--;
+      const [head, ...rest] = rowsSrc;
+      blocks.push({
+        t: "table",
+        headers: splitRow(head).map(parseInline),
+        rows: rest.filter((l) => !/^\|\s*:?-{3,}/.test(l)).map((l) => splitRow(l).map(parseInline)),
+      });
       continue;
     }
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
@@ -104,7 +129,9 @@ export function parseMarkdown(src: string): Block[] {
       const q: string[] = [];
       while (i < lines.length && /^\s*>/.test(lines[i])) q.push(lines[i++].replace(/^\s*>\s?/, ""));
       i--;
-      blocks.push({ t: "quote", c: parseInline(q.join(" ").trim()) });
+      const callout = /^\[!(info|warning|success|tip)\]\s?([\s\S]*)$/.exec(q.join("\n"));
+      if (callout) blocks.push({ t: "callout", kind: callout[1] as CalloutKind, c: parseInline(callout[2].replace(/\n/g, " ").trim()) });
+      else blocks.push({ t: "quote", c: parseInline(q.join(" ").trim()) });
       continue;
     }
     if (/^\s*[-*+]\s+/.test(line)) {
@@ -124,16 +151,52 @@ export function parseMarkdown(src: string): Block[] {
       blocks.push({ t: "ol", start: Number(ol[1]) || 1, items });
       continue;
     }
-    para.push(line.trim());
+    para.push(line.trim().replace(/^\\/, ""));
   }
   flush();
   return blocks;
+}
+
+/** Retire l'ancre explicite d'un titre : « Titre {#h2-ancre} » → « Titre ». */
+export function stripAnchor(text: string): string {
+  return text.replace(/\s*\{#[^}\s]+\}\s*$/, "");
+}
+
+/** Cellules d'une ligne de tableau (« \| » = barre verticale littérale). */
+function splitRow(line: string): string[] {
+  const inner = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  const cells: string[] = [];
+  let cur = "";
+  for (let k = 0; k < inner.length; k++) {
+    const ch = inner[k];
+    if (ch === "\\" && k + 1 < inner.length) {
+      cur += inner[k + 1] === "n" ? "\n" : inner[k + 1];
+      k++;
+    } else if (ch === "|") {
+      cells.push(cur.trim());
+      cur = "";
+    } else cur += ch;
+  }
+  cells.push(cur.trim());
+  return cells;
+}
+
+/** Titres de niveau 2 du corps (aperçu du sommaire de l'article). */
+export function headingsOf(src: string): string[] {
+  return src
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((l) => /^##\s+(.+?)\s*$/.exec(l))
+    .filter((m): m is RegExpExecArray => Boolean(m))
+    .map((m) => stripAnchor(m[1]));
 }
 
 /** Texte brut (comptage de mots, extrait auto). */
 export function plainText(src: string): string {
   return src
     .replace(/```[\s\S]*?```/g, " ")
+    .replace(/\{#[^}\s]+\}/g, " ")
+    .replace(/\[!(info|warning|success|tip)\]/g, " ")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/[#>*_`~-]+/g, " ")
     .replace(/\s+/g, " ")

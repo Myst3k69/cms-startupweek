@@ -39,13 +39,14 @@ import { ActivityTimeline } from "@/components/shared/timeline";
 import { SessionLink } from "@/components/shared/entity-links";
 import { useActions, useCollection, useEntity, useNow, useSession, useSettings } from "@/lib/hooks";
 import { CHANNELS, CONTENT_STATUSES, CONTENT_TYPES, labelOf } from "@/lib/domain/constants";
-import type { Channel, ContentItem, ContentType } from "@/lib/domain/types";
+import type { Channel, ContentItem, ContentMeta, ContentType } from "@/lib/domain/types";
 import { dateTime, number, percent, relative } from "@/lib/format";
 import { slugify } from "@/lib/utils";
 import { CHANNEL_COLOR, fromLocalInput, publicPath, siteHost, splitTags, toLocalInput } from "../lib/content";
 import { plainText, wordCount } from "../lib/markdown";
 import { MarkdownEditor } from "./markdown-editor";
 import { SeoPanel } from "./seo-panel";
+import { cleanMeta, SitePublicationPanel, siteKind } from "./site-publication-panel";
 
 interface Draft {
   title: string;
@@ -60,6 +61,11 @@ interface Draft {
   seoDescription: string;
   eventId: string;
   scheduledAt: string; // datetime-local
+  /** Publication sur le site (blog / FAQ) */
+  category: string;
+  sortOrder: string;
+  coverUrl: string;
+  meta: ContentMeta;
 }
 
 function toDraft(c: ContentItem): Draft {
@@ -76,6 +82,10 @@ function toDraft(c: ContentItem): Draft {
     seoDescription: c.seoDescription ?? "",
     eventId: c.eventId ?? "",
     scheduledAt: toLocalInput(c.scheduledAt),
+    category: c.category ?? "",
+    sortOrder: String(c.sortOrder ?? 0),
+    coverUrl: c.coverUrl ?? "",
+    meta: c.meta ?? {},
   };
 }
 
@@ -93,6 +103,10 @@ function fromDraft(d: Draft): Partial<ContentItem> {
     seoDescription: d.seoDescription.trim() || undefined,
     eventId: d.eventId || undefined,
     scheduledAt: fromLocalInput(d.scheduledAt),
+    category: d.category.trim(),
+    sortOrder: Number.parseInt(d.sortOrder, 10) || 0,
+    coverUrl: d.coverUrl.trim() || undefined,
+    meta: cleanMeta(d.meta),
   };
 }
 
@@ -162,8 +176,15 @@ function EditorInner({ item }: { item: ContentItem }) {
     [events],
   );
 
-  const validate = (): boolean => {
+  const kind = siteKind(draft.type, draft.channel);
+  const blogSlugs = React.useMemo(
+    () => contents.filter((c) => c.id !== item.id && c.type === "article" && c.channel === "blog" && c.slug).map((c) => c.slug).sort(),
+    [contents, item.id],
+  );
+
+  const validate = (publishing = false): boolean => {
     const next: Partial<Record<keyof Draft, string>> = {};
+    if (publishing && kind === "faq" && !draft.category) next.category = "Choisissez la catégorie de la FAQ où afficher la question.";
     if (draft.title.trim().length < 3) next.title = "Titre requis (3 caractères minimum).";
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(draft.slug.trim())) next.slug = "Slug invalide : minuscules, chiffres et tirets uniquement.";
     else if (contents.some((c) => c.id !== item.id && c.slug === draft.slug.trim())) next.slug = "Ce slug est déjà utilisé par un autre contenu.";
@@ -174,9 +195,10 @@ function EditorInner({ item }: { item: ContentItem }) {
   };
 
   /** Enregistre le brouillon (+ éventuel changement de statut) en une seule mutation journalisée. */
-  const persist = (extra: Partial<ContentItem> = {}, log = "Contenu enregistré", kind: "modification" | "statut" = "modification") => {
-    if (!editable || !validate()) return false;
-    update("contents", item.id, { ...fromDraft(draft), ...extra }, { log, kind });
+  const persist = (extra: Partial<ContentItem> = {}, log = "Contenu enregistré", logKind: "modification" | "statut" = "modification") => {
+    if (!editable || !validate(extra.status === "publie" || (extra.status === undefined && item.status === "publie"))) return false;
+    update("contents", item.id, { ...fromDraft(draft), ...extra }, { log, kind: logKind });
+    setDraft((d) => ({ ...d, meta: cleanMeta(d.meta) }));
     return true;
   };
 
@@ -453,10 +475,31 @@ function EditorInner({ item }: { item: ContentItem }) {
                 </div>
               </FormField>
               <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-muted-foreground">
-                Publication automatique : les contenus « Publié » des canaux Site et Blog sont lus par startupweek.tech (revalidation à la demande) — plus besoin de modifier le code du site.
+                {kind === "blog"
+                  ? "Publication automatique : un article de blog « Publié » est en ligne sur startupweek.tech/blog sous 60 s ; le repasser en rédaction ou l'archiver le retire."
+                  : kind === "faq"
+                    ? "Publication automatique : une question « Publiée » apparaît sur startupweek.tech/faq sous 60 s."
+                    : "Seuls les articles (canal Blog) et les questions de FAQ sont publiés automatiquement sur le site. Les autres contenus servent au planning éditorial."}
               </p>
             </CardContent>
           </Card>
+
+          {kind ? (
+            <SitePublicationPanel
+              kind={kind}
+              value={{ category: draft.category, sortOrder: draft.sortOrder, coverUrl: draft.coverUrl, meta: draft.meta }}
+              body={draft.body}
+              words={words}
+              users={users}
+              blogSlugs={blogSlugs}
+              disabled={!editable}
+              error={errors.category}
+              onChange={(p) => {
+                setDraft((d) => ({ ...d, ...p }));
+                setErrors((e) => ({ ...e, category: undefined }));
+              }}
+            />
+          ) : null}
 
           <SeoPanel
             title={draft.title}

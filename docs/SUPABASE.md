@@ -287,6 +287,23 @@ Points d'attention côté site :
 
 ---
 
+## 5 bis. Blog et FAQ du site pilotés par le back-office
+
+Migration `20260926190000_crm_contents_site_sync.sql` (version définitive attribuée à l'application en production). Même principe que les sessions : le CRM écrit dans des tables publiques que le site lit côté serveur (clé secrète, revalidation 60 s).
+
+| Contenu CRM (*Contenus*) | Condition | Table lue par le site | Page |
+| --- | --- | --- | --- |
+| Type « Article de blog », canal **Blog**, slug renseigné | statut **Publié** | `public.blog_post` | `/blog` et `/blog/<slug>` |
+| Type « FAQ » (question = titre, réponse = corps) | statut **Publié** | `public.faq_item` | `/faq` (catégorie + ordre) |
+
+- Tout autre statut (rédaction, relecture, planifié, archivé) ou la suppression retire la ligne publique. La **planification** n'est pas encore automatique : un contenu « Planifié » ne passe pas seul en « Publié » (cron à écrire).
+- Deux articles publiés avec le même slug : le second n'est pas publié, un incident `systeme` l'indique dans le journal ; il est repris dès que le slug se libère.
+- `crm.contents` gagne `category` (rubrique du blog / clé de catégorie FAQ), `sort_order` et `meta` (jsonb : temps de lecture, auteur, points clés, FAQ de l'article, appel à l'action, articles liés, sommaire, image mobile). Éditeur : panneau « Article du blog » / « Page FAQ du site ».
+- **Format du corps** (Markdown étendu, converti en blocs par le site — `lib/blog/markdown.ts` du site) : `## Titre {#h2-ancre}`, paragraphes, `**gras**`, liens `[texte](/url)`, listes `- `, citations `> `, encadrés `> [!info|warning|success|tip] texte`, tableaux `| a | b |`, images `![légende](/image.webp)`.
+- `public.blog_post` / `public.faq_item` : RLS active sans policy, droits retirés à `anon` / `authenticated` ; seul le serveur du site (service_role) les lit.
+- **Repli du site** : tant que la table est vide, non configurée ou en erreur, le site affiche les articles et questions livrés avec son code.
+- **Reprise initiale** : `npx tsx scripts/export-content-for-crm.ts` (dépôt du site) exporte les 34 articles et 41 questions actuels en lignes `crm.contents` (identifiants `cnt_blog_<slug>` / `cnt_faq_<id>`, import rejouable). Vérifié en local (PostgreSQL 16 + PostgREST, site construit sur la base) : 34 articles et la FAQ rendus **à l'identique** (HTML comparé page à page) ; seule la liste `/blog` change l'ordre de deux cartes, désormais triée strictement par date (l'article du 19/08 était placé après celui du 18/08).
+
 ## 6. Brancher Stripe
 
 1. Dashboard Stripe → Developers → Webhooks → *Add endpoint* : `https://cms-startupweek.vercel.app/api/stripe/webhook`.
