@@ -289,7 +289,7 @@ Points d'attention côté site :
 
 ## 5 bis. Blog et FAQ du site pilotés par le back-office
 
-Migration `20260926190000_crm_contents_site_sync.sql` (version définitive attribuée à l'application en production). Même principe que les sessions : le CRM écrit dans des tables publiques que le site lit côté serveur (clé secrète, revalidation 60 s).
+Migration `20260926184846_crm_contents_site_sync.sql`, **appliquée en production le 26/09/2026** (empreinte des fonctions, colonnes, trigger et RLS identique au test local). Reprise faite le même jour : 34 articles et 41 questions importés dans `crm.contents` (fonction Edge à usage unique `crm-import-contenus`, neutralisée — réponse 410 — et supprimable depuis le Dashboard) ; contenu de `public.blog_post` / `public.faq_item` identique (empreintes) à la copie locale sur laquelle le rendu du site a été comparé. Même principe que les sessions : le CRM écrit dans des tables publiques que le site lit côté serveur (clé secrète, revalidation 60 s).
 
 | Contenu CRM (*Contenus*) | Condition | Table lue par le site | Page |
 | --- | --- | --- | --- |
