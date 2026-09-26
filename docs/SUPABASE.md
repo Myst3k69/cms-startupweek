@@ -136,12 +136,11 @@ Lancer aussi les *advisors* Supabase (Dashboard → Advisors : Security et Perfo
 1. ✅ **Data API → Exposed schemas** : ajouter `crm` (§ 2.4) — fait le 26/09/2026.
 2. **Authentication → URL Configuration → Redirect URLs** : ajouter l'adresse de retour du CRM — toujours exactement `<adresse du CRM>/auth/callback` (la page à rouvrir après connexion est mémorisée dans le navigateur, pas dans l'URL). **Ne pas modifier le *Site URL*** (c'est celui du site).
    ```
-   https://cms-startupweek.vercel.app/auth/callback        # adresse de production Vercel du projet
-   https://crm.startupweek.tech/auth/callback              # si un sous-domaine est ajouté au projet Vercel
+   https://cms-startupweek.vercel.app/auth/callback        # adresse du CRM retenue (production Vercel)
    https://cms-startupweek-*-myst3k69s-projects.vercel.app/auth/callback   # aperçus Vercel (facultatif)
    http://localhost:3000/auth/callback                     # développement (facultatif)
    ```
-   Sans cela, Supabase renvoie le lien vers le *Site URL* (le site public) et la connexion échoue.
+   Sans cela, Supabase renvoie le lien vers le *Site URL* (le site public) et la connexion échoue. Un sous-domaine (ex. `crm.startupweek.tech`) pourra être ajouté plus tard : l'ajouter au projet Vercel (Settings → Domains) et à cette liste, sans rien changer au code.
 3. **Authentication → Emails → SMTP** : le serveur d'envoi par défaut de Supabase n'envoie qu'aux **membres de l'organisation Supabase** (« Email address not authorized » sinon), avec un plafond horaire bas. Configurer un SMTP personnalisé (ex. Resend, déjà utilisé par le site) — puis ajuster *Rate Limits* si besoin (30 emails / heure par défaut avec un SMTP personnalisé). Si le site envoie déjà ses emails Auth par un SMTP personnalisé, rien à faire.
 4. **Authentication → Emails → Templates → Magic Link** : le modèle doit utiliser `{{ .ConfirmationURL }}` (modèle par défaut). S'il a été personnalisé pour le site avec une URL fixe (`{{ .SiteURL }}/…`), les liens du CRM arriveraient sur le site : utiliser `{{ .RedirectTo }}`, ou `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=magiclink` (géré par `/auth/callback`, fonctionne alors depuis n'importe quel navigateur).
 5. Appliquer la migration `20260926150000_crm_auth_membership.sql` (rattachement automatique + journal sans doublon ; testée localement, voir § 11).
@@ -216,7 +215,7 @@ Idempotence : `leadId` (candidature, chaque étape du tunnel met à jour la mêm
 Remplacer les variables `N8N_WEBHOOK_*` par :
 
 ```
-CRM_INTAKE_URL=https://<domaine-du-crm>/api/intake
+CRM_INTAKE_URL=https://cms-startupweek.vercel.app/api/intake
 CRM_INTAKE_SECRET=<même valeur que INTAKE_SIGNING_SECRET>
 ```
 
@@ -284,7 +283,7 @@ Points d'attention côté site :
 
 ## 6. Brancher Stripe
 
-1. Dashboard Stripe → Developers → Webhooks → *Add endpoint* : `https://<domaine-du-crm>/api/stripe/webhook`.
+1. Dashboard Stripe → Developers → Webhooks → *Add endpoint* : `https://cms-startupweek.vercel.app/api/stripe/webhook`.
 2. Événements à cocher :
    - `checkout.session.completed`
    - `checkout.session.async_payment_succeeded`
@@ -310,7 +309,7 @@ Comportement : un paiement = une ligne `crm.payments` (référence `pi_…` uniq
    { "crons": [{ "path": "/api/qonto/sync", "schedule": "17 * * * *" }] }
    ```
    (Plan Vercel Hobby : un cron au maximum par jour — utiliser alors `"17 6 * * *"` et `?days=3` couvre les week-ends.)
-5. Test manuel : `curl -X POST -H "Authorization: Bearer $CRON_SECRET" "https://<crm>/api/qonto/sync?days=30"`.
+5. Test manuel : `curl -X POST -H "Authorization: Bearer $CRON_SECRET" "https://cms-startupweek.vercel.app/api/qonto/sync?days=30"`.
 
 Rapprochement automatique volontairement prudent : transaction créditrice dont le libellé/la référence contient **un seul** numéro `F-AAAA-NNNN` (préfixe = `settings.invoice_prefix`), facture émise non soldée, montant **exactement** égal au solde (ou au total TTC si rien n'est encore payé). Tout le reste reste « à rapprocher » dans l'interface. Les transactions déjà importées ne sont jamais réécrites (un rapprochement manuel n'est pas écrasé).
 
