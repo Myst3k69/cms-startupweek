@@ -14,7 +14,7 @@ Ce document décrit comment passer le back-office du mode démo (données dans l
 >
 > **Connexion par lien magique (§ 3)** : codée et testée de bout en bout **en local** — PostgreSQL 16 avec les 5 migrations, PostgREST 12.2.3, un faux service Supabase Auth (flux PKCE, jetons signés, codes d'erreur identiques) et Chromium. Scénarios validés : demande de lien (`create_user=false`, adresse normalisée, redirection `/auth/callback?next=…`), échange du code, rattachement automatique par email (migration 5) et repli sans migration 5, chargement des données, création d'un contact écrite en base avec une seule activité, refus RLS annulé à l'écran, rechargement, lien déjà utilisé, lien ouvert dans un autre navigateur, lien expiré, adresse inconnue (réponse neutre, aucun compte créé), compte hors équipe (session fermée), déconnexion, `next=//site-externe` ignoré, enchaînement acceptation → acompte → inscription → solde (écritures liées dans l'ordre, numéros cohérents, rien publié sur le site) ; mode démo inchangé.
 >
-> **Non testé** : le vrai service Supabase Auth (envoi réel de l'email, modèle *Magic Link*, URL de redirection autorisées — § 3.2), clés `sb_secret_…`, vraies API Qonto / Stripe / Resend, runtime Next.js des routes API, import Airtable (aucun script fourni). La migration `20260926150000` n'est **pas appliquée** en production.
+> **Non testé** : le vrai service Supabase Auth (envoi réel de l'email, modèle *Magic Link*, URL de redirection autorisées — § 3.2), clés `sb_secret_…`, vraies API Qonto / Stripe / Resend, runtime Next.js des routes API, import Airtable (aucun script fourni). Migration `20260926122058` (5) **appliquée en production le 26/09/2026** : empreintes identiques au test local, tables du site inchangées, rattachement / membre désactivé / anonyme / journal sans doublon vérifiés dans un bloc annulé sur la vraie base.
 
 ---
 
@@ -37,7 +37,7 @@ Site ◄──────────────── lit ──────�
 | `supabase/migrations/20260926103117_crm_rls.sql` | `team_members.auth_user_id`, `crm.current_role()`, `crm.has_access(section, level)`, RLS + policies |
 | `supabase/migrations/20260926103336_crm_functions.sql` | Numérotation légale, paiements, places restantes, synchro CRM → site, vues |
 | `supabase/migrations/20260926103516_qualiopi_referentiel.sql` | 32 indicateurs Qualiopi |
-| `supabase/migrations/20260926150000_crm_auth_membership.sql` | `crm.claim_team_membership()` (rattachement du compte Auth au membre de même email vérifié) ; audit automatique limité aux écritures hors session d'un membre — **non appliquée en production** |
+| `supabase/migrations/20260926122058_crm_auth_membership.sql` | `crm.claim_team_membership()` (rattachement du compte Auth au membre de même email vérifié) ; audit automatique limité aux écritures hors session d'un membre — appliquée le 26/09/2026 |
 | `src/lib/data/supabase.ts`, `src/lib/data/sync.ts` | Client navigateur (PKCE, schéma `crm`) ; chargement paginé et écritures ordonnées avec annulation en cas de refus |
 | `src/lib/auth/supabase-auth.ts`, `src/lib/store/remote-session.ts` | Lien magique, retour `/auth/callback`, membre de l'équipe, ouverture / fermeture de l'espace de travail |
 
@@ -125,7 +125,7 @@ Lancer aussi les *advisors* Supabase (Dashboard → Advisors : Security et Perfo
 ### 3.1 Ce que fait l'interface en mode `supabase`
 
 - **Connexion par lien magique** (`/connexion` → email → lien → `/auth/callback`), flux PKCE de Supabase Auth, sans mot de passe. `shouldCreateUser: false` : la page de connexion du CRM ne crée **jamais** de compte (le projet héberge aussi les comptes du site). Une adresse inconnue reçoit le même message qu'une adresse valide (on ne révèle pas qui est membre). Le lien ne fonctionne que dans le navigateur où il a été demandé (le vérificateur PKCE y est stocké).
-- Après connexion, le compte doit correspondre à un **membre actif** de `crm.team_members` (sinon : message explicite et session fermée). Avec la migration `20260926150000_crm_auth_membership.sql`, un membre créé dans *Paramètres → Équipe* est **rattaché automatiquement** à sa première connexion (même email, email vérifié). Sans cette migration, le rattachement se fait en SQL (§ 4).
+- Après connexion, le compte doit correspondre à un **membre actif** de `crm.team_members` (sinon : message explicite et session fermée). Grâce à la migration `20260926122058_crm_auth_membership.sql` (appliquée), un membre créé dans *Paramètres → Équipe* est **rattaché automatiquement** à sa première connexion (même email, email vérifié).
 - **Données** : chargées depuis la base à la connexion (pagination par 1 000 lignes), rien n'est conservé dans le navigateur (seule la session Supabase y est stockée, clé `sw-crm-auth`). Pas de jeu de démo.
 - **Écritures** : exécutées une par une dans l'ordre (les clés étrangères sont respectées pour les enchaînements « acceptation → facture d'acompte → tâche ») ; création = INSERT, modification = UPDATE des seuls champs modifiés (un champ vidé devient NULL) ; la ligne renvoyée par la base (numéro, statut recalculé par trigger) remplace la ligne affichée. **Si la base refuse** (droits RLS, contrainte), la modification est annulée à l'écran et une notification l'explique.
 - Journal d'activité et paramètres (`crm.activities`, `crm.settings`) lus et écrits en base ; *Paramètres → Données → Recharger depuis la base* pour voir les modifications des collègues (pas de temps réel).
@@ -143,7 +143,7 @@ Lancer aussi les *advisors* Supabase (Dashboard → Advisors : Security et Perfo
    Sans cela, Supabase renvoie le lien vers le *Site URL* (le site public) et la connexion échoue. Un sous-domaine (ex. `crm.startupweek.tech`) pourra être ajouté plus tard : l'ajouter au projet Vercel (Settings → Domains) et à cette liste, sans rien changer au code.
 3. **Authentication → Emails → SMTP** : le serveur d'envoi par défaut de Supabase n'envoie qu'aux **membres de l'organisation Supabase** (« Email address not authorized » sinon), avec un plafond horaire bas. Configurer un SMTP personnalisé (ex. Resend, déjà utilisé par le site) — puis ajuster *Rate Limits* si besoin (30 emails / heure par défaut avec un SMTP personnalisé). Si le site envoie déjà ses emails Auth par un SMTP personnalisé, rien à faire.
 4. **Authentication → Emails → Templates → Magic Link** : le modèle doit utiliser `{{ .ConfirmationURL }}` (modèle par défaut). S'il a été personnalisé pour le site avec une URL fixe (`{{ .SiteURL }}/…`), les liens du CRM arriveraient sur le site : utiliser `{{ .RedirectTo }}`, ou `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=magiclink` (géré par `/auth/callback`, fonctionne alors depuis n'importe quel navigateur).
-5. Appliquer la migration `20260926150000_crm_auth_membership.sql` (rattachement automatique + journal sans doublon ; testée localement, voir § 11).
+5. ✅ Migration `20260926122058_crm_auth_membership.sql` (rattachement automatique + journal sans doublon) — appliquée le 26/09/2026.
 
 ### 3.3 Variables Vercel (Production, et Preview si besoin)
 
@@ -178,7 +178,7 @@ Le projet Supabase héberge aussi les comptes des participants du site : le rôl
    select 'Prénom Nom', u.email, 'admin', 'Fondateur', u.id
    from auth.users u where lower(u.email) = 'prenom@startupweek.tech';
    ```
-3. **Autres membres** : avec la migration `20260926150000`, l'admin les ajoute dans *Paramètres → Équipe* (nom, email, rôle) ; leur compte est rattaché à leur première connexion. Sans cette migration : même requête SQL qu'au point 2 avec le bon rôle (`admin`, `commercial`, `pedagogie`, `formateur`, `lecture`).
+3. **Autres membres** : l'admin les ajoute dans *Paramètres → Équipe* (nom, email, rôle : `admin`, `commercial`, `pedagogie`, `formateur`, `lecture`) ; il faut aussi leur compte Auth (point 1). Leur compte est rattaché à leur première connexion (migration `20260926122058`).
 4. Désactiver un accès : *Paramètres → Équipe* ou `update crm.team_members set active = false where email = '…';` (effet à la prochaine requête).
 5. Renseigner les référents dans *Paramètres* (`quality_lead_id`, `disability_lead_id`, `siret`, `nda`, `iban`, `address`).
 
@@ -415,7 +415,8 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 6. **Qonto v2** : champs `id`, `amount_cents`, `side`, `settled_at`, `reference`, pagination `meta.next_page` et filtre `status[]=completed` (d'après la documentation ; non appelés réellement).
 7. **Rate-limit** en mémoire : par instance serverless (suffisant contre le spam ; pas une limite globale).
 8. Jours fériés non gérés dans le calcul « 48 h ouvrées » des réclamations (samedi/dimanche seulement).
-9. **Migration `20260926150000`** (non appliquée) : testée localement — compte à email vérifié rattaché au membre de même email (casse ignorée), email non vérifié / membre désactivé / compte sans membre → rien, `anon` refusé ; écriture d'un membre connecté → pas d'audit automatique (l'interface journalise), écriture service_role → audit conservé. `auth.users.email_confirmed_at` est supposée présente (colonne standard de Supabase Auth).
+9. **Migration `20260926122058`** (appliquée le 26/09/2026) : testée localement puis sur la vraie base (bloc annulé) — compte à email vérifié rattaché au membre de même email (casse ignorée), email non vérifié / membre désactivé / compte sans membre → rien, `anon` refusé ; écriture d'un membre connecté → pas d'audit automatique (l'interface journalise), écriture service_role → audit conservé. `auth.users.email_confirmed_at` est supposée présente (colonne standard de Supabase Auth).
+10. **Advisors après exposition du schéma `crm`** (26/09/2026) : `authenticated_security_definer_function_executable` (WARN) liste 8 fonctions `crm` appelables en RPC par tout compte connecté. Voulu pour `claim_team_membership`, `current_member_id`, `current_role`, `has_access`, `has_any_access`, `is_team_member` (elles ne renvoient que des informations sur l'appelant ; un compte du site obtient `null` / `false`). `session_places_remaining` et `session_registered_count` n'ont pas besoin de ce droit (seules des fonctions `SECURITY DEFINER` les appellent) : elles exposent un nombre de places, sans donnée personnelle — droit à retirer par une migration si l'on veut un advisor propre.
 
 ## 12. Reste à faire (hors de ce lot)
 

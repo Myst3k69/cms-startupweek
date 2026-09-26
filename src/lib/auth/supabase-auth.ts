@@ -130,7 +130,7 @@ export async function resolveMemberId(): Promise<MemberResult> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, reason: "no_session", message: "Session expirée : reconnectez-vous." };
 
-  // 1. Rattachement par email vérifié (migration 20260926150000) — renvoie l'id du membre.
+  // 1. Rattachement par email vérifié (migration 20260926122058) — renvoie l'id du membre.
   const claim = await supabase.rpc("claim_team_membership");
   if (!claim.error) {
     return typeof claim.data === "string" && claim.data ? { ok: true, memberId: claim.data } : { ok: false, reason: "not_member", message: NOT_MEMBER };
