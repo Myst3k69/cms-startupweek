@@ -111,6 +111,9 @@ const B2B_CONTACTS: [orgId: string, first: string, last: string, job: string][] 
   [ORG.valrive, "Damien", "Roche", "Chargé de mission entrepreneuriat"],
   [ORG.pixelune, "Zoé", "Bourgeois", "Directrice artistique"],
   [ORG.fabrique, "Paul", "Breton", "Directeur"],
+  [ORG.solveo, "Estelle", "Brun", "Directrice de l'innovation"],
+  [ORG.quantik, "Adrien", "Joly", "Co-fondateur"],
+  [ORG.arvel, "Olivier", "Lemoine", "Directeur général délégué"],
 ];
 
 /* ───────────────────────────── Plan des candidatures ───────────────────────────── */
@@ -158,6 +161,7 @@ interface Special {
   access?: number;
   reuse?: string; // clé d'une candidature antérieure du même contact
   balance?: "retard1" | "retard2" | "partielle";
+  stale?: boolean; // candidature « nouvelle » oubliée (hors SLA 48 h)
 }
 
 /** Cas particuliers (clé = « code#statut#rang »). */
@@ -190,6 +194,9 @@ const SPECIAL: Record<string, Special> = {
   "SW-0011#inscrite#0": { balance: "retard1" },
   "SW-0011#inscrite#1": { balance: "retard2" },
   "SW-0012#inscrite#2": { balance: "partielle" },
+  // Deux candidatures « nouvelle » restées sans réponse au-delà du SLA de 48 h.
+  "SW-0012#nouvelle#0": { stale: true },
+  "SW-0016#nouvelle#0": { stale: true },
 };
 
 const LEAD_STAGE: Record<ApplicationStatus, Application["leadStage"]> = {
@@ -358,8 +365,9 @@ export function buildPeople(ctx: SeedContext): void {
           };
           // Soldes en retard / partiels : inscriptions anciennes (solde émis à J-45, relances déjà parties).
           const [a, b] = special.balance ? [45, 70] : window[status];
-          subDay = Math.max(-r.between(a, b), createdDay + 1, sDay - 120);
-          submittedTs = status === "nouvelle" ? clock.ago(r.between(1, 130) * HOUR + r.between(0, 59) * MIN) : at(subDay);
+          // Jamais avant la création de la session ni plus de 5 mois avant son début ; toujours dans le passé.
+          subDay = Math.min(Math.max(-r.between(a, b), createdDay + 1, sDay - 150), -1);
+          submittedTs = status === "nouvelle" ? clock.ago((special.stale ? r.between(100, 130) : r.between(1, 68)) * HOUR + r.between(0, 59) * MIN) : at(subDay);
           if (status === "inscrite" || status === "desistee") {
             const interviewDay = subDay + r.between(2, 4);
             interviewTs = clock.rel(interviewDay, r.pick([10, 11, 14, 17, 18]), r.pick([0, 30]));

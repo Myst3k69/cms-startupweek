@@ -43,12 +43,14 @@ const ALNUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
 export class Rng {
   private readonly nextFn: () => number;
+  private readonly seed: number;
   constructor(seed: number | string) {
-    this.nextFn = mulberry32(typeof seed === "string" ? hashSeed(seed) : seed);
+    this.seed = (typeof seed === "string" ? hashSeed(seed) : seed) >>> 0;
+    this.nextFn = mulberry32(this.seed);
   }
-  /** Flux dérivé indépendant (ajouter un tirage dans un module ne décale pas les autres). */
+  /** Flux dérivé indépendant, fonction de la graine et du libellé seulement (ajouter un tirage dans un module ne décale pas les autres). */
   fork(label: string): Rng {
-    return new Rng(hashSeed(label) ^ Math.floor(this.nextFn() * 0xffffffff));
+    return new Rng((hashSeed(label) ^ this.seed) >>> 0);
   }
   next(): number {
     return this.nextFn();

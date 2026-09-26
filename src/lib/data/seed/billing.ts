@@ -4,7 +4,7 @@
  *
  * Numérotation légale : F-AAAA-NNNN et D-AAAA-NNNN, séquentielles sans trou par année, dans l'ordre d'émission.
  */
-import type { BankTransaction, Invoice, InvoiceKind, LineItem, Payment, PaymentMethod, Quote, QuoteStatus } from "../../domain/types";
+import type { BankTransaction, Invoice, InvoiceKind, LineItem, Payment, PaymentMethod, QuoteStatus } from "../../domain/types";
 import { type SeedContext, stamps } from "./context";
 import { DAY, HOUR, MIN, htFromTtc, linesTotalCents, pad, sortBy, stripeFee } from "./helpers";
 import { evId } from "./events";
@@ -428,8 +428,9 @@ function buildBank(ctx: SeedContext, invoices: Invoice[], payments: Payment[]): 
     const booked = clock.past(ts, 10 * MIN);
     return { id, ...stamps(ctx, booked), ...rest, bookedAt: clock.iso(booked) };
   });
+  const paymentsById = new Map(payments.map((p) => [p.id, p]));
   for (const [paymentId, idx] of links) {
-    const p = payments.find((x) => x.id === paymentId);
+    const p = paymentId ? paymentsById.get(paymentId) : undefined;
     if (p) p.bankTransactionId = idOf.get(idx);
   }
 }

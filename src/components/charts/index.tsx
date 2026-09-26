@@ -140,7 +140,7 @@ export function LineChart({
               </g>
             ))}
             {labels.map((l, i) =>
-              i % labelEvery === 0 || i === n - 1 ? (
+              (i % labelEvery === 0 && n - 1 - i >= labelEvery) || i === n - 1 ? (
                 <text key={i} x={x(i)} y={height - 6} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} className="fill-faint text-[10px]">
                   {l}
                 </text>

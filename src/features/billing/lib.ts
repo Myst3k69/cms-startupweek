@@ -227,7 +227,8 @@ export const CONFIDENCE_LABEL: Record<Confidence, { label: string; tone: "succes
 
 /**
  * Suggestions de facture pour un crédit bancaire, par score :
- * numéro de facture cité (+55), montant = reste dû (+35), nom du client (+20/25), paiement partiel plausible (+8).
+ * numéro de facture cité (+55), réf. d'accord OPCO (+50), montant = reste dû (+35), nom du client (+20/25),
+ * mention acompte/solde (+8), paiement partiel plausible (+8).
  */
 export function suggestMatches(tx: BankTransaction, invoices: Invoice[], lk: Pick<BillingLookups, "contacts" | "orgs">, prefix: string, limit = 3): MatchSuggestion[] {
   if (tx.amountCents <= 0) return [];
@@ -265,6 +266,18 @@ export function suggestMatches(tx: BankTransaction, invoices: Invoice[], lk: Pic
       score += has(c.firstName) ? 25 : 20;
       nameHit = true;
       reasons.push(`Nom « ${c.firstName} ${c.lastName} »`);
+    }
+    const ref = inv.funder?.agreementRef;
+    if (ref && ref.length >= 4 && text.includes(` ${normalizeText(ref)} `)) {
+      score += 50;
+      reasons.push(`Accord ${inv.funder!.name} n° ${ref}`);
+    } else if (!nameHit && inv.funder && has(inv.funder.name)) {
+      score += 20;
+      reasons.push(`Financeur « ${inv.funder.name} »`);
+    }
+    if ((inv.kind === "acompte" && text.includes(" acompte ")) || (inv.kind === "solde" && text.includes(" solde "))) {
+      score += 8;
+      reasons.push(`Mention « ${inv.kind} »`);
     }
     if (!amountMatches && tx.amountCents < balance && (numberHit || nameHit)) {
       score += 8;
@@ -311,6 +324,9 @@ function parseDate(raw: string): string | null {
 
 /** Contrepartie devinée depuis un libellé bancaire (« VIR SEPA JEAN DUPONT - F-2026-0042 » → « JEAN DUPONT »). */
 export function guessCounterparty(label: string) {
+  // Format Qonto : « VIR SEPA RECU /DE LYON START UP /MOTIF F-2026-0042 »
+  const qonto = /\/DE\s+(.+?)\s*(?:\/|$)/i.exec(label);
+  if (qonto) return qonto[1].trim();
   const stripped = label
     .replace(/^\s*(vir(ement)?\.?\s*)?(sepa\s*)?(inst(antan[ée])?\s*)?(re[çc]u\s*)?(de\s+)?/i, "")
     .split(/\s[-–—|/]\s|\s(?:ref|réf)\b|\s(?=F-?\d{4})/i)[0]
@@ -422,3 +438,19 @@ export function downloadCsv(filename: string, header: string[], rows: (string | 
 
 /** Montant comptable « 1234,56 » (export expert-comptable). */
 export const accountingAmount = (cents: number) => (cents / 100).toFixed(2).replace(".", ",");
+
+/** Aperçu (sans réservation) du prochain numéro de la séquence — même règle que nextNumber(). */
+export function previewNextNumber(numbers: string[], prefix: string, year: number) {
+  const re = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-${year}-(\\d+)$`);
+  const max = numbers.reduce((m, n) => {
+    const r = re.exec(n);
+    return r ? Math.max(m, Number(r[1])) : m;
+  }, 0);
+  return `${prefix}-${year}-${String(max + 1).padStart(4, "0")}`;
+}
+
+/** Ligne HT depuis un prix TTC (règle de lineFromTtc, version pure pour les valeurs initiales). */
+export function ttcLine(id: ID, label: string, ttcCents: number, vatExempt: boolean): LineItem {
+  const vatRate = vatExempt ? 0 : 20;
+  return { id, label, quantity: 1, unitPriceCents: vatRate ? Math.round(ttcCents / (1 + vatRate / 100)) : ttcCents, vatRate };
+}

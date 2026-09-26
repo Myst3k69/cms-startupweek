@@ -31,11 +31,16 @@ function useDocumentTitle(title: string | undefined) {
   }, [title]);
 }
 
+/**
+ * Cadre d'impression autonome (barre « Imprimer / PDF » + feuille A4). Si la page est rendue sous le
+ * PrintShell partagé (src/app/print/layout.tsx → `.print-root`), la barre et le fond sont masqués
+ * pour ne pas doublonner ceux du layout.
+ */
 function PrintFrame({ backHref, label, children }: { backHref: string; label: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh bg-surface-2 print:bg-transparent">
+    <div className="min-h-dvh bg-surface-2 [.print-root_&]:min-h-0 [.print-root_&]:bg-transparent print:bg-transparent">
       <style>{"@page { size: A4; margin: 12mm; }"}</style>
-      <div className="no-print sticky top-0 z-10 border-b border-border bg-surface/90 backdrop-blur">
+      <div className="no-print sticky top-0 z-10 border-b border-border bg-surface/90 backdrop-blur [.print-root_&]:hidden">
         <div className="mx-auto flex w-full max-w-[210mm] items-center justify-between gap-2 px-4 py-2">
           <LinkButton href={backHref} variant="ghost" size="sm">
             <ArrowLeft aria-hidden="true" /> Retour

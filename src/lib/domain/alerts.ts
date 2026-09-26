@@ -71,7 +71,7 @@ export function computeAlerts(s: AlertInput, now: number): Alert[] {
   }
 
   s.events
-    .filter((e) => ["inscriptions_ouvertes", "prevu"].includes(e.status))
+    .filter((e) => ["inscriptions_ouvertes", "prevu"].includes(e.status) && e.kind !== "webinaire")
     .forEach((e) => {
       const d = daysUntil(e.startAt, now);
       const st = sessionStats(e, s.applications);

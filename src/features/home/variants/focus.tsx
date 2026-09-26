@@ -57,7 +57,7 @@ export function FocusHome({ data }: { data: DashboardData }) {
   return (
     <div className="mx-auto max-w-5xl">
       <header className="pb-8 pt-4 sm:pt-8">
-        <p className="text-sm capitalize text-muted-foreground">{date(new Date(now).toISOString(), "EEEE d MMMM yyyy")}</p>
+        <p className="text-sm text-muted-foreground first-letter:uppercase">{date(new Date(now).toISOString(), "EEEE d MMMM yyyy")}</p>
         <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
           {hello} {firstName}.
         </h1>
@@ -78,8 +78,8 @@ export function FocusHome({ data }: { data: DashboardData }) {
         </p>
       </header>
 
-      <div className="grid gap-10 lg:grid-cols-[1fr_300px]">
-        <div className="space-y-8">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0 space-y-8">
           {urgent.length ? (
             <section>
               <h2 className="eyebrow mb-2 px-3 text-danger-text">Urgent</h2>
@@ -102,12 +102,12 @@ export function FocusHome({ data }: { data: DashboardData }) {
               <p className="px-3 text-sm text-muted-foreground">Tout est à jour. ✨</p>
             )}
           </section>
-          {data.myTasks.filter((t) => new Date(t.dueAt).getTime() >= now + 86_400_000).length ? (
+          {data.myTasks.filter((t) => new Date(t.dueAt).getTime() >= now + 86_400_000 && new Date(t.dueAt).getTime() < now + 7 * 86_400_000).length ? (
             <section>
               <h2 className="eyebrow mb-2 px-3 text-muted-foreground">Plus tard cette semaine</h2>
               <ul className="space-y-1 px-3">
                 {data.myTasks
-                  .filter((t) => new Date(t.dueAt).getTime() >= now + 86_400_000)
+                  .filter((t) => new Date(t.dueAt).getTime() >= now + 86_400_000 && new Date(t.dueAt).getTime() < now + 7 * 86_400_000)
                   .slice(0, 6)
                   .map((t) => (
                     <li key={t.id} className="flex items-baseline justify-between gap-4 text-sm">
@@ -120,7 +120,7 @@ export function FocusHome({ data }: { data: DashboardData }) {
           ) : null}
         </div>
 
-        <aside className="space-y-8">
+        <aside className="min-w-0 space-y-8">
           <section>
             <h2 className="eyebrow mb-3 text-muted-foreground">En trois chiffres</h2>
             <dl className="space-y-4">

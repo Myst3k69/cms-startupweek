@@ -43,7 +43,7 @@ export function CockpitHome({ data }: { data: DashboardData }) {
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <NeonKpi label="Encaissé · 30 j" value={moneyCompact(kpis.cash30)} delta={kpis.cash30Delta} trend={data.cashTrend} href="/facturation" />
             <NeonKpi label="Candidatures · 7 j" value={String(kpis.apps7)} delta={kpis.apps7Delta} trend={data.appsByWeek.values} href="/candidatures" />
             <NeonKpi label="Remplissage moyen" value={`${kpis.avgFill} %`} hint={`6 prochaines sessions`} trend={data.upcoming.slice(0, 8).map((e) => e.stats.fillRate)} href="/sessions" />
@@ -62,7 +62,7 @@ export function CockpitHome({ data }: { data: DashboardData }) {
       </section>
 
       {/* ── Finances + à traiter ── */}
-      <div className="grid gap-4 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <Card className="lg:col-span-8">
           <CardHeader>
             <div>
@@ -123,7 +123,7 @@ export function CockpitHome({ data }: { data: DashboardData }) {
       </div>
 
       {/* ── Sessions + funnel ── */}
-      <div className="grid gap-4 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <Card className="lg:col-span-7">
           <CardHeader>
             <CardTitle>Prochaines sessions</CardTitle>
@@ -166,7 +166,10 @@ export function CockpitHome({ data }: { data: DashboardData }) {
           <CardHeader>
             <div>
               <CardTitle>Entonnoir — 90 jours</CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">Du visiteur à l'inscription payée</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {data.visitors90.toLocaleString("fr-FR")} visiteurs → {data.funnel[0]?.value ?? 0} candidatures (
+                {data.visitors90 ? ((100 * (data.funnel[0]?.value ?? 0)) / data.visitors90).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) : 0} %) → inscription payée
+              </p>
             </div>
           </CardHeader>
           <CardContent>
@@ -176,7 +179,7 @@ export function CockpitHome({ data }: { data: DashboardData }) {
       </div>
 
       {/* ── Tendances + pipeline + activité ── */}
-      <div className="grid gap-4 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <Card className="lg:col-span-6">
           <CardHeader>
             <CardTitle>Candidatures par semaine</CardTitle>
@@ -222,7 +225,7 @@ function NeonKpi({ label, value, delta, hint, trend, href }: { label: string; va
           <p className="truncate font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{value}</p>
           {delta !== undefined ? (
             <p className={cn("mt-0.5 text-xs font-medium", delta >= 0 ? "text-success-text" : "text-danger-text")}>
-              {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toLocaleString("fr-FR")} % <span className="font-normal text-faint">vs période préc.</span>
+              {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toLocaleString("fr-FR")} % <span className="font-normal text-faint">vs préc.</span>
             </p>
           ) : (
             <p className="mt-0.5 text-xs text-faint">{hint}</p>

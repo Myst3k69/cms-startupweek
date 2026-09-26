@@ -432,3 +432,9 @@ export function saveOffer(input: OfferInput, id?: ID): Offer {
   }
   return s.create("offers", input, { log: `Offre « ${input.name} » ajoutée au catalogue` });
 }
+
+export function setOfferActive(id: ID, active: boolean) {
+  const o = findById("offers", id);
+  if (!o) return;
+  crm().update("offers", id, { active }, { log: `Offre « ${o.name} » ${active ? "activée" : "désactivée"}`, kind: "statut" });
+}

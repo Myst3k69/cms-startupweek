@@ -64,6 +64,8 @@ function DrawerBody({ sub, onClose }: { sub: Submission; onClose: () => void }) 
   const deals = useCrm((s) => s.deals);
   const organizations = useCrm((s) => s.organizations);
   const templates = useCrm((s) => s.emailTemplates);
+  const events = useCrm((s) => s.events);
+  const complaints = useCrm((s) => s.complaints);
   const userOptions = useUserOptions();
   const [composing, setComposing] = React.useState(false);
 
@@ -81,14 +83,24 @@ function DrawerBody({ sub, onClose }: { sub: Submission; onClose: () => void }) 
   }, [templates, sub.type]);
 
   const [firstName, ...rest] = sub.name.trim().split(/\s+/);
+  const sessionCode = sub.fields?.session ?? sub.fields?.eventCode ?? sub.fields?.sessionCode;
+  const ev = sessionCode ? events.find((e) => e.code === sessionCode) : undefined;
+  const complaint = sub.complaintId ? complaints.find((c) => c.id === sub.complaintId) : undefined;
   const vars = {
     prenom: contact?.firstName ?? firstName,
     nom: contact?.lastName ?? rest.join(" "),
     entreprise: sub.company,
     organisation: sub.company,
     sujet: sub.subject,
+    offre: sub.fields?.serviceName ?? sub.fields?.format,
     service: sub.fields?.serviceName,
-    session: sub.fields?.sessionName ?? sub.fields?.eventCode,
+    session: ev?.name ?? sub.fields?.sessionName ?? sessionCode,
+    code_session: ev?.code ?? sessionCode,
+    date_debut: ev ? date(ev.startAt, "d MMMM yyyy") : undefined,
+    date_fin: ev ? date(ev.endAt, "d MMMM yyyy") : undefined,
+    lieu: ev?.city,
+    numero_reclamation: complaint?.number,
+    lien_kit: sub.type === "digital_starter_kit" ? "https://storage.startupweek.tech/public/digital-starter-kit.zip" : undefined,
     delai: "48 h",
   };
 

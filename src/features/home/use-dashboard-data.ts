@@ -82,6 +82,7 @@ export interface DashboardData {
   upcoming: (EventSession & { stats: ReturnType<typeof sessionStats>; daysLeft: number })[];
   running: EventSession[];
   funnel: { label: string; value: number }[];
+  visitors90: number;
   alerts: Alert[];
   priorities: PriorityItem[];
   agenda: AgendaItem[];
@@ -174,18 +175,17 @@ export function computeDashboard(s: Source, now: number, user?: User): Dashboard
   };
   const visitors90 = s.traffic.filter((d) => ts(d.date) >= now - 90 * DAY).reduce((a, d) => a + d.visitors, 0);
   const funnel = [
-    { label: "Visiteurs du site", value: visitors90 },
     { label: "Candidatures", value: recentApps.length },
     { label: "Qualifiées", value: recentApps.filter((a) => reached(a, 1)).length },
     { label: "Entretiens", value: recentApps.filter((a) => reached(a, 2)).length },
     { label: "Acceptées", value: recentApps.filter((a) => reached(a, 3)).length },
     { label: "Inscrites (payées)", value: recentApps.filter((a) => reached(a, 4)).length },
   ];
-  const conversion90 = recentApps.length ? Math.round((funnel[5].value / recentApps.length) * 100) : 0;
+  const conversion90 = recentApps.length ? Math.round((funnel[4].value / recentApps.length) * 100) : 0;
 
   // ── Sessions
   const upcoming = s.events
-    .filter((e) => ts(e.startAt) > now && e.status !== "annule" && e.status !== "brouillon")
+    .filter((e) => ts(e.startAt) > now && e.status !== "annule" && e.status !== "brouillon" && e.kind !== "webinaire")
     .sort((a, b) => ts(a.startAt) - ts(b.startAt))
     .map((e) => ({ ...e, stats: sessionStats(e, s.applications), daysLeft: Math.ceil((ts(e.startAt) - now) / DAY) }));
   const running = s.events.filter((e) => isRunning(e, now));
@@ -358,6 +358,7 @@ export function computeDashboard(s: Source, now: number, user?: User): Dashboard
     upcoming,
     running,
     funnel,
+    visitors90,
     alerts,
     priorities,
     agenda,

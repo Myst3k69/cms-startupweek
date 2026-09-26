@@ -94,14 +94,47 @@ const ENTITY_LABEL: Partial<Record<EntityName, string>> = {
   submissions: "Demande",
 };
 
-function emptySeed() {
+/** Paramètres par défaut (remplacés par le seed de démo ou la base). */
+const DEFAULT_SETTINGS: Settings = {
+  legalName: "INTERSTELLABS SASU",
+  brand: "StartupWeek",
+  siret: "",
+  nda: "",
+  address: "",
+  email: "contact@startupweek.tech",
+  phone: "",
+  website: "https://www.startupweek.tech",
+  iban: "",
+  vatExempt: false,
+  invoicePrefix: "F",
+  quotePrefix: "D",
+  paymentTermsDays: 30,
+  latePenaltyText: "",
+  newcomer: false,
+  complaintAckHours: 48,
+  slaHours: 48,
+  stripeConnected: false,
+  qontoConnected: false,
+  emailProvider: "resend",
+  dataMode: "demo",
+  depositPercent: 30,
+  balanceDaysBefore: 30,
+};
+
+/** État vide : utilisé côté serveur et avant hydratation (le seed n'est généré que dans le navigateur). */
+function emptyState(): Collections & Pick<CrmState, "settings" | "activities" | "traffic"> {
+  const collections = Object.fromEntries((Object.keys(ID_PREFIX) as EntityName[]).map((k) => [k, []])) as unknown as Collections;
+  return { ...collections, settings: DEFAULT_SETTINGS, activities: [], traffic: [] };
+}
+
+function freshSeed() {
   return buildSeed(Date.now());
 }
 
 export const useCrm = create<CrmState>()(
   persist(
     (set, get) => ({
-      ...emptySeed(),
+      ...emptyState(),
       hydrated: false,
       seedVersion: SEED_VERSION,
       now: Date.now(),
@@ -159,7 +192,7 @@ export const useCrm = create<CrmState>()(
       tick: () => set({ now: Date.now() }),
       resetDemo: () => {
         const keepUser = get().sessionUserId;
-        set({ ...emptySeed(), seedVersion: SEED_VERSION, now: Date.now(), sessionUserId: keepUser });
+        set({ ...freshSeed(), seedVersion: SEED_VERSION, now: Date.now(), sessionUserId: keepUser });
       },
     }),
     {
@@ -175,12 +208,14 @@ export const useCrm = create<CrmState>()(
       },
       merge: (persisted, current) => {
         const p = persisted as Partial<CrmState> | undefined;
-        // Seed régénéré si la version du jeu de démo a changé.
-        if (!p || p.seedVersion !== SEED_VERSION) return { ...current, sessionUserId: p?.sessionUserId };
+        // Premier chargement (ou nouvelle version du jeu de démo) : génération du seed dans le navigateur.
+        if (!p || p.seedVersion !== SEED_VERSION) return { ...current, ...freshSeed(), seedVersion: SEED_VERSION, sessionUserId: p?.sessionUserId };
         return { ...current, ...p, settings: { ...current.settings, ...p.settings } };
       },
-      onRehydrateStorage: () => (state) => {
-        if (state) useCrm.setState({ hydrated: true, now: Date.now() });
+      onRehydrateStorage: () => (_state, error) => {
+        // En cas d'erreur (stockage corrompu, seed invalide) on débloque l'interface plutôt que de rester sur le squelette.
+        if (error) console.error("[store] réhydratation impossible", error);
+        useCrm.setState({ hydrated: true, now: Date.now() });
       },
     },
   ),

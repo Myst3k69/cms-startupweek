@@ -7,6 +7,17 @@ import { cn } from "@/lib/utils";
 import { MarkdownPreview } from "./markdown-preview";
 
 type Mode = "ecrire" | "apercu" | "cote";
+type ToolKind = "h2" | "bold" | "italic" | "ul" | "ol" | "quote" | "link";
+
+const TOOLS: { kind: ToolKind; icon: React.ComponentType<{ className?: string }>; label: string }[] = [
+  { kind: "h2", icon: Heading2, label: "Intertitre" },
+  { kind: "bold", icon: Bold, label: "Gras" },
+  { kind: "italic", icon: Italic, label: "Italique" },
+  { kind: "ul", icon: List, label: "Liste à puces" },
+  { kind: "ol", icon: ListOrdered, label: "Liste numérotée" },
+  { kind: "quote", icon: Quote, label: "Citation" },
+  { kind: "link", icon: Link2, label: "Lien" },
+];
 
 /** Éditeur Markdown : barre d'outils, modes écrire / aperçu / côte à côte. */
 export function MarkdownEditor({ value, onChange, disabled, id }: { value: string; onChange: (v: string) => void; disabled?: boolean; id?: string }) {
@@ -51,15 +62,24 @@ export function MarkdownEditor({ value, onChange, disabled, id }: { value: strin
       return { text: before + md + after, selStart: urlStart, selEnd: urlStart + 8 };
     });
 
-  const tools = [
-    { icon: Heading2, label: "Intertitre", run: () => prefix(() => "## ", "Intertitre") },
-    { icon: Bold, label: "Gras", run: () => wrap("**", "texte en gras") },
-    { icon: Italic, label: "Italique", run: () => wrap("*", "texte en italique") },
-    { icon: List, label: "Liste à puces", run: () => prefix(() => "- ", "élément") },
-    { icon: ListOrdered, label: "Liste numérotée", run: () => prefix((i) => `${i + 1}. `, "étape") },
-    { icon: Quote, label: "Citation", run: () => prefix(() => "> ", "citation") },
-    { icon: Link2, label: "Lien", run: link },
-  ];
+  const run = (kind: ToolKind) => {
+    switch (kind) {
+      case "h2":
+        return prefix(() => "## ", "Intertitre");
+      case "bold":
+        return wrap("**", "texte en gras");
+      case "italic":
+        return wrap("*", "texte en italique");
+      case "ul":
+        return prefix(() => "- ", "élément");
+      case "ol":
+        return prefix((i) => `${i + 1}. `, "étape");
+      case "quote":
+        return prefix(() => "> ", "citation");
+      case "link":
+        return link();
+    }
+  };
 
   const textarea = (
     <textarea
@@ -78,14 +98,14 @@ export function MarkdownEditor({ value, onChange, disabled, id }: { value: strin
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className={cn("flex flex-wrap items-center gap-0.5", mode === "apercu" && "invisible")} role="toolbar" aria-label="Mise en forme">
-          {tools.map((t) => (
+          {TOOLS.map((t) => (
             <button
               key={t.label}
               type="button"
               title={t.label}
               aria-label={t.label}
               disabled={disabled}
-              onClick={t.run}
+              onClick={() => run(t.kind)}
               className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground disabled:opacity-40"
             >
               <t.icon className="size-4" />

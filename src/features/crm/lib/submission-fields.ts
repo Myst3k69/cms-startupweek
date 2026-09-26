@@ -27,6 +27,12 @@ export const FIELD_LABELS: Record<string, string> = {
   eventCode: "Session",
   sessionCode: "Session",
   session: "Session",
+  preferredDates: "Dates souhaitées",
+  topic: "Sujet",
+  intent: "Intention",
+  disponibilite: "Disponibilités",
+  prenom: "Prénom",
+  type: "Catégorie",
   sessionName: "Session concernée",
   sector: "Secteur",
   industry: "Secteur",
@@ -45,7 +51,7 @@ export const FIELD_LABELS: Record<string, string> = {
   offer: "Offre",
   offerName: "Offre",
   heardFrom: "Nous a connus via",
-  source: "Nous a connus via",
+  source: "Provenance",
   linkedin: "LinkedIn",
   organization: "Organisation",
   orgName: "Organisation",
@@ -132,7 +138,7 @@ const VALUE_LABELS: Record<string, string> = {
   coaching: "Coaching individuel",
   accompagnement_mvp: "Accompagnement MVP",
   audit: "Audit / diagnostic",
-  diagnostic: "Diagnostic",
+  diagnostic: "Diagnostic MVP gratuit",
   formation: "Formation",
   atelier_ia: "Atelier IA",
   no_code: "No-code",
@@ -152,6 +158,27 @@ const VALUE_LABELS: Record<string, string> = {
   france_travail: "France Travail",
   cpf: "CPF",
   region: "Région",
+  // stades déclarés (tunnel / DSK)
+  commence: "Projet commencé",
+  refonte: "Refonte d'un projet existant",
+  incertain: "Pas encore sûr(e)",
+  // profils & intentions
+  tech: "Profil tech",
+  non_tech: "Profil non-tech",
+  reconversion: "Reconversion",
+  candidature: "Candidature",
+  // provenance newsletter
+  bio_instagram: "Lien en bio Instagram",
+  footer: "Pied de page du site",
+  // budget déclaré
+  finance: "Financement externe (OPCO, entreprise…)",
+  // catégories de réclamation
+  qualite: "Qualité pédagogique",
+  paiement: "Paiement",
+  remboursement: "Remboursement",
+  annulation: "Annulation",
+  accessibilite: "Accessibilité / handicap",
+  autre: "Autre",
   // booléens
   true: "Oui",
   false: "Non",
@@ -184,9 +211,9 @@ function humanizeRange(v: string, unit: string): string | undefined {
   const fmt = (s: string) => (unit === "€" ? euros(k(s)) : `${Number(k(s)).toLocaleString("fr-FR")}${unit ? ` ${unit}` : ""}`);
   let m = /^(\d+(?:[.,]\d+)?k?)\s*[-–à]\s*(\d+(?:[.,]\d+)?k?)$/i.exec(v);
   if (m) return unit === "€" ? `${euros(k(m[1])).replace(" €", "")} à ${fmt(m[2])}` : `${Number(k(m[1])).toLocaleString("fr-FR")} à ${fmt(m[2])}`;
-  m = /^(?:<|lt_?|moins_de_?)\s*(\d+(?:[.,]\d+)?k?)$/i.exec(v);
+  m = /^(?:<|lt_?|moins[-_](?:de[-_])?)\s*(\d+(?:[.,]\d+)?k?)$/i.exec(v);
   if (m) return `Moins de ${fmt(m[1])}`;
-  m = /^(?:>|gt_?|plus_de_?)\s*(\d+(?:[.,]\d+)?k?)$/i.exec(v) ?? /^(\d+(?:[.,]\d+)?k?)\s*\+$/i.exec(v);
+  m = /^(?:>|gt_?|plus[-_](?:de[-_])?)\s*(\d+(?:[.,]\d+)?k?)$/i.exec(v) ?? /^(\d+(?:[.,]\d+)?k?)\s*\+$/i.exec(v);
   if (m) return `Plus de ${fmt(m[1])}`;
   m = /^(\d+(?:[.,]\d+)?k?)$/i.exec(v);
   if (m) return fmt(m[1]);

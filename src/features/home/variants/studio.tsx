@@ -69,7 +69,12 @@ export function StudioHome({ data }: { data: DashboardData }) {
           <Link href={`/sessions/${next.id}`} className="group relative col-span-1 overflow-hidden rounded-2xl bg-sw-black text-white md:col-span-4 md:row-span-2">
             {next.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- visuels du site (domaine externe), pas d'optimisation nécessaire
-              <img src={next.imageUrl} alt="" className="absolute inset-0 size-full object-cover opacity-60 transition-transform duration-700 group-hover:scale-[1.03]" />
+              <img
+                src={next.imageUrl}
+                alt=""
+                onError={(e) => (e.currentTarget.style.display = "none")}
+                className="absolute inset-0 size-full object-cover opacity-60 transition-transform duration-700 group-hover:scale-[1.03]"
+              />
             ) : null}
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/10" aria-hidden="true" />
             <div className="relative flex h-full min-h-[340px] flex-col justify-between p-6 sm:p-8">
