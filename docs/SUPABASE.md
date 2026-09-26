@@ -215,6 +215,8 @@ Idempotence : `leadId` (candidature, chaque étape du tunnel met à jour la mêm
 
 ### 5.2 Côté site (startupweek-v2)
 
+> **Mise en œuvre retenue (26/09/2026) : double écriture.** Branche `claude/crm-double-ecriture` du site : `lib/server/crmMirror.ts` (`mirrorToCrm`) recopie chaque formulaire vers le CRM **après** la réponse à l'internaute (`after()` de Next), sans rien changer au parcours n8n (Airtable, emails, envoi du kit) ; un échec est journalisé et signalé par email (`notifyApiErrorByEmail`). Inactif tant que `CRM_INTAKE_URL` / `CRM_INTAKE_SECRET` ne sont pas définis. Côté CRM, **ne pas définir `RESEND_API_KEY`** pendant cette période (sinon deux accusés de réception). L'utilitaire `forwardToCrm` ci-dessous reste la cible pour la bascule définitive.
+
 Remplacer les variables `N8N_WEBHOOK_*` par :
 
 ```
