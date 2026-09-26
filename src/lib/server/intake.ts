@@ -302,6 +302,7 @@ export const newsletterSchema = z.looseObject({
 export const starterKitSchema = z.looseObject({
   ...baseShape,
   prenom: optText(100),
+  firstName: optText(100),
   consent: optBool,
   stade: optText(60),
 });
@@ -690,7 +691,9 @@ function mapCompanySize(value: string | undefined): Organization["size"] | undef
   const allowed: NonNullable<Organization["size"]>[] = ["1-10", "11-50", "51-200", "201-500", "500+"];
   const v = value.replace(/\s/g, "");
   if ((allowed as string[]).includes(v)) return v as Organization["size"];
-  const n = parseInt(v, 10);
+  // « plus de 500 » / « >500 » : au-delà de la borne annoncée
+  const above = /^(plusde|>)/i.test(v);
+  const n = parseInt(above ? v.replace(/\D/g, "") : v, 10) + (above ? 1 : 0);
   if (!Number.isFinite(n)) return undefined;
   if (n <= 10) return "1-10";
   if (n <= 50) return "11-50";
@@ -1131,6 +1134,7 @@ function normalizeNewsletter(p: NewsletterPayload, ctx: NormalizeContext): Norma
 
 function normalizeStarterKit(p: StarterKitPayload, ctx: NormalizeContext): NormalizedIntake {
   const c = common("starter-kit", p, ctx);
+  const prenom = p.prenom ?? p.firstName;
   const stade = (p.stade ?? "incertain").toLowerCase();
   // Case unique du formulaire Starter Kit : vaut acceptation de la politique de confidentialité
   // ET de l'envoi du kit / des emails associés — uniquement si cochée.
@@ -1139,7 +1143,7 @@ function normalizeStarterKit(p: StarterKitPayload, ctx: NormalizeContext): Norma
   return finalize("starter-kit", c, {
     submission: {
       status: "convertie",
-      name: p.prenom ?? p.email,
+      name: prenom ?? p.email,
       email: p.email,
       subject: "Téléchargement Digital Starter Kit",
       fields: buildFields(p),
@@ -1147,7 +1151,7 @@ function normalizeStarterKit(p: StarterKitPayload, ctx: NormalizeContext): Norma
     },
     contact: {
       email: p.email,
-      firstName: p.prenom ?? "",
+      firstName: prenom ?? "",
       lastName: "",
       lifecycle: FORM_LIFECYCLE["starter-kit"],
       source: FORM_SOURCE["starter-kit"],
@@ -1543,6 +1547,8 @@ async function upsertApplication(
       const projectId = await createProject(db, draft.project, contactId, session?.id);
       const { error: linkErr } = await db.from("applications").update({ project_id: projectId }).eq("id", current.id);
       fail("application.project", linkErr);
+    } else if (draft.project && current.projectId) {
+      await completeProject(db, current.projectId, draft.project);
     }
     return { id: current.id, number: current.number, created: false };
   }
@@ -1616,6 +1622,25 @@ async function createProject(db: CrmAdminClient, draft: ProjectDraft, contactId:
   const { data, error } = await db.from("projects").insert(toRow(project)).select("id").single();
   fail("project.insert", error);
   return (data as Row).id as ID;
+}
+
+/**
+ * Étapes suivantes du tunnel (même leadId) : complète le projet créé à la première étape
+ * sans écraser ce que l'équipe a pu saisir (nom par défaut, champs vides, stade « idee »).
+ */
+async function completeProject(db: CrmAdminClient, projectId: ID, draft: ProjectDraft): Promise<void> {
+  const { data, error } = await db.from("projects").select("name, description, stage, target_market").eq("id", projectId).maybeSingle();
+  fail("project.select", error);
+  if (!data) return;
+  const current = data as Row;
+  const patch: Record<string, unknown> = {};
+  if (draft.stage !== "idee" && current.stage === "idee") patch.stage = draft.stage;
+  if (!draft.name.startsWith("Projet de ") && String(current.name ?? "").startsWith("Projet de ")) patch.name = draft.name;
+  if (draft.description && !current.description) patch.description = draft.description;
+  if (draft.targetMarket && !current.target_market) patch.target_market = draft.targetMarket;
+  if (Object.keys(patch).length === 0) return;
+  const { error: upErr } = await db.from("projects").update(patch).eq("id", projectId);
+  fail("project.update", upErr);
 }
 
 async function createComplaint(db: CrmAdminClient, draft: ComplaintDraft, contactId: ID): Promise<{ id: ID; number: string }> {

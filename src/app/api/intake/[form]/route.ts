@@ -32,6 +32,12 @@ export const runtime = "nodejs";
 
 type Ctx = { params: Promise<{ form: string }> };
 
+function forwardedIp(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const first = value.split(",")[0]?.trim();
+  return first && first.toLowerCase() !== "unknown" ? first : undefined;
+}
+
 function reply(status: number, body: Record<string, unknown>, headers: Record<string, string>, extra: Record<string, string> = {}): Response {
   return Response.json(body, { status, headers: { ...headers, ...extra, "Cache-Control": "no-store" } });
 }
@@ -104,11 +110,10 @@ export async function POST(request: Request, { params }: Ctx): Promise<Response>
     return reply(202, { ok: true }, cors);
   }
 
-  // 6. Rate-limit par internaute. Requête signée : l'IP réelle transmise par le site fait foi.
+  // 6. Rate-limit par internaute. Requête signée : l'IP réelle transmise par le site fait foi
+  //    (première adresse d'une liste x-forwarded-for ; « unknown » ignoré).
   const userIp =
-    (signed && typeof data.ipAddress === "string" && data.ipAddress.trim()) ||
-    (signed && request.headers.get("x-sw-client-ip")?.trim()) ||
-    transportIp;
+    (signed && forwardedIp(data.ipAddress)) || (signed && forwardedIp(request.headers.get("x-sw-client-ip"))) || transportIp;
   const user = intakeUserLimiter.take(`u:${userIp}`);
   if (!user.ok) {
     return reply(429, { ok: false, error: "RATE_LIMITED" }, cors, { "Retry-After": String(user.retryAfterSec) });
@@ -138,6 +143,7 @@ export async function POST(request: Request, { params }: Ctx): Promise<Response>
         {
           ok: false,
           error: "SESSION_CLOSED",
+          code: "SESSION_CLOSED",
           message: "La session demandée n'accepte plus de candidatures (complète ou date limite passée). La demande a été transmise à l'équipe.",
           submissionId: result.submissionId,
           contactId: result.contactId,
