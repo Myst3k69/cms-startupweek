@@ -11,7 +11,7 @@ import { date } from "@/lib/format";
 import { useActions, useLookup, useNow } from "@/lib/hooks";
 import { cn, pct } from "@/lib/utils";
 import { HALF_DAYS } from "../../lib/labels";
-import { sessionDays } from "../../lib/sessions";
+import { sessionAudience, sessionDays } from "../../lib/sessions";
 import type { SessionData } from "./use-session-data";
 
 const CYCLE: (AttendanceStatus | undefined)[] = [undefined, "present", "retard", "excuse", "absent"];
@@ -109,8 +109,14 @@ export function AttendanceTab({ ev, data, canEdit }: { ev: EventSession; data: S
     return (
       <EmptyState
         icon={ClipboardCheck}
-        title="Aucun participant inscrit"
-        description="La grille d'émargement se remplit avec les candidatures « Inscrite (payée) » de la session."
+        title={sessionAudience(ev) === "b2b" ? "Participants gérés par l'organisation cliente" : sessionAudience(ev) === "ouvert" ? "Émargement non requis" : "Aucun participant inscrit"}
+        description={
+          sessionAudience(ev) === "b2b"
+            ? "Session B2B : imprimez la feuille d'émargement et faites-la signer par demi-journée (liste nominative fournie par le client), puis archivez-la comme preuve Qualiopi."
+            : sessionAudience(ev) === "ouvert"
+              ? "Événement d'information gratuit (hors action de formation) : pas de feuille d'émargement nominative."
+              : "La grille d'émargement se remplit avec les candidatures « Inscrite (payée) » de la session."
+        }
         action={
           <LinkButton href={`/print/emargement/${ev.id}`} target="_blank" variant="secondary">
             <Printer /> Feuille d'émargement vierge

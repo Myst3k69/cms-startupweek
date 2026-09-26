@@ -11,6 +11,7 @@ import type { EventSession } from "@/lib/domain/types";
 import { date } from "@/lib/format";
 import { useLookup, useNow } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
+import { sessionAudience } from "../../lib/sessions";
 import type { SessionData } from "./use-session-data";
 
 function DocButton({ href, icon: Icon, label, state, stateTone }: { href: string; icon: React.ComponentType<{ className?: string }>; label: string; state?: string; stateTone?: "ok" | "todo" | "muted" }) {
@@ -101,7 +102,17 @@ export function DocumentsTab({ ev, data }: { ev: EventSession; data: SessionData
               ))}
             </ul>
           ) : (
-            <EmptyState icon={FileText} title="Aucun participant" description="Les documents individuels apparaissent pour les candidatures acceptées et inscrites." />
+            <EmptyState
+              icon={FileText}
+              title="Aucun participant"
+              description={
+                sessionAudience(ev) === "b2b"
+                  ? "Session B2B : la convention est signée avec l'organisation cliente (devis accepté) et les certificats sont édités à partir de sa liste nominative."
+                  : sessionAudience(ev) === "ouvert"
+                    ? "Événement gratuit sans inscription nominative : pas de documents individuels."
+                    : "Les documents individuels apparaissent pour les candidatures acceptées et inscrites."
+              }
+            />
           )}
         </CardContent>
       </Card>

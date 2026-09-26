@@ -2,17 +2,19 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { BellRing, Columns3, Send } from "lucide-react";
-import { Badge, Button, DataTable, LinkButton, Segmented, StatusBadge, useToast, type Column } from "@/components/ui";
-import { ContactLink } from "@/components/shared/entity-links";
+import Link from "next/link";
+import { BellRing, Building2, ClipboardList, Columns3, FileText, Inbox, KanbanSquare, Radio, Receipt, Send } from "lucide-react";
+import { Badge, Button, Card, CardContent, DataTable, LinkButton, Segmented, StatusBadge, useToast, type Column } from "@/components/ui";
+import { ContactLink, OrgLink } from "@/components/shared/entity-links";
 import { sendConvocation, sendInvoiceReminder } from "@/lib/domain/actions";
-import { APPLICATION_STATUSES, FUNDING_SOURCES, labelOf } from "@/lib/domain/constants";
-import { contactName, invoiceBalance } from "@/lib/domain/selectors";
+import { APPLICATION_STATUSES, DEAL_STAGES, FUNDING_SOURCES, INVOICE_KINDS, INVOICE_STATUSES, QUOTE_STATUSES, labelOf } from "@/lib/domain/constants";
+import { contactName, effectiveInvoiceStatus, invoiceBalance, invoiceTotal } from "@/lib/domain/selectors";
 import type { Application, EventSession, Invoice } from "@/lib/domain/types";
 import { date, money } from "@/lib/format";
-import { useLookup, useNow } from "@/lib/hooks";
+import { useCollection, useEntity, useLookup, useNow } from "@/lib/hooks";
 import { daysUntil } from "@/lib/domain/selectors";
 import { accessibilityState } from "../../lib/applications";
+import { audienceLabel, sessionAudience } from "../../lib/sessions";
 import type { SessionData } from "./use-session-data";
 
 type Group = "inscrits" | "pipeline" | "sorties" | "toutes";
@@ -21,7 +23,147 @@ function openBalanceInvoices(app: Application, invoices: Invoice[]) {
   return invoices.filter((i) => i.applicationId === app.id && i.kind === "solde" && ["emise", "partielle", "en_retard"].includes(i.status) && invoiceBalance(i) > 0);
 }
 
+/** Webinaires et sessions B2B : pas de candidatures individuelles — on explique et on renvoie vers l'organisation / le devis. */
+function NoApplicationsPanel({ ev }: { ev: EventSession }) {
+  const now = useNow();
+  const audience = sessionAudience(ev);
+  const org = useEntity("organizations", ev.orgId);
+  const quotesAll = useCollection("quotes");
+  const dealsAll = useCollection("deals");
+  const invoicesAll = useCollection("invoices");
+  const quotes = React.useMemo(() => quotesAll.filter((q) => q.eventId === ev.id), [quotesAll, ev.id]);
+  const deals = React.useMemo(() => dealsAll.filter((d) => d.eventId === ev.id), [dealsAll, ev.id]);
+  const invoices = React.useMemo(() => invoicesAll.filter((i) => i.eventId === ev.id && !i.applicationId && i.status !== "annulee"), [invoicesAll, ev.id]);
+
+  if (audience === "ouvert") {
+    return (
+      <Card>
+        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent-text">
+            <Radio className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1 space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">
+              {audienceLabel(ev)} · {ev.capacity} places — inscriptions libres
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Les participants s'inscrivent directement via le formulaire du site : ils ne passent pas par une candidature, ne reçoivent ni facture ni convocation, et n'apparaissent donc pas dans cette liste.
+              Les inscriptions arrivent dans les demandes entrantes (type newsletter / webinaire) et alimentent les contacts.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <LinkButton href="/demandes" size="sm" variant="secondary">
+                <Inbox /> Demandes entrantes
+              </LinkButton>
+              <LinkButton href="/contacts" size="sm" variant="ghost">
+                Contacts
+              </LinkButton>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="space-y-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-info-soft text-info-text">
+            <Building2 className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1 space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">
+              Session B2B · {ev.capacity} participants · <OrgLink id={ev.orgId} />
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Les participants sont inscrits par {org?.name ?? "l'organisation cliente"} (liste nominative transmise avant la session) : pas de candidature individuelle ni de facture par
+              participant. La commande passe par le devis et les factures ci-dessous ; l'émargement et les évaluations restent tracés sur la session (Qualiopi).
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {ev.orgId ? (
+                <LinkButton href={`/organisations/${ev.orgId}`} size="sm" variant="secondary">
+                  <Building2 /> Fiche organisation
+                </LinkButton>
+              ) : null}
+              <LinkButton href={`/print/emargement/${ev.id}`} target="_blank" size="sm" variant="ghost">
+                <ClipboardList /> Feuille d'émargement vierge
+              </LinkButton>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 border-t border-border pt-4 md:grid-cols-3">
+          <section>
+            <h4 className="eyebrow mb-2 flex items-center gap-1.5 text-muted-foreground">
+              <KanbanSquare className="size-3.5" aria-hidden="true" /> Opportunité
+            </h4>
+            {deals.length ? (
+              <ul className="space-y-1.5">
+                {deals.map((d) => (
+                  <li key={d.id} className="flex items-center justify-between gap-2 text-sm">
+                    <Link href={`/pipeline?deal=${d.id}`} className="min-w-0 truncate text-foreground hover:text-accent-text">
+                      {d.title}
+                    </Link>
+                    <StatusBadge options={DEAL_STAGES} value={d.stage} className="shrink-0" />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-faint">Aucune opportunité liée.</p>
+            )}
+          </section>
+          <section>
+            <h4 className="eyebrow mb-2 flex items-center gap-1.5 text-muted-foreground">
+              <FileText className="size-3.5" aria-hidden="true" /> Devis
+            </h4>
+            {quotes.length ? (
+              <ul className="space-y-1.5">
+                {quotes.map((q) => (
+                  <li key={q.id} className="flex items-center justify-between gap-2 text-sm">
+                    <Link href={`/facturation/devis/${q.id}`} className="font-mono text-xs font-medium text-foreground hover:text-accent-text">
+                      {q.number}
+                    </Link>
+                    <span className="tabular text-xs text-muted-foreground">{money(invoiceTotal({ lines: q.lines, kind: "facture" }).ttc)}</span>
+                    <StatusBadge options={QUOTE_STATUSES} value={q.status} className="shrink-0" />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-faint">Aucun devis lié.</p>
+            )}
+          </section>
+          <section>
+            <h4 className="eyebrow mb-2 flex items-center gap-1.5 text-muted-foreground">
+              <Receipt className="size-3.5" aria-hidden="true" /> Factures
+            </h4>
+            {invoices.length ? (
+              <ul className="space-y-1.5">
+                {invoices.map((i) => (
+                  <li key={i.id} className="flex items-center justify-between gap-2 text-sm">
+                    <Link href={`/facturation/factures/${i.id}`} className="font-mono text-xs font-medium text-foreground hover:text-accent-text" title={labelOf(INVOICE_KINDS, i.kind)}>
+                      {i.number}
+                    </Link>
+                    <span className="tabular text-xs text-muted-foreground">{money(invoiceTotal(i).ttc)}</span>
+                    <StatusBadge options={INVOICE_STATUSES} value={effectiveInvoiceStatus(i, now)} className="shrink-0" />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-faint">Aucune facture émise.</p>
+            )}
+          </section>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function ParticipantsTab({ ev, data, canEdit }: { ev: EventSession; data: SessionData; canEdit: boolean }) {
+  if (sessionAudience(ev) !== "b2c" && data.apps.length === 0) return <NoApplicationsPanel ev={ev} />;
+  return <ParticipantsTable ev={ev} data={data} canEdit={canEdit} />;
+}
+
+function ParticipantsTable({ ev, data, canEdit }: { ev: EventSession; data: SessionData; canEdit: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const now = useNow();
