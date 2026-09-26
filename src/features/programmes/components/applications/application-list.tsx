@@ -61,7 +61,6 @@ export function ApplicationList({
         header: "Email",
         render: (a) => <span className="text-xs text-muted-foreground">{contacts.get(a.contactId)?.email ?? "—"}</span>,
         csv: (a) => contacts.get(a.contactId)?.email ?? "",
-        hideBelow: "xl",
         headerClassName: "hidden",
         className: "hidden",
       },
