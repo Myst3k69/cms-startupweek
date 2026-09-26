@@ -44,6 +44,17 @@
   --color-sw-teal: var(--sw-teal);
   --color-sw-amber: var(--sw-amber);
   --color-sw-violet: var(--sw-violet);
+  --color-da-bg: var(--da-bg);
+  --color-da-card: var(--da-card);
+  --color-da-card-2: var(--da-card-2);
+  --color-da-ink: var(--da-ink);
+  --color-da-muted: var(--da-muted);
+  --color-da-line: var(--da-line);
+  --color-da-accent: var(--da-accent);
+  --color-da-accent-ink: var(--da-accent-ink);
+  --color-da-accent-soft: var(--da-accent-soft);
+  --font-da-title: var(--da-font-title);
+  --radius-da: var(--da-radius);
   --color-series-1: var(--series-1);
   --color-series-2: var(--series-2);
   --color-series-3: var(--series-3);

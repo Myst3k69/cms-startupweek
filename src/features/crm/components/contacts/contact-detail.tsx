@@ -57,6 +57,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { ActivityTimeline } from "@/components/shared/timeline";
+import { ContactAcademyCard } from "@/features/academy/components/academy-panels";
 import { OrgLink, SessionLink, UserChip } from "@/components/shared/entity-links";
 import { StatusSelect } from "@/components/shared/status-select";
 import { ContactFormModal } from "../shared/contact-form-modal";
@@ -373,6 +374,7 @@ function ContactView({ contact, initialTab }: { contact: Contact; initialTab?: s
                 />
               </CardContent>
             </Card>
+            <ContactAcademyCard contactId={contact.id} />
             <Card>
               <CardHeader>
                 <CardTitle>Provenance</CardTitle>

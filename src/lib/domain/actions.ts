@@ -13,6 +13,10 @@ import { crm, findById } from "@/lib/store";
 import type {
   Application,
   ApplicationStatus,
+  AssignmentStatus,
+  Enrollment,
+  EnrollmentSource,
+  Persona,
   Contact,
   EmailTemplate,
   EntityRef,
@@ -278,6 +282,8 @@ export function changeApplicationStatus(applicationId: ID, status: ApplicationSt
   if (status === "inscrite") {
     if (contact) s.update("contacts", contact.id, { lifecycle: "participant" });
     createApplicationInvoice(app.id, "solde");
+    // StartupWeek Academy : accès automatique aux formations liées à la session.
+    enrollFromApplication(app.id);
     if (ev) {
       const d = new Date(ev.startAt).getTime() - 7 * DAY;
       createTask({ title: `Envoyer la convocation — ${contactName(contact)} (${ev.code})`, kind: "qualiopi", dueAt: iso(Math.max(now + DAY, d)), related, automated: true });
@@ -293,6 +299,7 @@ export function changeApplicationStatus(applicationId: ID, status: ApplicationSt
   if (status === "desistee" && ev) {
     s.log({ kind: "systeme", entity: "events", entityId: ev.id, summary: `Place libérée (désistement de ${contactName(contact)})` });
   }
+  if (status === "desistee") suspendApplicationEnrollments(app.id);
   return true;
 }
 
@@ -445,3 +452,163 @@ export function nextComplaintNumber(): string {
   return `REC-${year}-${String(max + 1).padStart(3, "0")}`;
 }
 
+
+/* ───────────────────────────── StartupWeek Academy ───────────────────────────── */
+
+/**
+ * Ouvre l'accès d'un contact à une formation. Idempotent : une inscription existante
+ * (même formation, même contact) est réactivée et son accès prolongé si besoin.
+ * En base : contrainte unique (course_id, contact_id).
+ */
+export function enrollInCourse(opts: {
+  courseId: ID;
+  contactId: ID;
+  source: EnrollmentSource;
+  persona?: Persona;
+  eventId?: ID;
+  applicationId?: ID;
+  cohortId?: ID;
+  pathId?: ID;
+  invoiceId?: ID;
+  /** Début du décompte d'accès (défaut : maintenant). */
+  accessFrom?: string;
+  /** Fin d'accès imposée (cohorte) ; sinon début + durée d'accès de la formation. */
+  expiresAt?: string;
+  silent?: boolean;
+}): { enrollment: Enrollment; created: boolean } | undefined {
+  const s = crm();
+  const course = findById("courses", opts.courseId);
+  const contact = findById("contacts", opts.contactId);
+  if (!course || !contact) return undefined;
+  const now = nowMs();
+  const from = Math.max(now, opts.accessFrom ? new Date(opts.accessFrom).getTime() : now);
+  const expiresAt = opts.expiresAt ?? iso(from + course.accessDays * DAY);
+  const existing = s.enrollments.find((e) => e.courseId === course.id && e.contactId === contact.id);
+  if (existing) {
+    const later = new Date(expiresAt).getTime() > new Date(existing.expiresAt).getTime();
+    const reopen = existing.status === "expiree" || existing.status === "suspendue";
+    if (!later && !reopen) return { enrollment: existing, created: false };
+    s.update(
+      "enrollments",
+      existing.id,
+      {
+        status: existing.completedAt ? "terminee" : "active",
+        expiresAt: later ? expiresAt : existing.expiresAt,
+        eventId: existing.eventId ?? opts.eventId,
+        applicationId: existing.applicationId ?? opts.applicationId,
+        cohortId: existing.cohortId ?? opts.cohortId,
+        invoiceId: existing.invoiceId ?? opts.invoiceId,
+      },
+      { log: `Accès prolongé jusqu'au ${date(later ? expiresAt : existing.expiresAt)}`, kind: "statut" },
+    );
+    return { enrollment: findById("enrollments", existing.id)!, created: false };
+  }
+  const app = opts.applicationId ? findById("applications", opts.applicationId) : undefined;
+  const enrollment = s.create(
+    "enrollments",
+    {
+      courseId: course.id,
+      contactId: contact.id,
+      source: opts.source,
+      status: "active",
+      persona: opts.persona ?? app?.persona ?? "non_tech",
+      eventId: opts.eventId,
+      applicationId: opts.applicationId,
+      cohortId: opts.cohortId,
+      pathId: opts.pathId,
+      invoiceId: opts.invoiceId,
+      grantedAt: iso(now),
+      expiresAt,
+      progressPercent: 0,
+      timeSpentMinutes: 0,
+    },
+    { log: `Accès ouvert à « ${course.title} »` },
+  );
+  s.log({ kind: "systeme", entity: "contacts", entityId: contact.id, actorId: s.sessionUserId, summary: `Accès StartupWeek Academy : « ${course.title} » jusqu'au ${date(expiresAt)}` });
+  if (!opts.silent) {
+    sendEmail({
+      to: contact.email,
+      subject: "Votre accès à StartupWeek Academy : {{formation}}",
+      body:
+        "Bonjour {{prenom}},\n\nVotre accès à la formation « {{formation}} » est ouvert jusqu'au {{date_fin}}.\nRetrouvez-la dans votre espace : {{lien_espace}}\n\nLes leçons se débloquent au fil de votre progression. Une question ? Répondez simplement à cet email.\n\nL'équipe StartupWeek",
+      vars: { prenom: contact.firstName, formation: course.title, date_fin: date(expiresAt, "d MMMM yyyy"), lien_espace: "https://www.startupweek.tech/mon-espace" },
+      related: { entity: "enrollments", id: enrollment.id },
+    });
+  }
+  return { enrollment, created: true };
+}
+
+/** Candidature « inscrite » : accès aux formations liées à sa session (6 mois après la fin de la session). */
+export function enrollFromApplication(applicationId: ID): number {
+  const s = crm();
+  const app = findById("applications", applicationId);
+  if (!app) return 0;
+  const ev = findById("events", app.eventId);
+  let created = 0;
+  for (const course of s.courses) {
+    if (course.status === "archivee" || !course.eventIds.includes(app.eventId)) continue;
+    const r = enrollInCourse({ courseId: course.id, contactId: app.contactId, source: "session", persona: app.persona, eventId: app.eventId, applicationId: app.id, accessFrom: ev?.endAt });
+    if (r?.created) created++;
+  }
+  return created;
+}
+
+/** Rattrapage : donne l'accès à tous les inscrits des sessions liées à une formation. */
+export function syncCourseEnrollments(courseId: ID): number {
+  const s = crm();
+  const course = findById("courses", courseId);
+  if (!course) return 0;
+  const apps = s.applications.filter((a) => a.status === "inscrite" && course.eventIds.includes(a.eventId));
+  let created = 0;
+  for (const app of apps) {
+    const ev = findById("events", app.eventId);
+    const r = enrollInCourse({ courseId, contactId: app.contactId, source: "session", persona: app.persona, eventId: app.eventId, applicationId: app.id, accessFrom: ev?.endAt });
+    if (r?.created) created++;
+  }
+  return created;
+}
+
+/** Désistement : les accès obtenus par cette candidature sont suspendus. */
+export function suspendApplicationEnrollments(applicationId: ID) {
+  const s = crm();
+  for (const e of s.enrollments.filter((x) => x.applicationId === applicationId && x.source === "session" && x.status === "active")) {
+    s.update("enrollments", e.id, { status: "suspendue" }, { log: "Accès suspendu (désistement)", kind: "statut" });
+  }
+}
+
+/** Cohorte école / entreprise : accès de chaque membre à chaque formation, jusqu'à la fin de la cohorte. */
+export function enrollCohort(cohortId: ID): number {
+  const s = crm();
+  const cohort = findById("cohorts", cohortId);
+  if (!cohort) return 0;
+  let created = 0;
+  for (const courseId of cohort.courseIds) {
+    for (const contactId of cohort.contactIds) {
+      const r = enrollInCourse({ courseId, contactId, source: "cohorte", cohortId: cohort.id, eventId: cohort.eventId, expiresAt: cohort.endsAt, accessFrom: cohort.startsAt });
+      if (r?.created) created++;
+    }
+  }
+  if (created) s.log({ kind: "systeme", entity: "cohorts", entityId: cohort.id, actorId: s.sessionUserId, summary: `${created} accès ouverts pour la cohorte « ${cohort.name} »` });
+  return created;
+}
+
+/** Correction d'un livrable par un formateur. */
+export function reviewAssignment(id: ID, review: { status: AssignmentStatus; feedback: string; grade?: number }) {
+  const s = crm();
+  const a = findById("assignments", id);
+  if (!a) return;
+  s.update(
+    "assignments",
+    id,
+    { status: review.status, feedback: review.feedback, grade: review.grade, reviewerId: s.sessionUserId, reviewedAt: iso(nowMs()) },
+    { log: review.status === "valide" ? "Livrable validé" : "Livrable à reprendre", kind: "statut" },
+  );
+}
+
+/** Certificat de réalisation (FOAD) émis pour une inscription. */
+export function issueCertificate(enrollmentId: ID) {
+  const s = crm();
+  const e = findById("enrollments", enrollmentId);
+  if (!e) return;
+  s.update("enrollments", e.id, { certificateIssuedAt: iso(nowMs()) }, { log: "Certificat de réalisation émis", kind: "document" });
+}

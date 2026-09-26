@@ -1,6 +1,7 @@
 import type {
   ActionStatus,
   ApplicationStatus,
+  AssignmentStatus,
   AttendanceStatus,
   BankTxStatus,
   Channel,
@@ -9,9 +10,14 @@ import type {
   ContactLifecycle,
   ContentStatus,
   ContentType,
+  CourseLevel,
+  CourseStatus,
+  DeliverableKind,
   DealStage,
   DealType,
   EmailStatus,
+  EnrollmentSource,
+  EnrollmentStatus,
   EvaluationKind,
   EventKind,
   EventMode,
@@ -21,6 +27,7 @@ import type {
   InvoiceKind,
   InvoiceStatus,
   LeadSource,
+  LessonBlockType,
   OrgStatus,
   OrgType,
   PaymentMethod,
@@ -456,6 +463,61 @@ export const CHANNELS = opts<Channel>({
   instagram: "Instagram",
   newsletter: "Newsletter",
 });
+
+/* ───────────────────────────── StartupWeek Academy ───────────────────────────── */
+
+export const COURSE_STATUSES = opts<CourseStatus>({
+  brouillon: ["Brouillon", "neutral"],
+  relecture: ["Relecture", "violet"],
+  publiee: ["Publiée", "success"],
+  archivee: ["Archivée", "neutral"],
+});
+
+export const COURSE_LEVELS = opts<CourseLevel>({
+  debutant: "Débutant",
+  intermediaire: "Intermédiaire",
+  avance: "Avancé",
+});
+
+export const LESSON_BLOCK_TYPES = opts<LessonBlockType>({
+  texte: "Texte",
+  video: "Vidéo",
+  quiz: "Quiz",
+  exercice: "Exercice",
+  ressource: "Ressource",
+  prompt: "Prompt",
+  checklist: "Checklist",
+});
+
+export const DELIVERABLE_KINDS = opts<DeliverableKind>({
+  texte: "Réponse écrite",
+  lien: "Lien",
+  fichier: "Fichier",
+  aucun: "Aucun livrable",
+});
+
+export const ENROLLMENT_SOURCES = opts<EnrollmentSource>({
+  session: ["Inscription à une session", "accent"],
+  achat: ["Achat en ligne", "success"],
+  cohorte: ["Cohorte école / entreprise", "violet"],
+  manuel: ["Accès manuel", "neutral"],
+});
+
+export const ENROLLMENT_STATUSES = opts<EnrollmentStatus>({
+  active: ["Active", "info"],
+  terminee: ["Terminée", "success"],
+  expiree: ["Expirée", "neutral"],
+  suspendue: ["Suspendue", "warning"],
+});
+
+export const ASSIGNMENT_STATUSES = opts<AssignmentStatus>({
+  soumis: ["À corriger", "warning"],
+  a_reprendre: ["À reprendre", "danger"],
+  valide: ["Validé", "success"],
+});
+
+/** Durée d'accès par défaut (6 mois). */
+export const ACADEMY_ACCESS_DAYS = 183;
 
 /** Catégories de la page FAQ du site (clé stockée dans `contents.category`, libellé et icône côté site). */
 export const FAQ_CATEGORIES: { value: string; label: string }[] = [

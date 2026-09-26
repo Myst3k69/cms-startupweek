@@ -693,6 +693,248 @@ export interface ContentMeta {
   mobileImage?: string;
 }
 
+/* ───────────────────────────── StartupWeek Academy (e-learning) ───────────────────────────── */
+
+/**
+ * Structure : Parcours → Formations → Modules → Leçons → Blocs.
+ * Le CRM est l'outil auteur (création, publication, attribution, suivi) ; les apprenants
+ * suivent les formations dans « Mon espace » du site, qui lit et écrit via l'API
+ * /api/academy/learner/* (voir docs/ACADEMY.md).
+ */
+export type CourseStatus = "brouillon" | "relecture" | "publiee" | "archivee";
+export type CourseLevel = "debutant" | "intermediaire" | "avance";
+
+export interface Course extends BaseEntity {
+  title: string;
+  slug: string;
+  subtitle: string;
+  description: string; // Markdown (page catalogue)
+  status: CourseStatus;
+  level: CourseLevel;
+  personas: Persona[]; // profils visés (vide = tous)
+  audience: string; // public visé
+  objectives: string[]; // objectifs opérationnels et évaluables (Qualiopi ind. 5)
+  prerequisites: string;
+  durationHours: number; // durée annoncée (FOAD : durée estimée des activités)
+  priceCents: Cents; // TTC, vente seule sur le catalogue (0 = non vendue seule)
+  vatRate: number; // 0 (exonération formation) ou 20
+  inCatalog: boolean; // proposée à l'achat sur le site
+  accessDays: number; // durée d'accès après attribution (6 mois = 183 j)
+  sequential: boolean; // leçon N+1 débloquée quand la leçon N est terminée
+  eventIds: ID[]; // sessions dont les inscrits reçoivent l'accès automatiquement
+  coverUrl?: string;
+  tags: string[];
+  authorIds: ID[]; // membres de l'équipe
+  speakerIds: ID[]; // formateurs référents (assistance pédagogique)
+  // Qualiopi / FOAD (art. D.6313-3-1 du Code du travail)
+  isTraining: boolean;
+  evaluationMethods: string;
+  assistance: string; // assistance technique et pédagogique : qui, comment, délai de réponse
+  accessibility: string;
+  passingScore: number; // % minimal aux quiz évalués
+  certificateMinProgress: number; // % de leçons terminées pour le certificat de réalisation
+  stripePriceId?: string; // prix Stripe (sinon prix calculé depuis priceCents)
+  publishedAt?: ISODate;
+}
+
+export interface CourseModule extends BaseEntity {
+  courseId: ID;
+  position: number; // 0, 1, 2…
+  title: string;
+  summary: string;
+  objectives: string[];
+}
+
+interface LessonBlockBase {
+  id: ID;
+  /** Hyper-personnalisation : bloc réservé à ces profils (vide / absent = tous). */
+  personas?: Persona[];
+}
+
+export interface TextBlock extends LessonBlockBase {
+  type: "texte";
+  markdown: string;
+}
+
+export interface VideoBlock extends LessonBlockBase {
+  type: "video";
+  title: string;
+  url: string; // YouTube (non répertoriée) — vide tant que la vidéo n'est pas tournée
+  durationMinutes: number;
+  script?: string; // plan / script de tournage (interne)
+  transcript?: string; // transcription (accessibilité)
+}
+
+export interface QuizOption {
+  id: ID;
+  label: string;
+  correct: boolean;
+}
+
+export interface QuizQuestion {
+  id: ID;
+  prompt: string;
+  kind: "unique" | "multiple";
+  options: QuizOption[];
+  explanation?: string;
+}
+
+export interface QuizBlock extends LessonBlockBase {
+  type: "quiz";
+  title: string;
+  graded: boolean; // compte dans l'évaluation des acquis
+  questions: QuizQuestion[];
+}
+
+export type DeliverableKind = "texte" | "lien" | "fichier" | "aucun";
+
+export interface ExerciseBlock extends LessonBlockBase {
+  type: "exercice";
+  title: string;
+  instructions: string; // Markdown
+  deliverable: DeliverableKind;
+  estimatedMinutes: number;
+  review: "formateur" | "auto"; // corrigé par un formateur, ou validé à la remise
+  rubric: string[]; // critères de réussite
+}
+
+export interface ResourceBlock extends LessonBlockBase {
+  type: "ressource";
+  resourceId: ID;
+  note?: string;
+}
+
+export interface PromptBlock extends LessonBlockBase {
+  type: "prompt";
+  title: string;
+  tool: string; // Claude, ChatGPT, Cursor…
+  prompt: string;
+  tips?: string;
+}
+
+export interface ChecklistItem {
+  id: ID;
+  label: string;
+}
+
+export interface ChecklistBlock extends LessonBlockBase {
+  type: "checklist";
+  title: string;
+  items: ChecklistItem[];
+}
+
+export type LessonBlock = TextBlock | VideoBlock | QuizBlock | ExerciseBlock | ResourceBlock | PromptBlock | ChecklistBlock;
+export type LessonBlockType = LessonBlock["type"];
+
+export interface Lesson extends BaseEntity {
+  courseId: ID;
+  moduleId: ID;
+  position: number; // ordre dans le module
+  title: string;
+  summary: string;
+  estimatedMinutes: number; // durée estimée (lecture + activités)
+  isPreview: boolean; // consultable depuis le catalogue sans inscription
+  blocks: LessonBlock[];
+}
+
+export interface AcademyPath extends BaseEntity {
+  title: string;
+  slug: string;
+  description: string;
+  status: CourseStatus;
+  personas: Persona[];
+  courseIds: ID[]; // ordre du parcours
+  priceCents: Cents; // TTC (0 = non vendu seul)
+  inCatalog: boolean;
+}
+
+export type EnrollmentSource = "session" | "achat" | "cohorte" | "manuel";
+export type EnrollmentStatus = "active" | "terminee" | "expiree" | "suspendue";
+
+export interface Enrollment extends BaseEntity {
+  courseId: ID;
+  contactId: ID;
+  source: EnrollmentSource;
+  status: EnrollmentStatus;
+  persona: Persona; // variante de contenu servie à l'apprenant
+  eventId?: ID;
+  applicationId?: ID;
+  cohortId?: ID;
+  pathId?: ID;
+  invoiceId?: ID;
+  grantedAt: ISODate;
+  expiresAt: ISODate;
+  startedAt?: ISODate;
+  lastActivityAt?: ISODate;
+  completedAt?: ISODate;
+  // Dénormalisés (recalculés à chaque activité de l'apprenant)
+  progressPercent: number; // % de leçons terminées
+  timeSpentMinutes: number;
+  quizAverage?: number; // % moyen aux quiz évalués
+  certificateIssuedAt?: ISODate;
+}
+
+export type LessonProgressStatus = "en_cours" | "terminee";
+
+export interface LessonProgress extends BaseEntity {
+  enrollmentId: ID;
+  lessonId: ID;
+  courseId: ID;
+  contactId: ID;
+  status: LessonProgressStatus;
+  startedAt: ISODate;
+  completedAt?: ISODate;
+  timeSpentSeconds: number;
+  quizScores: Record<string, number>; // id du bloc quiz → meilleur score (%)
+  quizAttempts: number;
+  checklist: Record<string, string[]>; // id du bloc checklist → items cochés
+}
+
+export type AssignmentStatus = "soumis" | "a_reprendre" | "valide";
+
+/** Livrable remis par un apprenant (bloc « exercice »). */
+export interface Assignment extends BaseEntity {
+  enrollmentId: ID;
+  lessonId: ID;
+  blockId: ID;
+  courseId: ID;
+  contactId: ID;
+  submittedAt: ISODate;
+  content: string;
+  url?: string;
+  status: AssignmentStatus;
+  feedback?: string;
+  grade?: number; // /20
+  reviewerId?: ID;
+  reviewedAt?: ISODate;
+}
+
+/** Connexion d'un apprenant (preuve de réalisation FOAD : relevé de connexions). */
+export interface LearnerConnection extends BaseEntity {
+  enrollmentId: ID;
+  contactId: ID;
+  courseId: ID;
+  startedAt: ISODate;
+  endedAt: ISODate;
+  durationSeconds: number;
+  lessonIds: ID[];
+  device?: string;
+}
+
+/** Cohorte : groupe d'apprenants d'une école / entreprise (accès collectif). */
+export interface Cohort extends BaseEntity {
+  name: string;
+  orgId?: ID;
+  eventId?: ID;
+  courseIds: ID[];
+  contactIds: ID[];
+  seats: number;
+  startsAt: ISODate;
+  endsAt: ISODate; // fin d'accès
+  invoiceId?: ID;
+  notes?: string;
+}
+
 /* ───────────────────────────── Analytics & automatisations ───────────────────────────── */
 
 export interface TrafficDay {
@@ -816,6 +1058,15 @@ export interface EntityMap {
   contents: ContentItem;
   automations: AutomationRule;
   offers: Offer;
+  courses: Course;
+  courseModules: CourseModule;
+  lessons: Lesson;
+  academyPaths: AcademyPath;
+  enrollments: Enrollment;
+  lessonProgress: LessonProgress;
+  assignments: Assignment;
+  learnerConnections: LearnerConnection;
+  cohorts: Cohort;
 }
 
 export type EntityName = keyof EntityMap;

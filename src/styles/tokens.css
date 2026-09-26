@@ -140,3 +140,59 @@
   background: var(--background);
   color: var(--foreground);
 }
+
+/* ───────────── StartupWeek Academy — 3 directions artistiques (sélecteur en bas à droite) ─────────────
+ * Néon : l'énergie StartupWeek (toujours sombre, cyan, grille).
+ * Campus : éditorial, papier chaud et titres serif (lecture longue).
+ * Atelier : outil de travail minimal, dense, accent violet, métadonnées en mono. */
+[data-da="neon"] {
+  --da-bg: var(--background);
+  --da-card: var(--surface);
+  --da-card-2: var(--surface-2);
+  --da-ink: var(--foreground);
+  --da-muted: var(--muted-foreground);
+  --da-line: rgba(0, 245, 255, 0.16);
+  --da-accent: var(--sw-cyan);
+  --da-accent-ink: var(--sw-ink);
+  --da-accent-soft: rgba(0, 245, 255, 0.09);
+  --da-font-title: var(--font-grotesk), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --da-radius: 1rem;
+}
+[data-da="campus"] {
+  --da-bg: var(--paper);
+  --da-card: #fbfaf6;
+  --da-card-2: var(--paper-2);
+  --da-ink: #1f1d17;
+  --da-muted: #6b6558;
+  --da-line: rgba(31, 29, 23, 0.14);
+  --da-accent: #076778;
+  --da-accent-ink: #ffffff;
+  --da-accent-soft: rgba(7, 103, 120, 0.09);
+  --da-font-title: var(--font-serif-display), ui-serif, Georgia, serif;
+  --da-radius: 0.25rem;
+}
+:root[data-theme="dark"] [data-da="campus"] {
+  --da-card: #1b1a15;
+  --da-ink: #f0ede4;
+  --da-muted: #a8a293;
+  --da-line: rgba(240, 237, 228, 0.12);
+  --da-accent: #5fcfdc;
+  --da-accent-ink: #001417;
+  --da-accent-soft: rgba(95, 207, 220, 0.12);
+}
+[data-da="atelier"] {
+  --da-bg: var(--background);
+  --da-card: var(--surface);
+  --da-card-2: var(--surface-2);
+  --da-ink: var(--foreground);
+  --da-muted: var(--muted-foreground);
+  --da-line: var(--border-strong);
+  --da-accent: var(--violet);
+  --da-accent-ink: #ffffff;
+  --da-accent-soft: var(--violet-soft);
+  --da-font-title: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --da-radius: 0.5rem;
+}
+:root[data-theme="dark"] [data-da="atelier"] {
+  --da-accent-ink: #0f0d1f;
+}
