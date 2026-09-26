@@ -161,7 +161,7 @@ SUPABASE_SECRET_KEY=sb_secret_…          # serveur uniquement (routes /api/*)
 
 ### 3.4 Limites connues du mode `supabase` (à lire avant usage réel)
 
-- **Emails déclenchés depuis l'interface** (acceptation, refus, relances, convocations…) : enregistrés dans `crm.email_messages` et le journal, **mais pas envoyés** — aucun envoi réel n'est branché côté interface (seuls les accusés de réception de `/api/intake` passent par Resend). À brancher avant de s'y fier. Par ailleurs `crm.email_templates` est **vide** en base (les modèles n'existent que dans le jeu de démo) : à créer dans *Emails → Modèles* ou à importer.
+- **Emails** : envoi réel par la file `crm.email_messages` (§ 5 quater) — actif dès que SMTP et le secret de la route d'envoi sont configurés ; d'ici là, les emails restent « Programmé » et l'interface le signale.
 - **Numéros de facture** : l'interface calcule le prochain numéro à partir des factures chargées et la base l'accepte en réalignant son compteur. Deux personnes émettant une facture au même instant obtiendraient le même numéro : la seconde est refusée par la base (doublon, index unique) et annulée à l'écran — à réémettre. Une facture émise ne peut plus changer de numéro ni être supprimée (émettre un avoir).
 - `invoices.paid_cents` / `status` et `applications.amount_paid_cents` sont recalculés par trigger à chaque paiement.
 - **Numéro de candidature** : attribué par la base (séquence), réalignée automatiquement quand un numéro est saisi à la main ou importé (migration `20260926173332_crm_applications_number_sync.sql`, **appliquée en production le 26/09/2026** et vérifiée : numéro manuel 50 → suivant 51 dans un bloc annulé, séquence remise ensuite sur le dernier numéro réel). Sans elle, la 1re étape d'une candidature du site a échoué le 26/09/2026 (numéro 1 déjà pris par une candidature créée par la simulation). La simulation de formulaires (*Automatisations → Testeur*) est désactivée en mode `supabase` : elle écrivait de fausses demandes dans la base réelle.
@@ -195,9 +195,10 @@ Le projet Supabase héberge aussi les comptes des participants du site : le rôl
 ```
 INTAKE_SIGNING_SECRET=<openssl rand -hex 32>
 ALLOWED_ORIGINS=https://www.startupweek.tech
-RESEND_API_KEY=re_…            # accusés de réception (sinon : pas d'email, la tâche SLA est créée quand même)
-EMAIL_FROM=StartupWeek <contact@startupweek.tech>
+# Emails : voir § 5 quater (SMTP_*, EMAIL_FROM, EMAIL_DISPATCH_SECRET…)
 ```
+
+Accusés de réception et Digital Starter Kit : envoyés par le CRM **seulement** si *Paramètres → Intégrations → Emails des formulaires du site* est activé (réponse `ack: "n8n"` sinon) — à activer en même temps que la désactivation des workflows n8n des formulaires, pour ne pas envoyer deux fois.
 
 Contrat de `POST /api/intake/<form>` (`form` ∈ `candidature`, `contact`, `entreprise`, `partenaire`, `reclamation`, `accompagnement`, `newsletter`, `starter-kit`) :
 
@@ -332,6 +333,59 @@ select at, summary, meta from crm.activities where entity_id = 'crm-scheduler' o
 ```
 
 Si les exécutions s'arrêtent (processus « pg_cron scheduler » absent de `pg_stat_activity`), Supabase recommande un redémarrage rapide du projet (*Settings → General*).
+
+## 5 quater. Envoi des emails
+
+Migration `20260926230000_crm_email_delivery.sql` (**à appliquer** — voir l'état en tête de section une fois appliquée).
+
+**Principe.** Tout email du CRM passe par la file `crm.email_messages` :
+
+1. l'interface (réponse, facture, devis, relance, candidature, convocation, questionnaire…) ou le serveur (formulaires du site, séquence Digital Starter Kit) insère un message **« programme »** (heure d'envoi = maintenant ou plus tard) ;
+2. la base appelle `POST /api/emails/dispatch` du back-office via `pg_net` : trigger sur `crm.email_messages` pour un envoi immédiat, et le planificateur (§ 5 ter, chaque minute) pour les envois programmés, les nouveaux essais et le rattrapage ;
+3. la route réserve les messages dus (`crm.claim_due_emails`, verrou + tentative comptée), complète les liens personnels, contrôle le message, envoie en **SMTP** (boîte `contact@startupweek.tech`, comme n8n) et note le résultat.
+
+| Résultat | Statut | Détail |
+| --- | --- | --- |
+| Envoyé | `envoye` | horodatage, Message-ID (`provider_id`), trace « Email envoyé » sur l'élément lié et sur le contact |
+| Refus / panne SMTP | `programme` puis `erreur` | nouvel essai à +5 puis +10 min ; `erreur` au 3e échec, raison dans `error` (visible dans le journal) |
+| Variable non remplie (`{{…}}`) | `erreur` | jamais envoyé avec une variable brute ; la fenêtre de rédaction bloque déjà |
+| Email marketing (catégorie « nurturing ») sans consentement | `brouillon` | raison dans `error` ; contrôle au moment de l'envoi |
+
+**Liens personnels complétés à l'envoi.** `{{lien_document}}` → `/documents/<jeton>` : la facture ou le devis lié, consultable et imprimable en PDF sans compte (jeton non devinable `public_token`, brouillons jamais servis, seules les données imprimées sont transmises). Emails marketing : lien de désinscription en pied (`/desinscription/<jeton>`) et en-têtes `List-Unsubscribe` / `List-Unsubscribe-Post` (désinscription en un clic des messageries, `POST /api/unsubscribe/<jeton>`) → consentement marketing du contact à faux, horodaté.
+
+**Modèles.** 25 modèles de production insérés par la migration (source : `src/lib/data/email-templates.ts`, formulations reprises des emails n8n, vouvoiement sauf Digital Starter Kit) : accusés des 6 formulaires, Digital Starter Kit + suite J+3, entretien, acceptation présentiel / distanciel, refus, convocation, accusé de réclamation, questionnaire à chaud, facture, facture d'acompte, avoir, rappel avant échéance, relances J+3 / J+10, mise en demeure, devis, relances manuelles. Modifiables dans *Emails → Modèles* (un modèle modifié n'est jamais écrasé par une migration). Séquence `seq_dsk` (kit à J0, suite à J+3).
+
+**Configuration (une fois).**
+
+1. Vercel, projet `cms-startupweek` → *Settings → Environment Variables* (Production), puis redéployer :
+   ```
+   SMTP_HOST=<hôte SMTP de la boîte contact@ — identifiant n8n « smtp-startupweek »>
+   SMTP_PORT=465                  # 587 si le serveur utilise STARTTLS (SMTP_SECURE=false)
+   SMTP_USER=contact@startupweek.tech
+   SMTP_PASSWORD=<mot de passe de la boîte>
+   EMAIL_FROM=StartupWeek <contact@startupweek.tech>
+   EMAIL_DISPATCH_SECRET=<valeur du secret Vault crm_email_dispatch_secret, point 2>
+   EMAIL_BCC=aurelien.chiren@gmail.com   # facultatif : copie de chaque email (n8n mettait cette adresse en copie)
+   PUBLIC_APP_URL=https://…              # facultatif : domaine des liens envoyés (défaut : URL de production Vercel)
+   ```
+2. Supabase → SQL Editor (une fois) — URL de la route et secret partagé, rangés dans Vault :
+   ```sql
+   select vault.create_secret('https://cms-startupweek.vercel.app/api/emails/dispatch', 'crm_email_dispatch_url');
+   select vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'crm_email_dispatch_secret');
+   select decrypted_secret from vault.decrypted_secrets where name = 'crm_email_dispatch_secret';  -- à copier dans EMAIL_DISPATCH_SECRET
+   ```
+3. *Paramètres → Intégrations* : « Emails transactionnels » doit afficher les voyants email et route d'envoi au vert ; *Emails → Modèles → Envoyer un test*.
+4. *Paramètres → Organisation* : SIRET, adresse, téléphone, n° de déclaration d'activité et **IBAN** (mentions des factures, règlement par virement dans les emails). *Paramètres → Qualiopi* : lien du questionnaire de satisfaction (sinon l'envoi du questionnaire à chaud est bloqué).
+
+**Surveiller.**
+
+```sql
+select status, count(*) from crm.email_messages group by status;
+select "to", subject, attempts, error, scheduled_at from crm.email_messages where status in ('erreur', 'programme') order by scheduled_at desc limit 20;
+select id, status_code, left(content::text, 200), created from net._http_response order by created desc limit 10;  -- réponses de la route d'envoi
+```
+
+**Limites.** Pas de suivi d'ouverture ni de clic (SMTP) ; un rebond différé (boîte pleine, adresse morte signalée plus tard) arrive dans la boîte `contact@`, pas dans le CRM. Les séquences autres que Digital Starter Kit (J-7, J+1, relances automatiques de devis / factures…) ne sont pas exécutées automatiquement : leurs emails s'envoient depuis les fiches (boutons) ou la fenêtre de rédaction. Les réponses au questionnaire de satisfaction restent dans l'outil de formulaire choisi.
 
 ## 6. Brancher Stripe
 
@@ -471,6 +525,7 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 | Formulaires | Remettre les URLs `N8N_WEBHOOK_*` dans le site et réactiver les 8 workflows. Effet immédiat. |
 | Synchro site | `alter table crm.sessions disable trigger sessions_site_sync; alter table crm.resources disable trigger resources_site_sync; alter table crm.applications disable trigger applications_capacity;` puis réactiver le polling n8n (il réécrit `public.event` depuis Airtable). |
 | Paiements | Désactiver l'endpoint dans Stripe ; retirer le cron Qonto de `vercel.json`. |
+| Emails | Retirer `EMAIL_DISPATCH_SECRET` (ou les variables SMTP) dans Vercel : plus rien ne part, les emails restent en file « Programmé ». Revenir à n8n pour les formulaires : désactiver *Emails des formulaires du site*. |
 | Planificateur | `select cron.unschedule('crm-scheduler');` (plus de publication ni de rappel automatiques ; les contenus « Planifié » attendent) ; `select cron.unschedule('crm-cron-purge');` ; `drop extension pg_cron;` supprime toutes les tâches. |
 | Tout le CRM | `drop schema crm cascade;` — supprime tables, fonctions et triggers du CRM ; **aucune table `public.*` n'est modifiée structurellement** (seules leurs lignes ont pu être mises à jour par la synchro). Puis `supabase migration repair --status reverted 20260926103012 20260926103117 20260926103336 20260926103516`. |
 | Données | Restauration du backup / PITR pris avant la migration (§ 2.1). |
@@ -492,10 +547,9 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 
 ## 12. Reste à faire (hors de ce lot)
 
-- Envoi réel des emails déclenchés depuis l'interface (§ 3.4) et modèles d'emails en base (`crm.email_templates` vide).
 - Numérotation des factures attribuée par la base plutôt que par l'interface (supprime le risque de doublon simultané, § 3.4).
 - Synchronisation en temps réel entre collègues (Supabase Realtime) — aujourd'hui : bouton *Recharger depuis la base*.
-- Envoi des emails programmés (`crm.email_messages` au statut `programme`, ex. séquence Digital Starter Kit) : traitement à ajouter au planificateur (§ 5 ter) ; seuls les accusés de réception sont envoyés immédiatement.
+- Exécution automatique des séquences autres que Digital Starter Kit (J-7, J+1, relances de devis / factures) : déclencheurs à ajouter au planificateur (§ 5 ter) — les emails eux-mêmes partent déjà (§ 5 quater).
 - Publication réelle sur LinkedIn / Instagram (aujourd'hui : tâche de rappel, § 5 ter) — via n8n ou les API des réseaux (LinkedIn exige une application validée pour publier sur une page entreprise).
 - Types TypeScript générés (`supabase gen types typescript --schema crm`) pour supprimer les casts du client service_role.
 - Phase 2 : formulaires du site → CRM (§ 5, § 9) ; d'ici là, les candidatures arrivent dans Airtable.

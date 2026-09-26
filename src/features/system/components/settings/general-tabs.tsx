@@ -190,7 +190,7 @@ export function BillingTab() {
 
 /* ───────────────────────────── Qualiopi ───────────────────────────── */
 
-const QUALIOPI_KEYS = ["qualityLeadId", "disabilityLeadId", "auditDate", "auditBody", "newcomer", "complaintAckHours", "slaHours"] as const;
+const QUALIOPI_KEYS = ["qualityLeadId", "disabilityLeadId", "auditDate", "auditBody", "newcomer", "complaintAckHours", "slaHours", "satisfactionFormUrl"] as const;
 const qualiopiSchema = z.object({
   qualityLeadId: z.string({ error: "Désignez un référent qualité" }).min(1, { error: "Désignez un référent qualité" }),
   disabilityLeadId: z.string({ error: "Désignez un référent handicap (ind. 26)" }).min(1, { error: "Désignez un référent handicap (ind. 26)" }),
@@ -199,6 +199,7 @@ const qualiopiSchema = z.object({
   newcomer: z.boolean(),
   complaintAckHours: z.number().int().min(1, { error: "Au moins 1 h" }).max(240, { error: "10 jours maximum" }),
   slaHours: z.number().int().min(1, { error: "Au moins 1 h" }).max(240, { error: "10 jours maximum" }),
+  satisfactionFormUrl: z.string().trim().refine((v) => v === "" || /^https?:\/\/\S+$/i.test(v), { error: "Adresse web complète attendue (https://…)" }),
 });
 
 function isoToDay(iso?: string) {
@@ -287,6 +288,14 @@ export function QualiopiTab() {
           <Input id="st-ack" type="number" min={1} value={draft.complaintAckHours} disabled={!editable} onChange={(e) => set("complaintAckHours", num(e.target.value))} />
         </FormField>
       </div>
+      <FormField
+        label="Questionnaire de satisfaction à chaud"
+        htmlFor="st-satisfaction"
+        error={errors.satisfactionFormUrl}
+        hint="Lien de votre formulaire (Tally, Google Forms…) envoyé aux participants en fin de session — indicateur 30. Le code de session et l'identifiant du participant sont ajoutés au lien."
+      >
+        <Input id="st-satisfaction" type="url" value={draft.satisfactionFormUrl} disabled={!editable} onChange={(e) => set("satisfactionFormUrl", e.target.value)} placeholder="https://tally.so/r/…" />
+      </FormField>
     </FormCard>
   );
 }
