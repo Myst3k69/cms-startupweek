@@ -13,7 +13,7 @@
  *   • refus de la base (droits, contrainte) → la modification locale est annulée
  *     et l'erreur est signalée à l'interface.
  */
-import type { Activity, Collections, EntityName, ID, Settings, TrafficDay } from "@/lib/domain/types";
+import type { Activity, Collections, ContentStatDay, EntityName, ID, Settings, TrafficDay } from "@/lib/domain/types";
 import { DATA_MODE, getSupabase, supabaseConfigured } from "./supabase";
 
 /** Nom des tables SQL (schéma crm) pour chaque collection du store. */
@@ -131,7 +131,10 @@ async function fetchAll(table: string, order: { column: string; ascending: boole
   const page = 1000; // plafond par requête de PostgREST sur Supabase (max-rows)
   const rows: Row[] = [];
   for (let from = 0; from < max; from += page) {
-    const { data, error } = await c.from(table).select("*").order(order.column, { ascending: order.ascending }).range(from, from + page - 1);
+    let query = c.from(table).select("*").order(order.column, { ascending: order.ascending });
+    // Départage par id : sans ordre total, la pagination peut sauter ou doubler des lignes de même date.
+    if (order.column !== "id") query = query.order("id", { ascending: true });
+    const { data, error } = await query.range(from, from + page - 1);
     if (error) return { rows, error };
     rows.push(...((data ?? []) as Row[]));
     if (!data || data.length < page) break;
@@ -144,6 +147,7 @@ export interface RemoteData {
   activities: Activity[];
   settings?: Partial<Settings>;
   traffic: TrafficDay[];
+  contentStats: ContentStatDay[];
   /** Erreur bloquante (ex. schéma non exposé) : rien n'a pu être chargé. */
   fatal?: string;
 }
@@ -240,7 +244,7 @@ export const remoteSync = {
   /** Charge toutes les collections visibles pour l'utilisateur connecté (RLS : une section non autorisée revient vide). */
   async loadAll(): Promise<RemoteData> {
     const c = getSupabase();
-    if (!c) return { collections: {}, activities: [], traffic: [] };
+    if (!c) return { collections: {}, activities: [], traffic: [], contentStats: [] };
     const collections: Partial<Record<EntityName, unknown[]>> = {};
     let fatal: string | undefined;
 
@@ -254,12 +258,14 @@ export const remoteSync = {
         collections[name] = rows.map(fromDb);
       }),
     );
-    if (fatal) return { collections: {}, activities: [], traffic: [], fatal };
+    if (fatal) return { collections: {}, activities: [], traffic: [], contentStats: [], fatal };
 
-    const [acts, settings, traffic] = await Promise.all([
+    const [acts, settings, traffic, contentStats] = await Promise.all([
       fetchAll("activities", { column: "at", ascending: false }, 1500),
       c.from("settings").select("*").eq("id", true).maybeSingle(),
       fetchAll("traffic_days", { column: "date", ascending: true }, 2000),
+      // Plus récents d'abord : si le plafond est atteint, ce sont les plus anciens jours qui manquent.
+      fetchAll("content_stats_days", { column: "date", ascending: false }, 20_000),
     ]);
     if (acts.error) report("activities", describeDbError(acts.error));
     if (settings.error) report("settings", describeDbError(settings.error));
@@ -275,6 +281,7 @@ export const remoteSync = {
       activities: acts.rows.map(fromDb) as unknown as Activity[],
       settings: s,
       traffic: traffic.rows.map(fromDb) as unknown as TrafficDay[],
+      contentStats: contentStats.rows.map(fromDb) as unknown as ContentStatDay[],
     };
   },
 };

@@ -40,12 +40,13 @@ import { SessionLink } from "@/components/shared/entity-links";
 import { useActions, useCollection, useEntity, useNow, useSession, useSettings } from "@/lib/hooks";
 import { CHANNELS, CONTENT_STATUSES, CONTENT_TYPES, labelOf } from "@/lib/domain/constants";
 import type { Channel, ContentItem, ContentMeta, ContentType } from "@/lib/domain/types";
-import { dateTime, number, percent, relative } from "@/lib/format";
+import { dateTime, number, relative } from "@/lib/format";
 import { slugify } from "@/lib/utils";
 import { CHANNEL_COLOR, fromLocalInput, publicPath, siteHost, splitTags, toLocalInput } from "../lib/content";
 import { plainText, wordCount } from "../lib/markdown";
 import { MarkdownEditor } from "./markdown-editor";
 import { SeoPanel } from "./seo-panel";
+import { ContentStatsCard } from "./content-stats-card";
 import { cleanMeta, SitePublicationPanel, siteKind } from "./site-publication-panel";
 
 interface Draft {
@@ -293,15 +294,6 @@ function EditorInner({ item }: { item: ContentItem }) {
     const cut = txt.length > 200 ? `${txt.slice(0, 197).replace(/\s+\S*$/, "")}…` : txt;
     set("excerpt", cut);
   };
-
-  const m = item.metrics;
-  const ctr = m.views ? (m.clicks / m.views) * 100 : 0;
-  const conv = m.clicks ? (m.leads / m.clicks) * 100 : 0;
-  const rank = React.useMemo(() => {
-    const sorted = contents.filter((c) => c.status === "publie").sort((a, b) => b.metrics.leads - a.metrics.leads);
-    const i = sorted.findIndex((c) => c.id === item.id);
-    return i >= 0 ? { pos: i + 1, of: sorted.length } : null;
-  }, [contents, item.id]);
 
   const canReview = item.status === "idee" || item.status === "redaction";
   const isPublished = item.status === "publie";
@@ -557,46 +549,7 @@ function EditorInner({ item }: { item: ContentItem }) {
             onChange={(p) => setDraft((d) => ({ ...d, ...p }))}
           />
 
-          <Card>
-            <CardHeader>
-              <div>
-                <CardTitle>Statistiques</CardTitle>
-                <CardDescription>{isPublished ? "Cumul depuis la publication (Vercel Analytics + UTM des formulaires)." : "Disponibles après publication."}</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid grid-cols-3 gap-3 text-center">
-                {[
-                  { label: "Vues", value: number(m.views) },
-                  { label: "Clics", value: number(m.clicks) },
-                  { label: "Leads", value: number(m.leads) },
-                ].map((s) => (
-                  <div key={s.label} className="rounded-md bg-surface-2 px-2 py-2.5">
-                    <dt className="text-[11px] text-muted-foreground">{s.label}</dt>
-                    <dd className="tabular mt-0.5 text-lg font-semibold text-foreground">{s.value}</dd>
-                  </div>
-                ))}
-              </dl>
-              <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-                <li className="flex justify-between">
-                  <span>Taux de clic</span>
-                  <span className="tabular font-medium text-foreground">{m.views ? percent(ctr, 1) : "—"}</span>
-                </li>
-                <li className="flex justify-between">
-                  <span>Clic → lead</span>
-                  <span className="tabular font-medium text-foreground">{m.clicks ? percent(conv, 1) : "—"}</span>
-                </li>
-                {rank && isPublished ? (
-                  <li className="flex justify-between">
-                    <span>Classement (leads)</span>
-                    <span className="tabular font-medium text-foreground">
-                      {rank.pos}ᵉ / {rank.of}
-                    </span>
-                  </li>
-                ) : null}
-              </ul>
-            </CardContent>
-          </Card>
+          <ContentStatsCard item={item} editable={editable} now={now} />
         </aside>
       </div>
 

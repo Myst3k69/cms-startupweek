@@ -655,6 +655,11 @@ export interface ContentItem extends BaseEntity {
   eventId?: ID;
   scheduledAt?: ISODate;
   publishedAt?: ISODate;
+  /**
+   * Chiffres saisis à la main (posts LinkedIn / Instagram, newsletter…). Les articles
+   * du blog sont mesurés sur le site (ContentStatDay) : affichage = saisie + mesure,
+   * via contentPerformance().
+   */
   metrics: { views: number; clicks: number; leads: number };
   /** Blog : rubrique affichée (« Méthodologie »…). FAQ : clé de catégorie (FAQ_CATEGORIES). */
   category?: string;
@@ -703,6 +708,26 @@ export interface TrafficDay {
   sources: Record<"direct" | "google" | "linkedin" | "instagram" | "meta_ads" | "newsletter" | "partenaires", number>;
   formStarts: number;
   formSubmits: number;
+}
+
+/**
+ * Audience d'un contenu publié sur le site, par jour (crm.content_stats_days) —
+ * écrite par le site (mesure sans cookie), jamais depuis l'interface.
+ * Aujourd'hui : articles du blog (page /blog/<slug>).
+ */
+export interface ContentStatDay {
+  id: ID;
+  contentId: ID;
+  date: ISODate; // YYYY-MM-DD (Europe/Paris)
+  views: number;
+  /** Lecteurs uniques du jour. */
+  visitors: number;
+  /** Clics sur un lien de l'article (appel à l'action, lien interne ou externe). */
+  clicks: number;
+  /** Formulaires envoyés après lecture de l'article (dernier article lu, même jour ou veille). */
+  leads: number;
+  /** Lecteurs par source de visite. */
+  sources: Partial<TrafficDay["sources"]>;
 }
 
 export type AutomationTrigger =

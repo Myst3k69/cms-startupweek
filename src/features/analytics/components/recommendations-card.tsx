@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowRight, CircleCheck, Info, Lightbulb, TriangleAlert } from "lucide-react";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui";
-import { useCollection, useLookup, useSettings } from "@/lib/hooks";
+import { useCollection, useContentPerformance, useLookup, useSettings } from "@/lib/hooks";
 import { useCrm } from "@/lib/store";
 import { SATISFACTION_KINDS, conversionRows, forecast, inCur, inPrev, npsOf, sourceOf, sumTraffic, trafficBetween, type Range } from "../lib/metrics";
 import { buildRecommendations, type Recommendation } from "../lib/recommendations";
@@ -31,6 +31,7 @@ export function RecommendationsCard({ range, now }: { range: Range; now: number 
   const deals = useCollection("deals");
   const submissions = useCollection("submissions");
   const contents = useCollection("contents");
+  const contentPerf = useContentPerformance();
   const evaluations = useCollection("evaluations");
   const traffic = useCrm((s) => s.traffic);
   const settings = useSettings();
@@ -47,11 +48,12 @@ export function RecommendationsCard({ range, now }: { range: Range; now: number 
       slaHours: settings.slaHours,
       traffic: sumTraffic(trafficBetween(traffic, range.startKey, range.endKey)),
       contents,
+      contentPerf,
       npsCur: npsOf(sat.filter((e) => inCur(e.submittedAt, range))),
       npsPrev: npsOf(sat.filter((e) => inPrev(e.submittedAt, range))),
       applications,
     });
-  }, [applications, contacts, events, deals, submissions, contents, evaluations, traffic, settings.slaHours, range, now]);
+  }, [applications, contacts, events, deals, submissions, contents, contentPerf, evaluations, traffic, settings.slaHours, range, now]);
 
   return (
     <Card>

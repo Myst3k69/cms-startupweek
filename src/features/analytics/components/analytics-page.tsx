@@ -146,7 +146,7 @@ export function AnalyticsPage() {
 
       <section>
         <SectionTitle title="Tracking" />
-        <TrackingCard />
+        <TrackingCard now={now} />
       </section>
     </div>
   );

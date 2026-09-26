@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useCrm } from "@/lib/store";
 import type { EntityMap, EntityName, ID } from "@/lib/domain/types";
+import { contentPerformance, type ContentPerformance } from "@/lib/domain/selectors";
 import { access, type Access, type Section } from "@/lib/auth/permissions";
 
 /**
@@ -23,6 +24,13 @@ export function useLookup<K extends EntityName>(name: K): Map<ID, EntityMap[K]> 
 export function useEntity<K extends EntityName>(name: K, id: ID | undefined | null): EntityMap[K] | undefined {
   const rows = useCollection(name);
   return useMemo(() => (id ? rows.find((r) => r.id === id) : undefined), [rows, id]);
+}
+
+/** Chiffres de chaque contenu (saisie manuelle + audience mesurée sur le site), par id. */
+export function useContentPerformance(): Map<ID, ContentPerformance> {
+  const contents = useCollection("contents");
+  const stats = useCrm((s) => s.contentStats);
+  return useMemo(() => contentPerformance(contents, stats), [contents, stats]);
 }
 
 export const useHydrated = () => useCrm((s) => s.hydrated);

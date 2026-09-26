@@ -1,7 +1,8 @@
 /**
  * Trafic du site (180 jours) et fil d'activité (30 derniers jours), dérivé des données du seed.
  */
-import type { Activity, ActivityKind, EntityName, TrafficDay } from "../../domain/types";
+import type { Activity, ActivityKind, ContentStatDay, EntityName, TrafficDay } from "../../domain/types";
+import { isSiteMeasured } from "../../domain/selectors";
 import type { SeedContext } from "./context";
 import { DAY, HOUR, MIN, linesTotalCents, pad, sortBy } from "./helpers";
 
@@ -68,6 +69,82 @@ export function buildTraffic(ctx: SeedContext): void {
     });
   }
   ctx.data.traffic = days;
+}
+
+/* ───────────────────────────── Audience des articles du blog ───────────────────────────── */
+
+/** Lecteurs d'un article par source : le blog vit surtout du SEO. */
+const ARTICLE_SHARE: [Source, number][] = [
+  ["google", 0.52],
+  ["linkedin", 0.16],
+  ["direct", 0.12],
+  ["newsletter", 0.08],
+  ["instagram", 0.05],
+  ["partenaires", 0.05],
+  ["meta_ads", 0.02],
+];
+
+/**
+ * Comme en production, les articles du blog sont mesurés sur le site : leurs chiffres
+ * (générés par buildContents) deviennent une audience quotidienne sur 180 jours au plus,
+ * décroissante depuis la publication, et leur saisie manuelle est remise à zéro. Les
+ * autres contenus (réseaux sociaux, newsletter, pages) gardent leurs chiffres saisis.
+ */
+export function buildContentStats(ctx: SeedContext): void {
+  const { clock } = ctx;
+  const r = ctx.rng.fork("content-stats");
+  const rows: ContentStatDay[] = [];
+
+  for (const c of ctx.data.contents) {
+    if (!isSiteMeasured(c) || !c.publishedAt) continue;
+    const total = c.metrics;
+    c.metrics = { views: 0, clicks: 0, leads: 0 };
+    const pubRel = Math.floor((Date.parse(c.publishedAt) - clock.today0) / DAY);
+    const first = Math.max(pubRel, -180);
+    if (first > -1 || total.views === 0) continue;
+
+    const days: number[] = [];
+    for (let i = first; i <= -1; i++) days.push(i);
+    const weights = days.map((i) => r.float(0.6, 1.4) / Math.sqrt(i - pubRel + 1));
+    const sum = weights.reduce((a, b) => a + b, 0);
+    const pick = () => {
+      let x = r.float(0, sum);
+      for (let k = 0; k < weights.length; k++) {
+        x -= weights[k];
+        if (x <= 0) return k;
+      }
+      return weights.length - 1;
+    };
+    const clicks = new Array<number>(days.length).fill(0);
+    const leads = new Array<number>(days.length).fill(0);
+    for (let n = 0; n < total.clicks; n++) clicks[pick()]++;
+    for (let n = 0; n < total.leads; n++) leads[pick()]++;
+
+    days.forEach((rel, k) => {
+      const views = Math.max(clicks[k], Math.round((total.views * weights[k]) / sum));
+      if (views === 0 && leads[k] === 0) return;
+      const visitors = Math.max(Math.min(views, 1), Math.round(views * r.float(0.72, 0.9)));
+      // Source tirée lecteur par lecteur (les volumes quotidiens sont trop faibles pour des parts arrondies).
+      const sources: ContentStatDay["sources"] = {};
+      for (let n = 0; n < visitors; n++) {
+        let x = r.float(0, 1);
+        const hit = ARTICLE_SHARE.find(([, share]) => (x -= share) <= 0)?.[0] ?? "google";
+        sources[hit] = (sources[hit] ?? 0) + 1;
+      }
+      const ts = clock.today0 + rel * DAY;
+      rows.push({
+        id: `cst_${c.id}_${clock.ymd(ts).replace(/-/g, "")}`,
+        contentId: c.id,
+        date: clock.ymd(ts),
+        views,
+        visitors,
+        clicks: clicks[k],
+        leads: leads[k],
+        sources,
+      });
+    });
+  }
+  ctx.data.contentStats = rows;
 }
 
 /* ───────────────────────────── Fil d'activité ───────────────────────────── */

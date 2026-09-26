@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { BarList } from "@/components/charts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Segmented } from "@/components/ui";
-import { useCollection, useLookup } from "@/lib/hooks";
+import { useCollection, useContentPerformance, useLookup } from "@/lib/hooks";
 import { CHANNELS, labelOf } from "@/lib/domain/constants";
 import { compactNumber, date, moneyCompact, number, percent } from "@/lib/format";
 import { alumniRebuy, topContents } from "../lib/metrics";
@@ -16,13 +16,14 @@ const METRIC_LABEL: Record<Metric, string> = { views: "vues", leads: "leads", cl
 /** Top contenus + cohortes d'alumni (récurrence / upsell). */
 export function GrowthSection({ now }: { now: number }) {
   const contents = useCollection("contents");
+  const perf = useContentPerformance();
   const applications = useCollection("applications");
   const invoices = useCollection("invoices");
   const events = useCollection("events");
   const offers = useLookup("offers");
   const [metric, setMetric] = React.useState<Metric>("views");
 
-  const top = React.useMemo(() => topContents(contents, metric, 7), [contents, metric]);
+  const top = React.useMemo(() => topContents(contents, perf, metric, 7), [contents, perf, metric]);
   const cohorts = React.useMemo(() => alumniRebuy(applications, invoices, events, offers, now), [applications, invoices, events, offers, now]);
 
   return (
@@ -31,7 +32,7 @@ export function GrowthSection({ now }: { now: number }) {
         <CardHeader className="flex-wrap">
           <div>
             <CardTitle>Top contenus</CardTitle>
-            <CardDescription>Contenus publiés · cumul depuis publication</CardDescription>
+            <CardDescription>Contenus publiés · cumul depuis publication (blog mesuré sur le site, réseaux saisis à la main)</CardDescription>
           </div>
           <Segmented<Metric>
             size="xs"
@@ -45,15 +46,15 @@ export function GrowthSection({ now }: { now: number }) {
           />
         </CardHeader>
         <CardContent>
-          {top.length === 0 || top.every((c) => c.metrics[metric] === 0) ? (
+          {top.length === 0 || top.every((t) => t.value === 0) ? (
             <NoData>Aucun contenu publié avec des {METRIC_LABEL[metric]}.</NoData>
           ) : (
             <BarList
               format={(v) => (metric === "views" ? compactNumber(v) : number(v))}
-              items={top.map((c) => ({
+              items={top.map(({ content: c, value, leads }) => ({
                 key: c.id,
-                value: c.metrics[metric],
-                hint: metric === "views" ? `· ${c.metrics.leads} leads` : `· ${labelOf(CHANNELS, c.channel)}`,
+                value,
+                hint: metric === "views" ? `· ${leads} leads` : `· ${labelOf(CHANNELS, c.channel)}`,
                 label: (
                   <Link href={`/contenus/${c.id}`} className="hover:text-accent-text hover:underline">
                     {c.title}

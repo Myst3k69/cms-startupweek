@@ -26,7 +26,7 @@ export function AcquisitionSection({ period, range, now }: { period: Period; ran
         <CardHeader>
           <div>
             <CardTitle>Visiteurs et pages vues</CardTitle>
-            <CardDescription>Vercel Web Analytics · par {series.grain}</CardDescription>
+            <CardDescription>Mesure du site sans cookie · par {series.grain}</CardDescription>
           </div>
         </CardHeader>
         <CardContent>

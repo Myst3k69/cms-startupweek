@@ -4,7 +4,7 @@ import * as React from "react";
 import { format, parseISO } from "date-fns";
 import { CalendarDays, Eye, KanbanSquare, List, Megaphone, Plus, Send, UserPlus, X } from "lucide-react";
 import { Button, PageHeader, Segmented, Select, StatCard, useToast } from "@/components/ui";
-import { useActions, useCollection, useLookup, useNow, useSession } from "@/lib/hooks";
+import { useActions, useCollection, useContentPerformance, useLookup, useNow, useSession } from "@/lib/hooks";
 import { CHANNELS, CONTENT_STATUSES, CONTENT_TYPES, labelOf } from "@/lib/domain/constants";
 import { inRange, lastWeeks } from "@/lib/domain/selectors";
 import type { ContentItem, ContentStatus } from "@/lib/domain/types";
@@ -27,6 +27,7 @@ export function ContentsPage() {
   const contents = useCollection("contents");
   const users = useLookup("users");
   const userList = useCollection("users");
+  const perf = useContentPerformance();
   const now = useNow();
   const toast = useToast();
   const { update } = useActions();
@@ -52,13 +53,14 @@ export function ContentsPage() {
     const pubPrev = published.filter((c) => inRange(c.publishedAt, prevStart, start));
     const planned = contents.filter((c) => c.status === "planifie").sort((a, b) => (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? ""));
     const next = planned.find((c) => c.scheduledAt && new Date(c.scheduledAt).getTime() >= now);
-    const views30 = pub30.reduce((s, c) => s + c.metrics.views, 0);
-    const viewsAll = published.reduce((s, c) => s + c.metrics.views, 0);
-    const leads = contents.reduce((s, c) => s + c.metrics.leads, 0);
-    const clicks = contents.reduce((s, c) => s + c.metrics.clicks, 0);
+    const sum = (list: ContentItem[], k: "views" | "clicks" | "leads") => list.reduce((s, c) => s + (perf.get(c.id)?.[k] ?? 0), 0);
+    const views30 = sum(pub30, "views");
+    const viewsAll = sum(published, "views");
+    const leads = sum(contents, "leads");
+    const clicks = sum(contents, "clicks");
     const weekly = lastWeeks(now, 12).map((w) => published.filter((c) => inRange(c.publishedAt, w.start, w.end)).length);
     return { pub30: pub30.length, pubDelta: pctDelta(pub30.length, pubPrev.length), planned: planned.length, next, views30, viewsAll, leads, clicks, weekly };
-  }, [contents, now]);
+  }, [contents, perf, now]);
 
   const authorOptions = React.useMemo(
     () => userList.filter((u) => contents.some((c) => c.authorId === u.id)).map((u) => ({ value: u.id, label: u.name })),
@@ -131,7 +133,7 @@ export function ContentsPage() {
         <StatCard
           label="Leads générés"
           value={number(stats.leads)}
-          hint={stats.clicks ? `${percent((stats.leads / stats.clicks) * 100, 1)} des clics deviennent des leads` : "Attribution via UTM des formulaires"}
+          hint={stats.clicks ? `${percent((stats.leads / stats.clicks) * 100, 1)} des clics deviennent des leads` : "Formulaires envoyés après lecture d'un article"}
           icon={UserPlus}
         />
       </div>
