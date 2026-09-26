@@ -196,7 +196,9 @@ function EditorInner({ item }: { item: ContentItem }) {
 
   /** Enregistre le brouillon (+ éventuel changement de statut) en une seule mutation journalisée. */
   const persist = (extra: Partial<ContentItem> = {}, log = "Contenu enregistré", logKind: "modification" | "statut" = "modification") => {
-    if (!editable || !validate(extra.status === "publie" || (extra.status === undefined && item.status === "publie"))) return false;
+    // « Planifié » vaut publication : le planificateur (pg_cron) le mettra en ligne tel quel.
+    const target = extra.status ?? item.status;
+    if (!editable || !validate(target === "publie" || target === "planifie")) return false;
     update("contents", item.id, { ...fromDraft(draft), ...extra }, { log, kind: logKind });
     setDraft((d) => ({ ...d, meta: cleanMeta(d.meta) }));
     return true;
@@ -223,7 +225,9 @@ function EditorInner({ item }: { item: ContentItem }) {
       toast({ title: "Date passée", description: "Choisissez une date future ou publiez maintenant.", tone: "danger" });
       return;
     }
-    if (persist({ status: "planifie", scheduledAt: iso }, `Planifié pour le ${dateTime(iso)}`, "statut")) toast({ title: "Publication programmée", description: dateTime(iso) });
+    if (persist({ status: "planifie", scheduledAt: iso }, `Planifié pour le ${dateTime(iso)}`, "statut")) {
+      toast({ title: "Publication programmée", description: `Mise en ligne automatique le ${dateTime(iso)}.` });
+    }
   };
 
   const publish = () => {
@@ -302,7 +306,11 @@ function EditorInner({ item }: { item: ContentItem }) {
           <>
             {labelOf(CONTENT_TYPES, item.type)} · {labelOf(CHANNELS, item.channel)} · modifié {relative(item.updatedAt, now)}
             {isPublished && item.publishedAt ? ` · publié le ${dateTime(item.publishedAt)}` : ""}
-            {item.status === "planifie" && item.scheduledAt ? ` · programmé le ${dateTime(item.scheduledAt)}` : ""}
+            {item.status === "planifie" && item.scheduledAt
+              ? new Date(item.scheduledAt).getTime() <= now
+                ? " · mise en ligne en cours (rechargez la page d'ici une minute)"
+                : ` · programmé le ${dateTime(item.scheduledAt)}`
+              : ""}
           </>
         }
         actions={
@@ -453,7 +461,7 @@ function EditorInner({ item }: { item: ContentItem }) {
               <FormField label="Auteur" htmlFor="ct-author">
                 <Select id="ct-author" value={draft.authorId} disabled={!editable} placeholder="Non attribué" options={users.map((u) => ({ value: u.id, label: u.name }))} onChange={(e) => set("authorId", e.target.value)} />
               </FormField>
-              <FormField label="Programmation" htmlFor="ct-when" error={errors.scheduledAt} hint="Date et heure de mise en ligne (fuseau local).">
+              <FormField label="Programmation" htmlFor="ct-when" error={errors.scheduledAt} hint="Mise en ligne automatique à cette heure (fuseau local), à la minute près, via « Planifier ».">
                 <Input id="ct-when" type="datetime-local" value={draft.scheduledAt} disabled={!editable} onChange={(e) => set("scheduledAt", e.target.value)} />
               </FormField>
               <FormField label="Session liée" htmlFor="ct-event" hint="Affiche le contenu sur la page de la session et trace les leads générés.">
