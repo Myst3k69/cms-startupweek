@@ -8,7 +8,7 @@ import { sessionStats } from "@/lib/domain/selectors";
 import type { Application, Evaluation, EventSession } from "@/lib/domain/types";
 import { date, dateRange, money } from "@/lib/format";
 import { Rating } from "../bits";
-import { audienceLabel, satisfactionOf, sessionAudience, type SessionAudience } from "../../lib/sessions";
+import { audienceLabel, satisfactionOf, sessionAudience, type EventBilling, type SessionAudience } from "../../lib/sessions";
 
 interface Row {
   ev: EventSession;
@@ -30,7 +30,7 @@ export function SessionList({
   events: EventSession[];
   applications: Application[];
   evaluations: Evaluation[];
-  billed: Map<string, { billed: number; collected: number }>;
+  billed: Map<string, EventBilling>;
 }) {
   const router = useRouter();
   const rows = React.useMemo<Row[]>(
@@ -45,7 +45,7 @@ export function SessionList({
           audience,
           enrolled: st.enrolled,
           fillRate: st.fillRate,
-          revenue: audience === "b2c" ? st.revenue : (b?.billed ?? 0),
+          revenue: audience === "b2c" ? st.revenue : (b?.signed ?? 0),
           collected: audience === "b2c" ? st.collected : (b?.collected ?? 0),
           satisfaction: sat.avg,
           responses: sat.count,

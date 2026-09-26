@@ -30,7 +30,7 @@ import { date, dateTime, money, relative } from "@/lib/format";
 import { useActions, useCollection, useNow } from "@/lib/hooks";
 import { pct } from "@/lib/utils";
 import { EVENT_FORMATS, REGIONS } from "../../lib/labels";
-import { audienceLabel, formatHours, fromDateInput, programHours, sessionAudience, toDateInput } from "../../lib/sessions";
+import { audienceLabel, formatHours, fromDateInput, sessionAudience, toDateInput } from "../../lib/sessions";
 import type { SessionData } from "./use-session-data";
 
 /* ───────────── Alertes ───────────── */
@@ -47,8 +47,7 @@ function useSessionAlerts(ev: EventSession, data: SessionData) {
     if (ev.status === "inscriptions_ouvertes" && Date.parse(ev.registrationDeadline) < now && d > 0) out.push({ tone: "warning", text: `Clôture des inscriptions dépassée (${date(ev.registrationDeadline)}) alors que la session est encore ouverte.` });
     const noConvoc = data.enrolled.filter((a) => !a.convocationSentAt).length;
     if (d > 0 && d <= 10 && noConvoc) out.push({ tone: "info", text: `${noConvoc} participant${noConvoc > 1 ? "s" : ""} sans convocation (indicateur 9) — onglet Participants.` });
-    const hours = programHours(ev.program);
-    if (ev.isTraining && ev.program.length && Math.abs(hours - ev.durationHours) >= 1) out.push({ tone: "info", text: `Le programme totalise ${formatHours(hours)} pour une durée déclarée de ${formatHours(ev.durationHours)}.` });
+    if (ev.isTraining && !ev.program.length && d > 0) out.push({ tone: "info", text: "Programme vide : complétez l'onglet Programme (fiche Qualiopi, convocation, émargement)." });
     if (ev.status === "brouillon" && ev.publishedOnSite) out.push({ tone: "warning", text: "Session publiée sur le site alors qu'elle est en brouillon." });
     return out;
   }, [ev, data, now]);

@@ -11,9 +11,9 @@ import { dateRange, money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { OrgLink } from "@/components/shared/entity-links";
 import { SessionImage } from "../bits";
-import { audienceLabel, sessionAudience } from "../../lib/sessions";
+import { audienceLabel, sessionAudience, type EventBilling } from "../../lib/sessions";
 
-export function SessionCard({ ev, applications, now, billed }: { ev: EventSession; applications: Application[]; now: number; billed?: number }) {
+export function SessionCard({ ev, applications, now, billing }: { ev: EventSession; applications: Application[]; now: number; billing?: EventBilling }) {
   const st = sessionStats(ev, applications);
   const audience = sessionAudience(ev);
   const b2c = audience === "b2c";
@@ -97,7 +97,9 @@ export function SessionCard({ ev, applications, now, billed }: { ev: EventSessio
             <p className="relative z-10 truncate text-muted-foreground">
               Client : <OrgLink id={ev.orgId} />
             </p>
-            <p className="tabular text-muted-foreground">{billed ? `Facturé ${money(billed)}` : "Facturation sur devis (pas de candidatures individuelles)"}</p>
+            <p className="tabular text-muted-foreground">
+              {billing?.signed ? `CA signé ${money(billing.signed)} · facturé ${money(billing.billed)}` : "Facturation sur devis (pas de candidatures individuelles)"}
+            </p>
           </div>
         ) : (
           <div className="mt-3 rounded-md bg-surface-2/70 px-3 py-2.5 text-xs">
@@ -125,14 +127,14 @@ export function SessionCard({ ev, applications, now, billed }: { ev: EventSessio
   );
 }
 
-export function SessionCards({ events, applications, now, billed }: { events: EventSession[]; applications: Application[]; now: number; billed: Map<string, { billed: number }> }) {
+export function SessionCards({ events, applications, now, billed }: { events: EventSession[]; applications: Application[]; now: number; billed: Map<string, EventBilling> }) {
   if (!events.length) {
     return <EmptyState icon={CalendarX2} title="Aucune session à venir" description="Aucune session à venir ne correspond à ces filtres. Consultez la vue Liste pour l'historique." />;
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {events.map((ev) => (
-        <SessionCard key={ev.id} ev={ev} applications={applications} now={now} billed={billed.get(ev.id)?.billed} />
+        <SessionCard key={ev.id} ev={ev} applications={applications} now={now} billing={billed.get(ev.id)} />
       ))}
     </div>
   );

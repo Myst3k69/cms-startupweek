@@ -25,7 +25,8 @@ export function SessionsPage({ initialView }: { initialView?: string }) {
   const applications = useCollection("applications");
   const evaluations = useCollection("evaluations");
   const invoices = useCollection("invoices");
-  const billed = React.useMemo(() => billedByEvent(invoices), [invoices]);
+  const quotes = useCollection("quotes");
+  const billed = React.useMemo(() => billedByEvent(invoices, quotes), [invoices, quotes]);
 
   const [view, setView] = React.useState<View>(initialView === "calendrier" || initialView === "liste" ? initialView : "cartes");
   const [status, setStatus] = React.useState("");
@@ -56,7 +57,7 @@ export function SessionsPage({ initialView }: { initialView?: string }) {
       const audience = sessionAudience(e);
       if (audience === "b2b") {
         const b = billed.get(e.id);
-        b2b += b?.billed ?? 0;
+        b2b += b?.signed ?? 0;
         collected += b?.collected ?? 0;
         return;
       }

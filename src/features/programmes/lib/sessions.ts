@@ -2,7 +2,7 @@
  * Dérivations pures propres aux sessions (jours de formation, durée du programme,
  * satisfaction, NPS, codes). Toujours `now` en paramètre (rendu pur).
  */
-import type { Evaluation, EventSession, Invoice, ProgramSlot } from "@/lib/domain/types";
+import type { Evaluation, EventSession, Invoice, ProgramSlot, Quote } from "@/lib/domain/types";
 import { invoiceTotal } from "@/lib/domain/selectors";
 
 export const DAY = 86_400_000;
@@ -116,16 +116,34 @@ export function evalScore10(ev: Evaluation): number | undefined {
   return Math.round((v / scale) * 100) / 10;
 }
 
-/** Montant facturé (TTC, avoirs déduits) et encaissé par session, toutes factures non annulées. */
-export function billedByEvent(invoices: Invoice[]): Map<string, { billed: number; collected: number }> {
-  const m = new Map<string, { billed: number; collected: number }>();
+export interface EventBilling {
+  /** Facturé TTC (avoirs déduits), factures émises non annulées. */
+  billed: number;
+  collected: number;
+  /** Devis acceptés TTC. */
+  quoted: number;
+  /** CA signé = max(facturé, devis acceptés) — une commande B2B est souvent facturée en plusieurs fois. */
+  signed: number;
+}
+
+/** Facturation par session (utile pour les sessions B2B, sans candidatures individuelles). */
+export function billedByEvent(invoices: Invoice[], quotes: Quote[] = []): Map<string, EventBilling> {
+  const m = new Map<string, EventBilling>();
+  const get = (id: string) => m.get(id) ?? { billed: 0, collected: 0, quoted: 0, signed: 0 };
   invoices.forEach((i) => {
     if (!i.eventId || i.status === "annulee" || i.status === "brouillon") return;
-    const cur = m.get(i.eventId) ?? { billed: 0, collected: 0 };
+    const cur = get(i.eventId);
     cur.billed += invoiceTotal(i).ttc;
     if (i.kind !== "avoir") cur.collected += i.paidCents;
     m.set(i.eventId, cur);
   });
+  quotes.forEach((q) => {
+    if (!q.eventId || q.status !== "accepte") return;
+    const cur = get(q.eventId);
+    cur.quoted += invoiceTotal({ lines: q.lines, kind: "facture" }).ttc;
+    m.set(q.eventId, cur);
+  });
+  m.forEach((v) => (v.signed = Math.max(v.billed, v.quoted)));
   return m;
 }
 

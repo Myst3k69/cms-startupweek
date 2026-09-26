@@ -211,9 +211,9 @@ export function sendInvoiceReminder(invoiceId: ID) {
   sendEmail({
     to,
     template: tpl,
-    subject: tpl ? undefined : `Rappel — facture ${inv.number}`,
-    body: tpl ? undefined : `Bonjour,\n\nSauf erreur de notre part, la facture {{numero}} d'un montant de {{montant}} arrivée à échéance le {{echeance}} reste à régler.\nLien de paiement : {{lien_paiement}}\n\nL'équipe StartupWeek`,
-    vars: { prenom: contact?.firstName ?? "", numero: inv.number, montant: money(invoiceBalance(inv), true), echeance: date(inv.dueAt), lien_paiement: inv.stripePaymentLink ?? "" },
+    subject: tpl ? undefined : "Rappel — facture {{numero_facture}}",
+    body: tpl ? undefined : `Bonjour,\n\nSauf erreur de notre part, la facture {{numero_facture}} d'un montant de {{montant}} arrivée à échéance le {{date_echeance}} reste à régler.\nLien de paiement : {{lien_paiement}}\n\nL'équipe StartupWeek`,
+    vars: { prenom: contact?.firstName ?? "", numero_facture: inv.number, montant: money(invoiceBalance(inv), true), date_echeance: date(inv.dueAt), lien_paiement: inv.stripePaymentLink ?? "" },
     related: { entity: "invoices", id: inv.id },
   });
   s.update("invoices", inv.id, { remindersSent: inv.remindersSent + 1, lastReminderAt: iso(nowMs()) });
@@ -245,6 +245,8 @@ export function changeApplicationStatus(applicationId: ID, status: ApplicationSt
     session: ev?.name,
     code_session: ev?.code,
     date_debut: ev ? date(ev.startAt, "d MMMM yyyy") : "",
+    date_fin: ev ? date(ev.endAt, "d MMMM yyyy") : "",
+    duree: ev ? `${ev.durationHours} h` : "",
     lieu: ev?.city,
     montant_acompte: ev ? money(Math.round((ev.priceCents * s.settings.depositPercent) / 100)) : "",
   };
@@ -289,7 +291,7 @@ export function sendConvocation(applicationId: ID) {
     template: findTemplate("qualiopi", "convocation"),
     subject: findTemplate("qualiopi", "convocation") ? undefined : `Convocation — ${ev.name}`,
     body: findTemplate("qualiopi", "convocation") ? undefined : "Bonjour {{prenom}},\n\nVous êtes convoqué(e) à la session {{session}} qui débute le {{date_debut}} ({{lieu}}).\nProgramme, horaires, accès et règlement intérieur en pièce jointe.\n\nL'équipe StartupWeek",
-    vars: { prenom: contact.firstName, session: ev.name, date_debut: date(ev.startAt, "d MMMM yyyy"), lieu: ev.city, code_session: ev.code },
+    vars: { prenom: contact.firstName, session: ev.name, date_debut: date(ev.startAt, "d MMMM yyyy"), date_fin: date(ev.endAt, "d MMMM yyyy"), duree: `${ev.durationHours} h`, lieu: ev.city, code_session: ev.code },
     related: { entity: "applications", id: app.id },
   });
   s.update("applications", app.id, { convocationSentAt: iso(nowMs()) });
@@ -405,7 +407,7 @@ export function acknowledgeComplaint(id: ID) {
     sendEmail({
       to: contact.email,
       template: findTemplate("qualiopi", "réclamation") ?? findTemplate("accuse_reception", "réclamation"),
-      vars: { prenom: contact.firstName, numero: c.number },
+      vars: { prenom: contact.firstName, numero_reclamation: c.number, date_reception: date(c.receivedAt) },
       related: { entity: "complaints", id: c.id },
     });
   }
