@@ -6,6 +6,9 @@
  *    des participants du site, la page de connexion du CRM ne doit pas en créer.
  * 2. Le lien ramène sur /auth/callback?code=… : `completeSignIn()` échange le code
  *    contre une session (même navigateur requis : le vérificateur PKCE y est stocké).
+ *    L'adresse de retour est TOUJOURS exactement `<origine>/auth/callback` (une seule
+ *    URL exacte à autoriser dans Supabase) ; la page demandée est mémorisée dans le
+ *    navigateur (`takeStoredNext()`).
  * 3. `resolveMemberId()` : le compte doit correspondre à un membre actif de
  *    `crm.team_members` (sinon aucune donnée n'est lisible, RLS) — rattachement
  *    automatique par email vérifié via `crm.claim_team_membership()` si la migration
@@ -19,6 +22,19 @@ import { safeNext } from "./redirect";
 
 const emailSchema = z.email();
 
+const NEXT_KEY = "sw-crm-next";
+
+/** Page à ouvrir après connexion, mémorisée à la demande du lien (lue une seule fois). */
+export function takeStoredNext(): string | null {
+  try {
+    const v = localStorage.getItem(NEXT_KEY);
+    localStorage.removeItem(NEXT_KEY);
+    return v ? safeNext(v) : null;
+  } catch {
+    return null;
+  }
+}
+
 export type LinkRequest = { ok: true; email: string } | { ok: false; message: string };
 
 export async function requestMagicLink(rawEmail: string, next: string): Promise<LinkRequest> {
@@ -28,11 +44,14 @@ export async function requestMagicLink(rawEmail: string, next: string): Promise<
   const supabase = getSupabase();
   if (!supabase) return { ok: false, message: "Supabase n'est pas configuré sur ce déploiement (variables NEXT_PUBLIC_SUPABASE_*)." };
 
-  const redirect = new URL("/auth/callback", window.location.origin);
-  redirect.searchParams.set("next", safeNext(next));
+  try {
+    localStorage.setItem(NEXT_KEY, safeNext(next));
+  } catch {
+    // stockage indisponible : retour sur l'accueil après connexion
+  }
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: false, emailRedirectTo: redirect.toString() },
+    options: { shouldCreateUser: false, emailRedirectTo: `${window.location.origin}/auth/callback` },
   });
   if (!error) return { ok: true, email };
 

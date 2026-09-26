@@ -12,8 +12,9 @@ const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : u
 /** Retour du lien magique Supabase : ?code=… (PKCE), ?token_hash=…&type=… ou ?error=…. */
 export default async function AuthCallbackPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
-  const next = safeNext(sp.next);
-  if (DATA_MODE !== "supabase") redirect(`/connexion?next=${encodeURIComponent(next)}`);
+  // `next` n'est plus transmis par le lien (page mémorisée dans le navigateur) ; accepté s'il est présent.
+  const next = typeof sp.next === "string" ? safeNext(sp.next) : undefined;
+  if (DATA_MODE !== "supabase") redirect(`/connexion?next=${encodeURIComponent(next ?? "/")}`);
   return (
     <AuthCallback
       next={next}

@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Loader2, TriangleAlert } from "lucide-react";
 import { LinkButton } from "@/components/ui";
-import { completeSignIn, type CallbackParams } from "@/lib/auth/supabase-auth";
+import { completeSignIn, takeStoredNext, type CallbackParams } from "@/lib/auth/supabase-auth";
 import { useCrm } from "@/lib/store";
 import { openWorkspace } from "@/lib/store/remote-session";
 
@@ -19,8 +19,9 @@ function hashErrors(): Partial<CallbackParams> {
   };
 }
 
-export function AuthCallback({ next, params }: { next: string; params: CallbackParams }) {
+export function AuthCallback({ next: nextFromQuery, params }: { next?: string; params: CallbackParams }) {
   const router = useRouter();
+  const [next, setNext] = React.useState(nextFromQuery ?? "/");
   const [error, setError] = React.useState<string | null>(null);
   const [step, setStep] = React.useState("Vérification du lien…");
   const ran = React.useRef(false);
@@ -29,6 +30,8 @@ export function AuthCallback({ next, params }: { next: string; params: CallbackP
     // Un code d'autorisation ne s'échange qu'une fois (double exécution des effets en dev).
     if (ran.current) return;
     ran.current = true;
+    const target = nextFromQuery ?? takeStoredNext() ?? "/";
+    setNext(target);
     void (async () => {
       const fail = (message: string) => {
         // Débloque /connexion (le démarrage automatique de session est sauté sur cette page).
@@ -41,9 +44,9 @@ export function AuthCallback({ next, params }: { next: string; params: CallbackP
       setStep("Chargement de vos données…");
       const ws = await openWorkspace();
       if (!ws.ok) return fail(ws.message);
-      router.replace(next);
+      router.replace(target);
     })();
-  }, [params, next, router]);
+  }, [params, nextFromQuery, router]);
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background p-6">

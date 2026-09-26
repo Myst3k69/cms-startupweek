@@ -14,7 +14,7 @@ Ce document décrit comment passer le back-office du mode démo (données dans l
 >
 > **Connexion par lien magique (§ 3)** : codée et testée de bout en bout **en local** — PostgreSQL 16 avec les 5 migrations, PostgREST 12.2.3, un faux service Supabase Auth (flux PKCE, jetons signés, codes d'erreur identiques) et Chromium. Scénarios validés : demande de lien (`create_user=false`, adresse normalisée, redirection `/auth/callback?next=…`), échange du code, rattachement automatique par email (migration 5) et repli sans migration 5, chargement des données, création d'un contact écrite en base avec une seule activité, refus RLS annulé à l'écran, rechargement, lien déjà utilisé, lien ouvert dans un autre navigateur, lien expiré, adresse inconnue (réponse neutre, aucun compte créé), compte hors équipe (session fermée), déconnexion, `next=//site-externe` ignoré, enchaînement acceptation → acompte → inscription → solde (écritures liées dans l'ordre, numéros cohérents, rien publié sur le site) ; mode démo inchangé.
 >
-> **Non testé** : le vrai service Supabase Auth (envoi réel de l'email, modèle *Magic Link*, URL de redirection autorisées — § 3.2), clés `sb_secret_…`, exposition du schéma `crm` à l'API (§ 2.4, pas encore faite), vraies API Qonto / Stripe / Resend, runtime Next.js des routes API, import Airtable (aucun script fourni). La migration `20260926150000` n'est **pas appliquée** en production.
+> **Non testé** : le vrai service Supabase Auth (envoi réel de l'email, modèle *Magic Link*, URL de redirection autorisées — § 3.2), clés `sb_secret_…`, vraies API Qonto / Stripe / Resend, runtime Next.js des routes API, import Airtable (aucun script fourni). La migration `20260926150000` n'est **pas appliquée** en production.
 
 ---
 
@@ -58,7 +58,7 @@ Ce que remplacent les triggers SQL (plus aucun polling) :
 
 ## 2. Appliquer les migrations
 
-> ✅ **Fait le 26/09/2026** sur le projet « startupweek » (voir l'état en tête de document). Les § 2.1 à 2.3 restent la procédure de référence pour un autre environnement (projet de test, reconstruction) ; il reste à faire le § 2.4 au moment de la bascule.
+> ✅ **Fait le 26/09/2026** sur le projet « startupweek » (voir l'état en tête de document). Les § 2.1 à 2.3 restent la procédure de référence pour un autre environnement (projet de test, reconstruction) ; le § 2.4 (exposition du schéma) est fait également.
 
 ### 2.1 Sur une branche d'abord (offre Pro requise)
 
@@ -89,7 +89,7 @@ Coller et exécuter **dans l'ordre** les 4 fichiers `20260926103012` → `202609
 
 ### 2.4 Exposer le schéma `crm` à l'API
 
-Dashboard → Project Settings → **Data API** → *Exposed schemas* : ajouter `crm`. Sans cela, supabase-js reçoit `PGRST106 The schema must be one of the following…`. **Pas encore fait** : à faire juste avant la bascule (§ 3). Exposer le schéma ne l'ouvre pas au public : `anon` n'a aucun droit sur `crm` et un compte connecté non rattaché à `crm.team_members` ne voit aucune ligne (vérifié sur la base réelle).
+Dashboard → Project Settings → **Data API** → *Exposed schemas* : ajouter `crm`. Sans cela, supabase-js reçoit `PGRST106 The schema must be one of the following…`. ✅ **Fait le 26/09/2026.** Exposer le schéma ne l'ouvre pas au public : `anon` n'a aucun droit sur `crm` et un compte connecté non rattaché à `crm.team_members` ne voit aucune ligne (vérifié sur la base réelle).
 
 ### 2.5 Vérifications après migration
 
@@ -133,16 +133,17 @@ Lancer aussi les *advisors* Supabase (Dashboard → Advisors : Security et Perfo
 
 ### 3.2 Réglages Supabase (Dashboard du projet « startupweek »)
 
-1. **Data API → Exposed schemas** : ajouter `crm` (§ 2.4).
-2. **Authentication → URL Configuration → Redirect URLs** : ajouter les adresses de retour du CRM. **Ne pas modifier le *Site URL*** (c'est celui du site).
+1. ✅ **Data API → Exposed schemas** : ajouter `crm` (§ 2.4) — fait le 26/09/2026.
+2. **Authentication → URL Configuration → Redirect URLs** : ajouter l'adresse de retour du CRM — toujours exactement `<adresse du CRM>/auth/callback` (la page à rouvrir après connexion est mémorisée dans le navigateur, pas dans l'URL). **Ne pas modifier le *Site URL*** (c'est celui du site).
    ```
-   https://<domaine-du-crm>/auth/callback
-   https://cms-startupweek-*-myst3k69s-projects.vercel.app/**      # aperçus Vercel (facultatif)
-   http://localhost:3000/auth/callback                             # développement (facultatif)
+   https://cms-startupweek.vercel.app/auth/callback        # adresse de production Vercel du projet
+   https://crm.startupweek.tech/auth/callback              # si un sous-domaine est ajouté au projet Vercel
+   https://cms-startupweek-*-myst3k69s-projects.vercel.app/auth/callback   # aperçus Vercel (facultatif)
+   http://localhost:3000/auth/callback                     # développement (facultatif)
    ```
    Sans cela, Supabase renvoie le lien vers le *Site URL* (le site public) et la connexion échoue.
 3. **Authentication → Emails → SMTP** : le serveur d'envoi par défaut de Supabase n'envoie qu'aux **membres de l'organisation Supabase** (« Email address not authorized » sinon), avec un plafond horaire bas. Configurer un SMTP personnalisé (ex. Resend, déjà utilisé par le site) — puis ajuster *Rate Limits* si besoin (30 emails / heure par défaut avec un SMTP personnalisé). Si le site envoie déjà ses emails Auth par un SMTP personnalisé, rien à faire.
-4. **Authentication → Emails → Templates → Magic Link** : le modèle doit utiliser `{{ .ConfirmationURL }}` (modèle par défaut). S'il a été personnalisé pour le site avec une URL fixe (`{{ .SiteURL }}/…`), les liens du CRM arriveraient sur le site : utiliser `{{ .RedirectTo }}`, ou `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=magiclink` (géré par `/auth/callback`, fonctionne alors depuis n'importe quel navigateur).
+4. **Authentication → Emails → Templates → Magic Link** : le modèle doit utiliser `{{ .ConfirmationURL }}` (modèle par défaut). S'il a été personnalisé pour le site avec une URL fixe (`{{ .SiteURL }}/…`), les liens du CRM arriveraient sur le site : utiliser `{{ .RedirectTo }}`, ou `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=magiclink` (géré par `/auth/callback`, fonctionne alors depuis n'importe quel navigateur).
 5. Appliquer la migration `20260926150000_crm_auth_membership.sql` (rattachement automatique + journal sans doublon ; testée localement, voir § 11).
 
 ### 3.3 Variables Vercel (Production, et Preview si besoin)
