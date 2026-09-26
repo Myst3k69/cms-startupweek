@@ -1,6 +1,6 @@
 # Proposition — un back-office 100 % custom pour StartupWeek
 
-> Analyse réalisée le 26/09/2026 à partir de : le site `startupweek-v2` (Next.js 16 + Supabase), les 14 workflows n8n du dossier StartupWeek (instance `srv1055276`), la base Airtable « CRM Startup Week » (`appN2nYYPT0tCvLoU`) et le projet Supabase `startupweek`. Lecture seule : rien n'a été modifié sur ces systèmes.
+> Analyse réalisée le 26/09/2026 à partir de : le site `startupweek-v2` (Next.js 16 + Supabase), les 14 workflows n8n du dossier StartupWeek, la base Airtable « CRM Startup Week » et le projet Supabase `startupweek`. Lecture seule : rien n'a été modifié sur ces systèmes.
 
 ## 1. Constat : l'existant en une image
 

@@ -5,7 +5,7 @@ Ce document décrit comment passer le back-office du mode démo (données dans l
 > **Statut des tests (lire avant toute mise en production)**
 >
 > Validé **localement uniquement**, sur une base jetable :
-> - les 4 migrations appliquées sur PostgreSQL 16, avec émulation Supabase (rôles `anon` / `authenticated` / `service_role` BYPASSRLS, `auth.users`, `auth.uid()`) et **répliques** de `public.event`, `public.template`, `public.administrative_resource`, `public.administrative_resource_event` (colonnes et enums relevés via le MCP Supabase en lecture le 26/09/2026, projet `qrgvwunbswwdjjxoeuun`) ;
+> - les 4 migrations appliquées sur PostgreSQL 16, avec émulation Supabase (rôles `anon` / `authenticated` / `service_role` BYPASSRLS, `auth.users`, `auth.uid()`) et **répliques** de `public.event`, `public.template`, `public.administrative_resource`, `public.administrative_resource_event` (colonnes et enums relevés via le MCP Supabase en lecture le 26/09/2026, projet « startupweek ») ;
 > - scénarios SQL : RLS par rôle (formateur, commercial, lecture, admin, utilisateur Auth non rattaché, anon), numérotation F/D/REC sans trou, immuabilité et non-suppression des factures émises, paiements → statut facture, places restantes et bascule `inscriptions_ouvertes ↔ complet`, synchro vers `public.event` / `template` / `administrative_resource(_event)`, vues d'analytics ;
 > - matrice `crm.section_access()` comparée à `PERMISSIONS` (`src/lib/auth/permissions.ts`) : **90/90 combinaisons identiques** ;
 > - les 4 routes (`/api/intake/[form]`, `/api/stripe/webhook`, `/api/qonto/sync`, `/api/health`) exécutées de bout en bout avec supabase-js contre **PostgREST 12.2.3** local ; les API Stripe, Qonto et Resend étaient **simulées**.
@@ -62,7 +62,7 @@ Ce que remplacent les triggers SQL (plus aucun polling) :
 ### 2.2 Avec la CLI
 
 ```bash
-supabase link --project-ref qrgvwunbswwdjjxoeuun
+supabase link --project-ref <project-ref>
 # L'historique distant contient 3 migrations absentes de ce repo : les récupérer d'abord,
 # sinon `db push` refuse (« Remote migration versions not found in local migrations directory »).
 supabase migration fetch            # télécharge les migrations de l'historique distant dans supabase/migrations
@@ -115,7 +115,7 @@ Variables (voir `.env.example`) :
 
 ```
 NEXT_PUBLIC_CRM_DATA_MODE=supabase
-NEXT_PUBLIC_SUPABASE_URL=https://qrgvwunbswwdjjxoeuun.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…
 SUPABASE_SECRET_KEY=sb_secret_…          # serveur uniquement (routes /api/*)
 ```
@@ -278,7 +278,7 @@ Rapprochement automatique volontairement prudent : transaction créditrice dont 
 
 ## 8. Migration des données Airtable
 
-Base : « CRM Startup Week » (`appN2nYYPT0tCvLoU`). Aucun script d'import n'est livré ; recommandation : export via l'API Airtable → transformation (script Node ponctuel) → insertion avec le client service_role, **table par table dans l'ordre ci-dessous**, en renseignant `airtable_record_id` (colonne unique prévue sur les tables importées) pour pouvoir rejouer l'import sans doublon (`upsert … on conflict (airtable_record_id)`).
+Base : « CRM Startup Week ». Aucun script d'import n'est livré ; recommandation : export via l'API Airtable → transformation (script Node ponctuel) → insertion avec le client service_role, **table par table dans l'ordre ci-dessous**, en renseignant `airtable_record_id` (colonne unique prévue sur les tables importées) pour pouvoir rejouer l'import sans doublon (`upsert … on conflict (airtable_record_id)`).
 
 ### 8.1 Correspondance
 

@@ -73,9 +73,11 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 
 | Élément | État |
 |---|---|
-| Interface complète (18 sections + documents) | ✅ fonctionnelle en mode démo |
-| Automatisations (acompte à l'acceptation, solde, emails, tâches, convocations, accusés de réclamation) | ✅ exécutées côté client en démo |
-| Schéma SQL, RLS, triggers, vues | ✍️ écrits, à appliquer sur une branche Supabase |
-| Endpoints `/api/intake`, Stripe, Qonto | ✍️ écrits (mode *dry-run* sans variables d'environnement), à tester en préproduction |
-| Envoi réel des emails (Resend) | ⏳ à brancher côté serveur |
-| Documents légaux (convention, CGV, attestation) | ⚠️ modèles à faire valider juridiquement |
+| Interface complète (18 sections, 35 pages back-office, 7 documents imprimables, 4 routes API) | ✅ fonctionnelle en mode démo |
+| Automatisations (acompte à l'acceptation, inscription au paiement, solde, emails, tâches, convocations, accusés de réclamation, garde de capacité) | ✅ exécutées côté client en démo — chaîne complète vérifiée dans le navigateur |
+| Qualité | ✅ `pnpm typecheck`, `pnpm lint`, `pnpm build` sans erreur ; 53 écrans vérifiés en clair / sombre / mobile 390 px (aucune erreur console, aucun débordement) |
+| Schéma SQL, RLS, triggers, vues | ✍️ écrits et testés sur un PostgreSQL local jetable — **non appliqués** sur le projet Supabase de production |
+| Endpoints `/api/intake`, Stripe, Qonto | ✍️ écrits et testés en local (*dry-run* sans variables d'environnement) — à tester en préproduction avec les vraies API |
+| Envoi réel des emails (Resend) | ⏳ prévu côté serveur (intake) ; les emails déclenchés depuis l'interface sont journalisés en démo |
+| Documents légaux (convention, CGV, attestation) | ⚠️ modèles à faire valider juridiquement (voir le point L.6353-6 dans la proposition) |
+| Import des données Airtable | ⏳ mapping documenté (`docs/SUPABASE.md`), script à écrire au moment de la bascule |
