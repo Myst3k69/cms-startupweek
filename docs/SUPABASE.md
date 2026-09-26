@@ -333,6 +333,16 @@ select at, summary, meta from crm.activities where entity_id = 'crm-scheduler' o
 
 Si les exécutions s'arrêtent (processus « pg_cron scheduler » absent de `pg_stat_activity`), Supabase recommande un redémarrage rapide du projet (*Settings → General*).
 
+## 5 quater. StartupWeek Academy (e-learning)
+
+Migration `20260926220123_crm_academy.sql`, **appliquée en production le 26/09/2026** : 9 tables `crm.academy_*` (formations, modules, leçons, parcours, cohortes, inscriptions, progression, livrables, connexions), RLS par la nouvelle section `academy` (écriture : admin, pédagogie, formateur ; lecture : commercial, lecture — 36 policies), `crm.section_access()` étendue, entités Academy ajoutées à `crm.activities.entity`, audit hors session d'un membre. Vérifié après application : droits par rôle, RLS active sur les 9 tables, `anon` sans droit, `section_access('commercial', 'facturation')` inchangé.
+
+> **Attention pour les prochaines migrations** : toute nouvelle version de `crm.section_access()` doit conserver la section `academy` (sinon l'équipe perd l'accès à Academy), et toute nouvelle version de `activities_entity_check` doit garder les entités `courses`, `courseModules`, `lessons`, `academyPaths`, `enrollments`, `lessonProgress`, `assignments`, `learnerConnections`, `cohorts`.
+
+Testé avant application sur PostgreSQL 16 (émulation Supabase) + PostgREST 12.2.3 : matrice `section_access()` = `PERMISSIONS` (95/95), contraintes (slug unique, catalogue réservé aux formations publiées et payantes, leçon rattachée au module de la même formation, inscription unique par formation × contact, suppression d'une formation ayant des apprenants refusée), RLS (formateur corrige un livrable, commercial en lecture seule, compte non rattaché : 0 ligne, `anon` refusé), cascades à la suppression d'un contact ; parcours complet via les routes API sur la base : webhook Stripe `checkout.session.completed` → contact, facture `F-2026-0001` payée par trigger, paiement, accès de 183 jours ; rejeu → doublon détecté ; API apprenant signée (sommaire, leçon, connexions, checklist, fin de leçon, déblocage de la suivante).
+
+Formation type : `supabase/data/academy_mvp_ia.sql` (généré par `scripts/academy-sql.ts`, idempotent, statut « relecture »). Contrat de l'API apprenant, vente et variables : [ACADEMY.md](ACADEMY.md).
+
 ## 6. Brancher Stripe
 
 1. Dashboard Stripe → Developers → Webhooks → *Add endpoint* : `https://cms-startupweek.vercel.app/api/stripe/webhook`.
