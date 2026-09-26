@@ -1,0 +1,142 @@
+/* StartupWeek OS — design tokens.
+ * Palette issue du site startupweek.tech (#0A0A0A / cyan #00F5FF) et de offres.startupweek.tech.
+ * Thème clair par défaut côté outil de travail, thème sombre « marque » via [data-theme="dark"].
+ * Séries de graphiques : palette catégorielle validée (dataviz) — ordre fixe, jamais cyclé. */
+:root {
+  --sw-black: #0a0a0a;
+  --sw-ink: #001417;
+  --sw-cyan: #00f5ff;
+  --sw-cyan-2: #73f9ff;
+  --sw-teal: #00a8b8;
+  --sw-teal-deep: #076778;
+  --sw-amber: #ffb020;
+  --sw-violet: #b48cff;
+
+  --background: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --surface-3: #e8ebf0;
+  --foreground: #0f172a;
+  --muted-foreground: #5b6577;
+  --faint: #8a94a6;
+  --border: rgba(15, 23, 42, 0.09);
+  --border-strong: rgba(15, 23, 42, 0.16);
+  --primary: #00c2d1;
+  --primary-hover: #00b0be;
+  --primary-foreground: #001417;
+  --accent-text: #076778;
+  --accent-soft: rgba(0, 168, 184, 0.09);
+  --accent-soft-strong: rgba(0, 168, 184, 0.16);
+  --ring: #00a8b8;
+  --overlay: rgba(4, 11, 20, 0.45);
+
+  --success: #0ca30c;
+  --success-text: #006300;
+  --success-soft: rgba(12, 163, 12, 0.1);
+  --warning: #fab219;
+  --warning-text: #8a5a00;
+  --warning-soft: rgba(250, 178, 25, 0.16);
+  --serious: #ec835a;
+  --danger: #d03b3b;
+  --danger-text: #b42323;
+  --danger-soft: rgba(208, 59, 59, 0.1);
+  --info: #2a78d6;
+  --info-text: #1c5cab;
+  --info-soft: rgba(42, 120, 214, 0.1);
+  --violet: #4a3aa7;
+  --violet-soft: rgba(74, 58, 167, 0.1);
+
+  /* Graphiques (dataviz, validé clair) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --chart-surface: #ffffff;
+  /* Rampe séquentielle (magnitude : heatmaps) — bleu, clair → foncé */
+  --seq-1: #b7d3f6;
+  --seq-2: #86b6ef;
+  --seq-3: #5598e7;
+  --seq-4: #2a78d6;
+  --seq-5: #1c5cab;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 16px -4px rgba(15, 23, 42, 0.12);
+  --shadow-lg: 0 24px 48px -12px rgba(15, 23, 42, 0.25);
+  --sidebar-width: 15.5rem;
+  /* Variante « Studio » du tableau de bord : papier chaud + encre */
+  --paper: #f3f1ea;
+  --paper-2: #ebe8de;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"],
+.scope-dark {
+  --background: #0a0a0a;
+  --surface: #111416;
+  --surface-2: #161a1d;
+  --surface-3: #1d2226;
+  --foreground: #f5f7fa;
+  --muted-foreground: #94a3b8;
+  --faint: #5b6577;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --primary: #00f5ff;
+  --primary-hover: #73f9ff;
+  --primary-foreground: #001417;
+  --accent-text: #00f5ff;
+  --accent-soft: rgba(0, 245, 255, 0.07);
+  --accent-soft-strong: rgba(0, 245, 255, 0.13);
+  --ring: #00f5ff;
+  --overlay: rgba(0, 0, 0, 0.6);
+
+  --success-text: #3fcf3f;
+  --success-soft: rgba(12, 163, 12, 0.16);
+  --warning-text: #fab219;
+  --warning-soft: rgba(250, 178, 25, 0.14);
+  --danger-text: #f07070;
+  --danger-soft: rgba(208, 59, 59, 0.18);
+  --info-text: #6da7ec;
+  --info-soft: rgba(57, 135, 229, 0.16);
+  --violet: #9085e9;
+  --violet-soft: rgba(144, 133, 233, 0.16);
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --chart-surface: #111416;
+  --seq-1: #104281;
+  --seq-2: #184f95;
+  --seq-3: #256abf;
+  --seq-4: #3987e5;
+  --seq-5: #6da7ec;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 24px 64px -12px rgba(0, 0, 0, 0.8);
+  --paper: #14130f;
+  --paper-2: #1c1b16;
+  color-scheme: dark;
+}
+
+/* Section toujours sombre (bandeau « mission control ») : les enfants héritent des tokens sombres. */
+.scope-dark {
+  background: var(--background);
+  color: var(--foreground);
+}
