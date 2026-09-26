@@ -38,22 +38,31 @@ export function watchAuth() {
 
 let started = false;
 
+export const CONFIG_NOTICE =
+  "Connexion indisponible : la variable NEXT_PUBLIC_SUPABASE_URL (adresse https://…supabase.co) ou NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY est absente ou invalide sur ce déploiement Vercel. Corrigez-la puis redéployez.";
+
 /** Au chargement de l'application : reprend la session enregistrée dans ce navigateur, s'il y en a une. */
 export async function startRemoteSession() {
   if (started) return;
   started = true;
-  const supabase = getSupabase();
-  if (!supabase) {
-    useCrm.getState().clearRemote(supabaseConfigured ? undefined : "Mode Supabase activé mais NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY sont absentes du déploiement.");
-    return;
+  try {
+    const supabase = supabaseConfigured ? getSupabase() : null;
+    if (!supabase) {
+      useCrm.getState().clearRemote(CONFIG_NOTICE);
+      return;
+    }
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) {
+      useCrm.getState().clearRemote();
+      return;
+    }
+    const res = await openWorkspace();
+    if (!res.ok) useCrm.getState().clearRemote(res.message);
+  } catch (e) {
+    // Jamais d'écran bloqué sur le chargement : l'erreur est affichée sur /connexion.
+    console.error("[session] démarrage impossible", e);
+    useCrm.getState().clearRemote(`Connexion à Supabase impossible : ${e instanceof Error ? e.message : String(e)}`);
   }
-  const { data } = await supabase.auth.getSession();
-  if (!data.session) {
-    useCrm.getState().clearRemote();
-    return;
-  }
-  const res = await openWorkspace();
-  if (!res.ok) useCrm.getState().clearRemote(res.message);
 }
 
 /** Recharge toutes les données depuis la base (bouton « Recharger »). */
