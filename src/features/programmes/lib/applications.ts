@@ -36,6 +36,10 @@ function capitalize(s: string) {
   return s ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
+function uncapitalize(s: string) {
+  return s ? s[0].toLowerCase() + s.slice(1) : s;
+}
+
 /**
  * Change le statut d'une candidature (avec garde de capacité) et décrit les automatisations déclenchées.
  * À appeler depuis un gestionnaire d'événement (jamais pendant le rendu).
@@ -179,7 +183,7 @@ export function scheduleInterview(applicationId: ID, iso: string | undefined, no
   if (app.status !== "entretien") {
     const res = moveApplication(app.id, "entretien");
     if (!res.ok) return res;
-    if (res.description) parts.push(res.description.replace(/\.$/, "").toLowerCase());
+    if (res.description) parts.push(uncapitalize(res.description.replace(/\.$/, "")));
     title = res.title;
   }
   if (notify && contact && iso) {
