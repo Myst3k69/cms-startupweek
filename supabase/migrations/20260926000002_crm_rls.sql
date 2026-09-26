@@ -80,7 +80,8 @@ as $$
     when p_role = 'formateur' then
       case
         when p_section = any (array['dashboard', 'relances', 'projets', 'sessions']) then 'write'
-        when p_section = any (array['candidatures', 'ressources', 'intervenants']) then 'read'
+        -- contacts en lecture : noms des participants (émargement, évaluations, projets suivis)
+        when p_section = any (array['candidatures', 'ressources', 'intervenants', 'contacts']) then 'read'
         else 'none'
       end
     when p_role = 'lecture' then

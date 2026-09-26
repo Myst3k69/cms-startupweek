@@ -8,8 +8,9 @@ import type { ID } from "@/lib/domain/types";
 import { date, dateRange } from "@/lib/format";
 import { Button, useToast } from "@/components/ui";
 import { Checkline, DocFooter, DocHeader, DocNotFound, DocSection, DocTitle, Facts, PrintPage, ScreenNotes, SignatureBlock } from "./print-kit";
-import { acquisitionLevel, capitalize, docRef, hoursLabel, isRemote, legalRepresentative, modeLabel } from "../doc-data";
+import { acquisitionLevel, docRef, hoursLabel, isRemote, legalRepresentative, modeLabel } from "../doc-data";
 import { fmt1, traineeAttendance } from "@/features/qualiopi/metrics";
+import { scoreLabel } from "@/features/qualiopi/labels";
 
 /**
  * Certificat de réalisation (modèle du ministère du Travail) + attestation de fin de formation
@@ -165,7 +166,7 @@ export function AttestationDoc({ applicationId }: { applicationId: ID }) {
               <tbody>
                 {scores.map(([k, v]) => (
                   <tr key={k} className="border-b border-border last:border-0">
-                    <td className="py-1.5 pr-2">{capitalize(k)}</td>
+                    <td className="py-1.5 pr-2">{scoreLabel(k)}</td>
                     <td className="tabular py-1.5 pr-2 text-right">{fmt1(v)} / 5</td>
                     <td className="py-1.5">{acquisitionLevel(v)}</td>
                   </tr>

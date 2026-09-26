@@ -156,7 +156,21 @@ export function RulesTab() {
           </div>
         ),
       },
-      { key: "trigger", header: "Déclencheur", sort: (r) => AUTOMATION_TRIGGER_LABEL[r.trigger], render: (r) => <span className="text-muted-foreground">{AUTOMATION_TRIGGER_LABEL[r.trigger]}</span>, hideBelow: "lg" },
+      {
+        key: "trigger",
+        header: "Déclencheur · conditions",
+        sort: (r) => AUTOMATION_TRIGGER_LABEL[r.trigger],
+        csv: (r) => `${AUTOMATION_TRIGGER_LABEL[r.trigger]} — ${r.conditions}`,
+        render: (r) => (
+          <div className="min-w-0 max-w-[18rem]">
+            <p className="truncate text-foreground">{AUTOMATION_TRIGGER_LABEL[r.trigger]}</p>
+            <p className="truncate font-mono text-[11px] text-muted-foreground" title={r.conditions}>
+              {r.conditions || "Toujours"}
+            </p>
+          </div>
+        ),
+        hideBelow: "lg",
+      },
       { key: "actions", header: "Étapes", align: "right", sort: (r) => r.actions.length, render: (r) => r.actions.length, hideBelow: "md" },
       {
         key: "active",

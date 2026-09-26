@@ -40,3 +40,35 @@ export const EVIDENCE_KINDS: Option<Evidence["kind"]>[] = [
 
 /** Indicateur Qualiopi de chaque type de veille. */
 export const WATCH_INDICATOR: Record<WatchItem["kind"], number> = { legale: 23, metiers: 24, pedagogique: 25, handicap: 26 };
+
+/** Libellés des critères de grilles d'évaluation (clés de Evaluation.scores). */
+const SCORE_LABELS: Record<string, string> = {
+  scope: "Définir le périmètre du MVP (scope)",
+  maquette: "Concevoir le parcours et la maquette",
+  build: "Construire le MVP (no-code, automatisations, IA)",
+  tests: "Conduire et exploiter des tests utilisateurs",
+  pitch: "Pitcher le projet et sa roadmap",
+  autonomie_numerique: "Autonomie numérique",
+  maturite_projet: "Maturité du projet",
+  outils_nocode: "Maîtrise des outils no-code",
+  aisance_pitch: "Aisance à l'oral (pitch)",
+  contenu: "Contenu",
+  intervenants: "Intervenants",
+  organisation: "Organisation",
+  lieu: "Lieu / environnement",
+  rythme: "Rythme",
+  mise_en_pratique: "Mise en pratique",
+  avancement_projet: "Avancement du projet",
+  utilite_ressources: "Utilité des ressources",
+  niveau_groupe: "Niveau du groupe",
+  conditions: "Conditions d'intervention",
+  conformite_administrative: "Conformité administrative",
+  adequation_besoin: "Adéquation au besoin",
+  encadrement: "Encadrement",
+};
+
+export function scoreLabel(key: string): string {
+  if (SCORE_LABELS[key]) return SCORE_LABELS[key];
+  const t = key.replace(/[_-]+/g, " ").trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}

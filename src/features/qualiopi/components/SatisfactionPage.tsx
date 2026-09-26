@@ -37,6 +37,7 @@ import {
 } from "../metrics";
 import { useQualiopiData } from "../use-qualiopi-data";
 import { QualiopiNav } from "./qualiopi-nav";
+import { scoreLabel } from "../labels";
 import { PublishResultsModal } from "./publish-results-modal";
 import { ActionDrawer, type ActionDraft } from "./action-drawer";
 
@@ -153,7 +154,7 @@ export function SatisfactionPage() {
     evaluations
       .filter((e) => e.kind === "acquis" && (!sessionId || e.eventId === sessionId))
       .forEach((e) => Object.entries(e.scores).forEach(([k, v]) => v <= 5 && acc.set(k, [...(acc.get(k) ?? []), v])));
-    return [...acc.entries()].map(([k, v]) => ({ label: k, value: mean(v) ?? 0, n: v.length })).sort((a, b) => b.value - a.value);
+    return [...acc.entries()].map(([k, v]) => ({ key: k, label: scoreLabel(k), value: mean(v) ?? 0, n: v.length })).sort((a, b) => b.value - a.value);
   }, [evaluations, sessionId]);
 
   const verbatims = React.useMemo(
@@ -333,7 +334,7 @@ export function SatisfactionPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <BarList max={5} format={(v) => fmt1(v)} items={competencies.map((c) => ({ key: c.label, label: c.label, value: c.value, hint: `${c.n} éval.` }))} className="sm:columns-2 sm:gap-8 [&>li]:break-inside-avoid" />
+            <BarList max={5} format={(v) => fmt1(v)} items={competencies.map((c) => ({ key: c.key, label: c.label, value: c.value, hint: `${c.n} éval.` }))} className="sm:columns-2 sm:gap-8 [&>li]:break-inside-avoid" />
           </CardContent>
         </Card>
       ) : null}

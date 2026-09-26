@@ -13,7 +13,7 @@ import { useLookup, useNow } from "@/lib/hooks";
 import { pct } from "@/lib/utils";
 import { Rating } from "../bits";
 import { templateMatching } from "../../lib/applications";
-import { average, evalScore10, npsOf } from "../../lib/sessions";
+import { average, evalScore10, npsOf, sessionAudience } from "../../lib/sessions";
 import type { SessionData } from "./use-session-data";
 
 const fmt1 = (v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
@@ -61,7 +61,9 @@ export function EvaluationsTab({ ev, data, canEdit }: { ev: EventSession; data: 
         if (typeof v === "number") bySpeaker.set(e.speakerId!, [...(bySpeaker.get(e.speakerId!) ?? []), v]);
       });
 
-    const verbatims = [...hot, ...cold].filter((e) => e.comment?.trim()).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+    const verbatims = data.evals
+      .filter((e) => ["a_chaud", "a_froid", "entreprise", "financeur"].includes(e.kind) && e.comment?.trim())
+      .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
 
     return {
       hot,
@@ -115,7 +117,7 @@ export function EvaluationsTab({ ev, data, canEdit }: { ev: EventSession; data: 
         <p className="text-sm text-muted-foreground">
           {view.hot.length} réponse{view.hot.length > 1 ? "s" : ""} à chaud · {view.cold.length} à froid · {data.evals.filter((e) => e.kind === "intervenant").length} évaluation{data.evals.filter((e) => e.kind === "intervenant").length > 1 ? "s" : ""} d'intervenants
         </p>
-        {canEdit ? (
+        {canEdit && sessionAudience(ev) === "b2c" ? (
           <Button size="sm" onClick={sendHot} disabled={!hasEnrolled} title={started ? undefined : "À envoyer en fin de session"}>
             <Send /> Envoyer le questionnaire à chaud
           </Button>

@@ -14,6 +14,7 @@ import { runReminderStep, sendDueSoonNotice } from "../actions";
 import { PartyCell, useBillingLookups } from "./shared";
 
 const STEP_ICONS = [Mail, PhoneCall, Gavel];
+const LEVEL_SHORT = ["", "J+3", "J+10", "Mise en demeure"];
 
 function SequenceTimeline({ counts }: { counts: number[] }) {
   const steps = [{ title: "Échéance", detail: "Rappel préventif possible dès J-7", day: "J0", icon: CalendarClock }, ...REMINDER_STEPS.map((s, i) => ({ title: s.title, detail: s.detail, day: `J+${s.day}`, icon: STEP_ICONS[i] }))];
@@ -92,8 +93,8 @@ export function RemindersTab() {
 
   const columns = React.useMemo<Column<Invoice>[]>(
     () => [
-      { key: "number", header: "Facture", render: (i) => <span className="font-mono text-xs font-medium">{i.number}</span>, sort: (i) => i.number },
-      { key: "client", header: "Client", render: (i) => <PartyCell doc={i} />, sort: (i) => partyName(i, lk), className: "max-w-52" },
+      { key: "number", header: "Facture", render: (i) => <span className="whitespace-nowrap font-mono text-xs font-medium">{i.number}</span>, sort: (i) => i.number },
+      { key: "client", header: "Client", render: (i) => <PartyCell doc={i} compact className="max-w-40 xl:max-w-52" />, sort: (i) => partyName(i, lk) },
       {
         key: "due",
         header: "Échéance",
@@ -115,8 +116,8 @@ export function RemindersTab() {
         render: (i) => {
           const lvl = Math.min(i.remindersSent, 3);
           return (
-            <Badge tone={lvl === 0 ? "neutral" : lvl === 3 ? "danger" : "warning"} dot>
-              {lvl}/3 · {REMINDER_LEVEL_LABELS[lvl]}
+            <Badge tone={lvl === 0 ? "neutral" : lvl === 3 ? "danger" : "warning"} dot title={REMINDER_LEVEL_LABELS[lvl]}>
+              {lvl === 0 ? "Aucune" : `${lvl}/3 · ${LEVEL_SHORT[lvl]}`}
             </Badge>
           );
         },

@@ -10,7 +10,7 @@ import type { Payment } from "@/lib/domain/types";
 import { date, money } from "@/lib/format";
 import { DataTable, StatusBadge, type Column, type FilterDef } from "@/components/ui";
 import { accountingAmount, DAY, displayNumber, partyName } from "../lib";
-import { PartyCell, useBillingLookups } from "./shared";
+import { METHOD_SHORT, PartyCell, useBillingLookups } from "./shared";
 
 export function PaymentsTab() {
   const payments = useCollection("payments");
@@ -38,7 +38,7 @@ export function PaymentsTab() {
         render: (p) => {
           const inv = invoices.get(p.invoiceId);
           return inv ? (
-            <Link href={`/facturation/factures/${inv.id}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs font-medium text-accent-text hover:underline">
+            <Link href={`/facturation/factures/${inv.id}`} onClick={(e) => e.stopPropagation()} className="whitespace-nowrap font-mono text-xs font-medium text-accent-text hover:underline">
               {displayNumber(inv)}
             </Link>
           ) : (
@@ -52,17 +52,16 @@ export function PaymentsTab() {
         header: "Client",
         render: (p) => {
           const inv = invoices.get(p.invoiceId);
-          return inv ? <PartyCell doc={inv} /> : <span className="text-faint">—</span>;
+          return inv ? <PartyCell doc={inv} compact className="max-w-44" /> : <span className="text-faint">—</span>;
         },
         sort: (p) => {
           const inv = invoices.get(p.invoiceId);
           return inv ? partyName(inv, lk) : "";
         },
-        className: "max-w-52",
         hideBelow: "md",
       },
       { key: "amount", header: "Montant", align: "right", render: (p) => <span className="whitespace-nowrap font-medium">{money(p.amountCents, true)}</span>, sort: (p) => p.amountCents, csv: (p) => accountingAmount(p.amountCents) },
-      { key: "method", header: "Moyen", render: (p) => <span className="text-xs">{labelOf(PAYMENT_METHODS, p.method)}</span>, sort: (p) => labelOf(PAYMENT_METHODS, p.method) },
+      { key: "method", header: "Moyen", render: (p) => <span className="whitespace-nowrap text-xs" title={labelOf(PAYMENT_METHODS, p.method)}>{METHOD_SHORT[p.method]}</span>, sort: (p) => METHOD_SHORT[p.method], csv: (p) => labelOf(PAYMENT_METHODS, p.method) },
       {
         key: "ref",
         header: "Référence",

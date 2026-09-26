@@ -191,11 +191,12 @@ export function ratingStats(evals: Evaluation[]): RatingStats {
   };
 }
 
-/** Tonalité d'un verbatim : positif (≥ 4/5 ou NPS ≥ 9), négatif (≤ 2/5 ou NPS ≤ 6), sinon neutre. */
+/** Tonalité d'un verbatim : négatif (≤ 2/5, ou ≤ 3/5 avec NPS détracteur), positif (≥ 4/5), sinon neutre ; à défaut de note, selon le NPS. */
 export function sentimentOf(e: Pick<Evaluation, "satisfaction" | "nps">): "positif" | "neutre" | "negatif" {
+  const detractor = typeof e.nps === "number" && e.nps <= 6;
   if (typeof e.satisfaction === "number") {
+    if (e.satisfaction <= 2 || (e.satisfaction <= 3 && detractor)) return "negatif";
     if (e.satisfaction >= 4) return "positif";
-    if (e.satisfaction <= 2) return "negatif";
     return "neutre";
   }
   if (typeof e.nps === "number") {

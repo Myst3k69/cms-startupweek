@@ -46,7 +46,8 @@ export const PERMISSIONS: Record<Role, Record<Section, Access>> = {
     ["dashboard", "relances", "emails", "candidatures", "projets", "sessions", "intervenants", "qualiopi", "ressources", "contenus"],
     ["demandes", "contacts", "organisations", "pipeline", "facturation", "analytics", "automatisations"],
   ),
-  formateur: matrix(["dashboard", "relances", "projets", "sessions"], ["candidatures", "ressources", "intervenants"]),
+  // contacts en lecture : noms des participants pour l'émargement, les évaluations et les projets suivis.
+  formateur: matrix(["dashboard", "relances", "projets", "sessions"], ["candidatures", "ressources", "intervenants", "contacts"]),
   lecture: matrix(["dashboard"], ALL.filter((s) => s !== "parametres")),
 };
 

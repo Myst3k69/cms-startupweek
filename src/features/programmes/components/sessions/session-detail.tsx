@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, CalendarX2, ClipboardCheck, Columns3, Euro, FileText, Globe2, LayoutDashboard, Library, ListChecks, MapPin, Printer, Smile, Users } from "lucide-react";
+import { ArrowLeft, Building2, CalendarX2, ClipboardCheck, Columns3, Euro, FileText, Globe2, LayoutDashboard, Library, ListChecks, MapPin, Printer, Smile, Users } from "lucide-react";
 import { Badge, EmptyState, LinkButton, PageHeader, StatusBadge, Tabs, useToast } from "@/components/ui";
 import { StatusSelect } from "@/components/shared/status-select";
 import { EVENT_KINDS, EVENT_MODES, EVENT_STATUSES, labelOf } from "@/lib/domain/constants";
@@ -11,6 +11,7 @@ import { dateRange } from "@/lib/format";
 import { useActions, useEntity, useNow, useSession } from "@/lib/hooks";
 import { SessionImage } from "../bits";
 import { replaceQuery } from "../../lib/url";
+import { audienceLabel, sessionAudience } from "../../lib/sessions";
 import { useSessionData } from "./use-session-data";
 import { OverviewTab } from "./tab-overview";
 import { ParticipantsTab } from "./tab-participants";
@@ -58,10 +59,11 @@ function SessionDetailView({ ev, initialTab }: { ev: EventSession; initialTab: S
   const [tab, setTab] = React.useState<SessionTab>(initialTab);
   const d = daysUntil(ev.startAt, now);
   const ended = Date.parse(ev.endAt) < now;
+  const audience = sessionAudience(ev);
 
   const tabs = [
     { value: "apercu" as const, label: "Aperçu", icon: LayoutDashboard },
-    { value: "participants" as const, label: "Participants", icon: Users, count: data.enrolled.length },
+    { value: "participants" as const, label: "Participants", icon: Users, count: audience === "b2c" ? data.enrolled.length : undefined },
     { value: "programme" as const, label: "Programme", icon: ListChecks },
     { value: "emargement" as const, label: "Émargement", icon: ClipboardCheck },
     { value: "evaluations" as const, label: "Évaluations", icon: Smile, count: data.evals.length || undefined },
@@ -89,9 +91,15 @@ function SessionDetailView({ ev, initialTab }: { ev: EventSession; initialTab: S
         }
         actions={
           <>
-            <LinkButton href={`/candidatures?session=${ev.id}`} size="sm" variant="secondary">
-              <Columns3 /> Candidatures ({data.apps.length})
-            </LinkButton>
+            {audience === "b2c" ? (
+              <LinkButton href={`/candidatures?session=${ev.id}`} size="sm" variant="secondary">
+                <Columns3 /> Candidatures ({data.apps.length})
+              </LinkButton>
+            ) : audience === "b2b" && ev.orgId ? (
+              <LinkButton href={`/organisations/${ev.orgId}`} size="sm" variant="secondary">
+                <Building2 /> Organisation cliente
+              </LinkButton>
+            ) : null}
             <LinkButton href={`/print/programme/${ev.id}`} target="_blank" size="sm" variant="secondary">
               <Printer /> Imprimer le programme
             </LinkButton>
@@ -118,6 +126,7 @@ function SessionDetailView({ ev, initialTab }: { ev: EventSession; initialTab: S
           </Badge>
           {ev.founderEdition ? <Badge tone="accent">Founder Edition</Badge> : null}
           {ev.earlyBird ? <Badge tone="warning">Early Bird</Badge> : null}
+          <Badge tone={audience === "b2c" ? "accent" : audience === "b2b" ? "info" : "neutral"}>{audienceLabel(ev)}</Badge>
           {ev.isTraining ? <Badge tone="violet">Action de formation</Badge> : null}
           <SessionImage src={ev.imageUrl} alt="" className="ml-auto hidden h-10 w-16 rounded-md sm:block" />
         </div>

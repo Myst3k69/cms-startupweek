@@ -17,7 +17,8 @@ function resultTiles(r: ResultIndicators) {
   ];
 }
 
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+/** Échappement du contenu texte (pas d'attributs dynamiques dans le bloc). */
+const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
 
 function toHtml(r: ResultIndicators, asOf: string) {
   const items = resultTiles(r)

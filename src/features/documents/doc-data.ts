@@ -118,8 +118,3 @@ export function acquisitionLevel(v: number) {
   if (v >= 2) return "En cours d'acquisition";
   return "Non acquis";
 }
-
-export function capitalize(s: string) {
-  const t = s.replace(/[_-]+/g, " ").trim();
-  return t.charAt(0).toUpperCase() + t.slice(1);
-}

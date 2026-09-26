@@ -30,7 +30,7 @@ import { date, dateTime, money, relative } from "@/lib/format";
 import { useActions, useCollection, useNow } from "@/lib/hooks";
 import { pct } from "@/lib/utils";
 import { EVENT_FORMATS, REGIONS } from "../../lib/labels";
-import { formatHours, fromDateInput, programHours, toDateInput } from "../../lib/sessions";
+import { audienceLabel, formatHours, fromDateInput, programHours, sessionAudience, toDateInput } from "../../lib/sessions";
 import type { SessionData } from "./use-session-data";
 
 /* ───────────── Alertes ───────────── */
@@ -41,8 +41,9 @@ function useSessionAlerts(ev: EventSession, data: SessionData) {
     const out: { tone: "danger" | "warning" | "info"; text: string }[] = [];
     const d = daysUntil(ev.startAt, now);
     const open = ["inscriptions_ouvertes", "prevu"].includes(ev.status);
-    if (open && d > 0 && d <= 21 && data.stats.belowMinimum) out.push({ tone: "danger", text: `Sous le seuil minimum à J-${d} : ${data.stats.enrolled}/${ev.minCapacity} inscrits. Décidez du maintien ou du report.` });
-    if (ev.status === "inscriptions_ouvertes" && data.stats.remaining === 0) out.push({ tone: "warning", text: "Toutes les places sont vendues : passez la session en « Complet » (le site affichera « complet »)." });
+    const b2c = sessionAudience(ev) === "b2c";
+    if (b2c && open && d > 0 && d <= 21 && data.stats.belowMinimum) out.push({ tone: "danger", text: `Sous le seuil minimum à J-${d} : ${data.stats.enrolled}/${ev.minCapacity} inscrits. Décidez du maintien ou du report.` });
+    if (b2c && ev.status === "inscriptions_ouvertes" && data.stats.remaining === 0) out.push({ tone: "warning", text: "Toutes les places sont vendues : passez la session en « Complet » (le site affichera « complet »)." });
     if (ev.status === "inscriptions_ouvertes" && Date.parse(ev.registrationDeadline) < now && d > 0) out.push({ tone: "warning", text: `Clôture des inscriptions dépassée (${date(ev.registrationDeadline)}) alors que la session est encore ouverte.` });
     const noConvoc = data.enrolled.filter((a) => !a.convocationSentAt).length;
     if (d > 0 && d <= 10 && noConvoc) out.push({ tone: "info", text: `${noConvoc} participant${noConvoc > 1 ? "s" : ""} sans convocation (indicateur 9) — onglet Participants.` });
@@ -453,11 +454,26 @@ function HighlightsCard({ ev, canEdit }: { ev: EventSession; canEdit: boolean })
 export function OverviewTab({ ev, data, canEdit }: { ev: EventSession; data: SessionData; canEdit: boolean }) {
   const alerts = useSessionAlerts(ev, data);
   const { stats, finance, satisfaction } = data;
+  const audience = sessionAudience(ev);
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Remplissage" value={`${stats.enrolled}/${ev.capacity}`} icon={Ticket} hint={`${stats.fillRate} % · ${stats.remaining} place${stats.remaining > 1 ? "s" : ""} · seuil ${ev.minCapacity}`} />
-        <StatCard label="CA attendu" value={money(finance.expected)} icon={Euro} hint={`${stats.pipeline} candidature${stats.pipeline > 1 ? "s" : ""} en cours`} />
+        {audience === "b2c" ? (
+          <StatCard label="Remplissage" value={`${stats.enrolled}/${ev.capacity}`} icon={Ticket} hint={`${stats.fillRate} % · ${stats.remaining} place${stats.remaining > 1 ? "s" : ""} · seuil ${ev.minCapacity}`} />
+        ) : (
+          <StatCard
+            label={audience === "b2b" ? "Participants prévus" : "Capacité"}
+            value={ev.capacity}
+            icon={Ticket}
+            hint={audience === "b2b" ? "Liste nominative gérée par le client" : `${audienceLabel(ev)} · inscriptions libres`}
+          />
+        )}
+        <StatCard
+          label="CA attendu"
+          value={money(finance.expected)}
+          icon={Euro}
+          hint={audience === "b2c" ? `${stats.pipeline} candidature${stats.pipeline > 1 ? "s" : ""} en cours` : audience === "b2b" ? "Selon devis et factures du client" : "Événement gratuit"}
+        />
         <StatCard label="Encaissé" value={money(finance.collected)} icon={Wallet} hint={`${pct(finance.collected, finance.expected)} % · reste ${money(finance.remaining)}`} />
         <StatCard
           label="Satisfaction à chaud"

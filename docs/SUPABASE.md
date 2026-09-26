@@ -84,7 +84,7 @@ Dashboard → Project Settings → **Data API** → *Exposed schemas* : ajouter 
 
 ```sql
 -- 1. Matrice de droits (doit reproduire src/lib/auth/permissions.ts)
-select crm.section_access('formateur', 'contacts'), crm.section_access('commercial', 'facturation');  -- none | write
+select crm.section_access('formateur', 'contacts'), crm.section_access('commercial', 'facturation');  -- read | write
 
 -- 2. Référentiel Qualiopi
 select * from crm.v_qualiopi_readiness order by criterion;   -- 32 indicateurs, 9 non applicables

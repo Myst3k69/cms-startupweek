@@ -20,7 +20,7 @@ Sur `/connexion`, choisissez un profil pour voir les droits changer :
 | Aurélien Chiren | Admin | Tout |
 | Commerciale | `commercial` | Demandes, contacts, pipeline, relances, candidatures, facturation |
 | Responsable pédagogique & qualité | `pedagogie` | Sessions, Qualiopi, candidatures, projets, contenus |
-| Formateur / mentor | `formateur` | Ses sessions (émargement, évaluations), projets |
+| Formateur / mentor | `formateur` | Sessions (émargement, évaluations), projets ; lecture des contacts et candidatures |
 | Expert-comptable | `lecture` | Consultation |
 
 Le profil peut être changé à tout moment depuis le menu utilisateur (bas de la barre latérale).

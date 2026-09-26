@@ -38,8 +38,8 @@ export function QuotesTab() {
 
   const columns = React.useMemo<Column<Quote>[]>(
     () => [
-      { key: "number", header: "Numéro", render: (q) => <span className="font-mono text-xs font-medium">{displayNumber(q)}</span>, sort: (q) => q.number },
-      { key: "client", header: "Client", render: (q) => <PartyCell doc={q} />, sort: (q) => partyName(q, lk), className: "max-w-56" },
+      { key: "number", header: "Numéro", render: (q) => <span className="whitespace-nowrap font-mono text-xs font-medium">{displayNumber(q)}</span>, sort: (q) => q.number },
+      { key: "client", header: "Client", render: (q) => <PartyCell doc={q} className="max-w-56" />, sort: (q) => partyName(q, lk) },
       {
         key: "deal",
         header: "Opportunité",
@@ -63,7 +63,7 @@ export function QuotesTab() {
         sort: (q) => quoteTotal(q).ht,
         csv: (q) => accountingAmount(quoteTotal(q).ht),
       },
-      { key: "issued", header: "Émis le", render: (q) => <span className="tabular text-xs">{date(q.issuedAt)}</span>, sort: (q) => q.issuedAt, csv: (q) => date(q.issuedAt, "dd/MM/yyyy"), hideBelow: "md" },
+      { key: "issued", header: "Émis le", render: (q) => <span className="tabular whitespace-nowrap text-xs">{date(q.issuedAt)}</span>, sort: (q) => q.issuedAt, csv: (q) => date(q.issuedAt, "dd/MM/yyyy"), hideBelow: "md" },
       {
         key: "valid",
         header: "Validité",
@@ -88,7 +88,7 @@ export function QuotesTab() {
         render: (q) => {
           const inv = q.invoiceId ? invoices.get(q.invoiceId) : undefined;
           return inv ? (
-            <Link href={`/facturation/factures/${inv.id}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-accent-text hover:underline">
+            <Link href={`/facturation/factures/${inv.id}`} onClick={(e) => e.stopPropagation()} className="whitespace-nowrap font-mono text-xs text-accent-text hover:underline">
               {displayNumber(inv)}
             </Link>
           ) : (
