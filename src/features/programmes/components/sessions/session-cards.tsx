@@ -7,11 +7,11 @@ import { Badge, EmptyState, Progress, StatusBadge } from "@/components/ui";
 import { EVENT_MODES, EVENT_STATUSES, labelOf } from "@/lib/domain/constants";
 import { daysUntil, sessionStats } from "@/lib/domain/selectors";
 import type { Application, EventSession } from "@/lib/domain/types";
-import { dateRange, money } from "@/lib/format";
+import { money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { OrgLink } from "@/components/shared/entity-links";
 import { SessionImage } from "../bits";
-import { audienceLabel, sessionAudience, type EventBilling } from "../../lib/sessions";
+import { audienceLabel, sessionAudience, type EventBilling, sessionDates } from "../../lib/sessions";
 
 export function SessionCard({ ev, applications, now, billing }: { ev: EventSession; applications: Application[]; now: number; billing?: EventBilling }) {
   const st = sessionStats(ev, applications);
@@ -34,7 +34,7 @@ export function SessionCard({ ev, applications, now, billing }: { ev: EventSessi
         <div className="absolute inset-x-3 bottom-2.5 flex items-end justify-between gap-2 text-white">
           <span className="inline-flex items-center gap-1 text-xs font-medium">
             <CalendarDays className="size-3.5" aria-hidden="true" />
-            {dateRange(ev.startAt, ev.endAt)}
+            {sessionDates(ev)}
           </span>
           <span className="rounded-full bg-sw-black/60 px-2 py-0.5 text-[11px] font-medium backdrop-blur">{running ? "En cours" : `J-${d}`}</span>
         </div>

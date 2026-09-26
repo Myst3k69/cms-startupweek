@@ -9,11 +9,11 @@ import { useCrm } from "@/lib/store";
 import { SPEAKER_KINDS, labelOf } from "@/lib/domain/constants";
 import { contactName } from "@/lib/domain/selectors";
 import type { Speaker } from "@/lib/domain/types";
-import { date, dateRange, money } from "@/lib/format";
+import { date, money } from "@/lib/format";
 import { useActions, useCollection, useLookup, useNow, useSession } from "@/lib/hooks";
 import { Chips, Rating } from "../bits";
 import { CONTRACT_TYPES } from "../../lib/labels";
-import { average, formatHours, fromDateInput, slotHours, toDateInput } from "../../lib/sessions";
+import { average, formatHours, fromDateInput, slotHours, toDateInput, sessionDates } from "../../lib/sessions";
 import { SpeakerFields, charterFromLog, parseSpeakerDraft, speakerToDraft, trainingUpToDate, type SpeakerDraft } from "./speaker-form";
 
 function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
@@ -235,7 +235,7 @@ export function SpeakerDrawer({ speaker, onClose }: { speaker: Speaker; onClose:
                 {sessions.slice(0, 12).map(({ ev, slots, hours, past }) => (
                   <li key={ev.id} className="flex items-center gap-3 px-3 py-2 text-sm">
                     <SessionLink id={ev.id} className="min-w-0 flex-1 truncate" />
-                    <span className="hidden text-xs text-muted-foreground sm:inline">{dateRange(ev.startAt, ev.endAt)}</span>
+                    <span className="hidden text-xs text-muted-foreground sm:inline">{sessionDates(ev)}</span>
                     <span className="tabular shrink-0 text-xs text-muted-foreground">{slots ? `${slots} créneau${slots > 1 ? "x" : ""} · ${formatHours(hours)}` : "Jury / mentorat"}</span>
                     <Badge tone={past ? "neutral" : "accent"} className="shrink-0">
                       {past ? "Passée" : "À venir"}

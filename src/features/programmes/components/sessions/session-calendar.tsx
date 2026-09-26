@@ -6,9 +6,9 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, Dot } from "@/components/ui";
 import { EVENT_STATUSES, labelOf, toneOf, type Tone } from "@/lib/domain/constants";
 import type { EventSession } from "@/lib/domain/types";
-import { date, dateRange } from "@/lib/format";
+import { date } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { startOfDay } from "../../lib/sessions";
+import { startOfDay, sessionDates } from "../../lib/sessions";
 
 const WEEKDAYS = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."];
 
@@ -144,7 +144,7 @@ export function SessionCalendar({ events, now }: { events: EventSession[]; now: 
                   <Link
                     key={p.ev.id}
                     href={`/sessions/${p.ev.id}`}
-                    title={`${p.ev.code} · ${p.ev.name} — ${dateRange(p.ev.startAt, p.ev.endAt)} · ${labelOf(EVENT_STATUSES, p.ev.status)}`}
+                    title={`${p.ev.code} · ${p.ev.name} — ${sessionDates(p.ev)} · ${labelOf(EVENT_STATUSES, p.ev.status)}`}
                     style={{ gridColumn: `${p.from + 1} / ${p.to + 2}`, gridRow: p.lane + 1 }}
                     className={cn(
                       "mx-0.5 flex min-w-0 items-center gap-1 truncate rounded-md px-1.5 text-[10px] font-medium ring-1 ring-inset transition-opacity hover:opacity-80 sm:text-[11px]",

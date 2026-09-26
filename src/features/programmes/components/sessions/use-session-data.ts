@@ -34,12 +34,12 @@ export function useSessionData(ev: EventSession) {
   }, [invoices, apps, ev.id]);
 
   const finance = React.useMemo(() => {
-    // Hors candidatures (B2B) : le CA signé est le plus grand du facturé et des devis acceptés (commande facturée en plusieurs fois).
-    const unlinked = sessionInvoices.filter((i) => !i.applicationId && i.kind !== "avoir").reduce((s, i) => s + invoiceTotal(i).ttc, 0);
+    // CA attendu = inscrits (prix dû) + commandes hors candidatures (B2B : max du facturé et des devis acceptés, avoirs déduits).
+    const unlinked = sessionInvoices.filter((i) => !i.applicationId).reduce((s, i) => s + invoiceTotal(i).ttc, 0);
     const quoted = quotes.filter((q) => q.eventId === ev.id && q.status === "accepte").reduce((s, q) => s + invoiceTotal({ lines: q.lines, kind: "facture" }).ttc, 0);
-    const credits = sessionInvoices.filter((i) => i.kind === "avoir").reduce((s, i) => s + invoiceTotal(i).ttc, 0);
-    const expected = stats.revenue + Math.max(unlinked, quoted) + credits;
-    const collected = sessionInvoices.filter((i) => i.kind !== "avoir").reduce((s, i) => s + i.paidCents, 0);
+    const expected = stats.revenue + Math.max(unlinked, quoted);
+    // Encaissé net : règlements reçus moins remboursements (avoirs réglés, ex. acompte d'un désistement).
+    const collected = sessionInvoices.reduce((s, i) => s + (i.kind === "avoir" ? -i.paidCents : i.paidCents), 0);
     return { expected, collected, remaining: Math.max(0, expected - collected) };
   }, [sessionInvoices, stats.revenue, quotes, ev.id]);
 

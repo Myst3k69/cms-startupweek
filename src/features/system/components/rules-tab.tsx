@@ -171,7 +171,7 @@ export function RulesTab() {
         ),
         hideBelow: "lg",
       },
-      { key: "actions", header: "Étapes", align: "right", sort: (r) => r.actions.length, render: (r) => r.actions.length, hideBelow: "md" },
+      { key: "actions", header: "Étapes", align: "right", sort: (r) => r.actions.length, render: (r) => r.actions.length, hideBelow: "2xl" },
       {
         key: "active",
         header: "Active",
@@ -185,7 +185,7 @@ export function RulesTab() {
         ),
       },
       { key: "runs", header: "Exécutions", align: "right", sort: (r) => r.runs, render: (r) => number(r.runs) },
-      { key: "last", header: "Dernière", sort: (r) => r.lastRunAt ?? "", render: (r) => <span className="whitespace-nowrap text-muted-foreground">{r.lastRunAt ? relative(r.lastRunAt, now) : "—"}</span>, hideBelow: "sm" },
+      { key: "last", header: "Dernière", sort: (r) => r.lastRunAt ?? "", render: (r) => <span className="whitespace-nowrap text-muted-foreground">{r.lastRunAt ? relative(r.lastRunAt, now) : "—"}</span>, hideBelow: "xl" },
       {
         key: "errors",
         header: "Erreurs",

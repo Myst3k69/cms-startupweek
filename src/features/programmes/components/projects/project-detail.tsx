@@ -46,11 +46,11 @@ import { useCrm } from "@/lib/store";
 import { APPLICATION_STATUSES, PROJECT_STAGES, SPEAKER_KINDS, labelOf } from "@/lib/domain/constants";
 import { contactName } from "@/lib/domain/selectors";
 import type { ID, Project } from "@/lib/domain/types";
-import { compactNumber, date, dateRange, money, number, relative } from "@/lib/format";
+import { compactNumber, date, money, number, relative } from "@/lib/format";
 import { useActions, useCollection, useEntity, useLookup, useNow, useSession } from "@/lib/hooks";
 import { cn, uid } from "@/lib/utils";
 import { PROJECT_HEALTH } from "../../lib/labels";
-import { DAY, fromDateInput, toDateInput } from "../../lib/sessions";
+import { DAY, fromDateInput, toDateInput, sessionDates } from "../../lib/sessions";
 import { followUpState } from "./project-card";
 
 /* ───────────── Fiche ───────────── */
@@ -595,7 +595,7 @@ function PeopleCard({ p, canEdit }: { p: Project; canEdit: boolean }) {
                 return (
                   <li key={id} className="group flex items-center gap-2 text-sm">
                     <SessionLink id={id} className="min-w-0 flex-1 truncate" />
-                    {e ? <span className="shrink-0 text-xs text-muted-foreground">{dateRange(e.startAt, e.endAt)}</span> : null}
+                    {e ? <span className="shrink-0 text-xs text-muted-foreground">{sessionDates(e)}</span> : null}
                     {removeBtn(`Retirer ${e?.code ?? "la session"}`, () => update("projects", p.id, { eventIds: p.eventIds.filter((x) => x !== id) }, { log: `Session retirée : ${e?.code ?? id}` }))}
                   </li>
                 );
@@ -715,7 +715,6 @@ export function ProjectDetail({ id }: { id: ID }) {
         breadcrumbs={[{ label: "Projets", href: "/projets" }, { label: p.name }]}
         eyebrow={p.sector || "Projet"}
         title={p.name}
-        description={p.tagline || undefined}
         actions={
           editable ? (
             <Button size="sm" onClick={() => setNoting(true)}>

@@ -17,11 +17,14 @@ export interface ProjectLookups {
   speakers: Map<ID, Speaker>;
 }
 
+/** Fenêtre d'anticipation des suivis post-formation (J+30 / J+90). */
+export const FOLLOW_UP_WINDOW_DAYS = 30;
+
 export function followUpState(p: Project, now: number): "retard" | "bientot" | undefined {
   if (!p.followUpAt) return undefined;
   const t = Date.parse(p.followUpAt);
   if (t < now) return "retard";
-  if (t < now + 7 * 86_400_000) return "bientot";
+  if (t < now + FOLLOW_UP_WINDOW_DAYS * 86_400_000) return "bientot";
   return undefined;
 }
 

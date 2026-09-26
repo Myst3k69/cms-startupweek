@@ -7,11 +7,11 @@ import { StatusSelect } from "@/components/shared/status-select";
 import { EVENT_KINDS, EVENT_MODES, EVENT_STATUSES, labelOf } from "@/lib/domain/constants";
 import { daysUntil } from "@/lib/domain/selectors";
 import type { EventSession, ID } from "@/lib/domain/types";
-import { dateRange } from "@/lib/format";
+
 import { useActions, useEntity, useNow, useSession } from "@/lib/hooks";
 import { SessionImage } from "../bits";
 import { replaceQuery } from "../../lib/url";
-import { audienceLabel, sessionAudience } from "../../lib/sessions";
+import { audienceLabel, sessionAudience, sessionDates } from "../../lib/sessions";
 import { useSessionData } from "./use-session-data";
 import { OverviewTab } from "./tab-overview";
 import { ParticipantsTab } from "./tab-participants";
@@ -80,7 +80,7 @@ function SessionDetailView({ ev, initialTab }: { ev: EventSession; initialTab: S
         title={ev.name}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span>{dateRange(ev.startAt, ev.endAt)}</span>
+            <span>{sessionDates(ev)}</span>
             <span className="inline-flex items-center gap-1">
               {ev.mode === "distanciel" ? <Globe2 className="size-3.5" aria-hidden="true" /> : <MapPin className="size-3.5" aria-hidden="true" />}
               {labelOf(EVENT_MODES, ev.mode)} · {ev.city}

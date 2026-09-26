@@ -19,7 +19,7 @@ export interface Column<T> {
   headerClassName?: string;
   align?: "left" | "right" | "center";
   /** Masquée sous ce breakpoint. */
-  hideBelow?: "sm" | "md" | "lg" | "xl";
+  hideBelow?: "sm" | "md" | "lg" | "xl" | "2xl";
 }
 
 export interface FilterDef<T> {
@@ -49,7 +49,7 @@ interface Props<T> {
   rowClassName?: (row: T) => string | undefined;
 }
 
-const HIDE: Record<string, string> = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: "hidden lg:table-cell", xl: "hidden xl:table-cell" };
+const HIDE: Record<string, string> = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: "hidden lg:table-cell", xl: "hidden xl:table-cell", "2xl": "hidden 2xl:table-cell" };
 
 function toCsv<T>(rows: T[], columns: Column<T>[]) {
   const cols = columns.filter((c) => c.csv || c.sort);

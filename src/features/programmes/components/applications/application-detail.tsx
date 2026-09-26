@@ -25,11 +25,12 @@ import { sendConvocation } from "@/lib/domain/actions";
 import { APPLICATION_STATUSES, PERSONAS, labelOf } from "@/lib/domain/constants";
 import { contactName } from "@/lib/domain/selectors";
 import type { ApplicationStatus, EntityName, ID } from "@/lib/domain/types";
-import { dateRange, dateTime, relative } from "@/lib/format";
+import { dateTime, relative } from "@/lib/format";
 import { useActions, useCollection, useEntity, useNow, useSession } from "@/lib/hooks";
 import { scoreTone } from "../../lib/labels";
 import { CandidateCard, DossierCard, LinkedProjectCard, PaymentCard, QualiopiChecklist, ScoringCard } from "./application-sections";
 import { useApplicationMover, type MoveTarget } from "./use-mover";
+import { sessionDates } from "../../lib/sessions";
 
 interface ActionDef {
   key: string;
@@ -132,7 +133,7 @@ export function ApplicationDetail({ id }: { id: ID }) {
         }
         description={
           <>
-            {event ? `${event.name} · ${dateRange(event.startAt, event.endAt)}` : "Session inconnue"} — reçue {relative(app.submittedAt, now)} ({dateTime(app.submittedAt)})
+            {event ? `${event.name} · ${sessionDates(event)}` : "Session inconnue"} — reçue {relative(app.submittedAt, now)} ({dateTime(app.submittedAt)})
           </>
         }
         actions={

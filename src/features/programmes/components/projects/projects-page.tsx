@@ -9,7 +9,7 @@ import { useActions, useCollection, useLookup, useNow, useSession } from "@/lib/
 import { pct } from "@/lib/utils";
 import { PROJECT_HEALTH } from "../../lib/labels";
 import { replaceQuery } from "../../lib/url";
-import { ProjectCard, followUpState } from "./project-card";
+import { FOLLOW_UP_WINDOW_DAYS, ProjectCard, followUpState } from "./project-card";
 import { ProjectFormModal } from "./project-form-modal";
 
 type View = "grille" | "kanban";
@@ -122,7 +122,7 @@ export function ProjectsPage({ initialView, initialSession }: { initialView?: st
         <StatCard label="Projets suivis" value={stats.followed} icon={Rocket} hint={`${filtered.length - stats.followed} en pause`} />
         <StatCard label="MVP livrés" value={stats.delivered} icon={Target} hint={`${pct(stats.delivered, filtered.length)} % des projets`} />
         <StatCard label="À risque" value={stats.risky} icon={AlertTriangle} hint={stats.blocked ? `dont ${stats.blocked} bloqué${stats.blocked > 1 ? "s" : ""}` : "Aucun projet bloqué"} />
-        <StatCard label="Suivi J+30 / J+90 à faire" value={stats.follow} icon={BellRing} hint={stats.late ? `dont ${stats.late} en retard` : "dans les 7 prochains jours"} />
+        <StatCard label="Suivi J+30 / J+90 à faire" value={stats.follow} icon={BellRing} hint={stats.late ? `dont ${stats.late} en retard` : `dans les ${FOLLOW_UP_WINDOW_DAYS} prochains jours`} />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">

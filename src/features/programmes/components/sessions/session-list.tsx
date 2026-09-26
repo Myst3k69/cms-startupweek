@@ -6,9 +6,9 @@ import { Badge, DataTable, Progress, StatusBadge, type Column } from "@/componen
 import { EVENT_KINDS, EVENT_MODES, EVENT_STATUSES, labelOf } from "@/lib/domain/constants";
 import { sessionStats } from "@/lib/domain/selectors";
 import type { Application, Evaluation, EventSession } from "@/lib/domain/types";
-import { date, dateRange, money } from "@/lib/format";
+import { date, money } from "@/lib/format";
 import { Rating } from "../bits";
-import { audienceLabel, satisfactionOf, sessionAudience, type EventBilling, type SessionAudience } from "../../lib/sessions";
+import { audienceLabel, satisfactionOf, sessionAudience, type EventBilling, type SessionAudience, sessionDates } from "../../lib/sessions";
 
 interface Row {
   ev: EventSession;
@@ -71,7 +71,7 @@ export function SessionList({
       {
         key: "dates",
         header: "Dates",
-        render: (r) => <span className="whitespace-nowrap text-xs">{dateRange(r.ev.startAt, r.ev.endAt)}</span>,
+        render: (r) => <span className="whitespace-nowrap text-xs">{sessionDates(r.ev)}</span>,
         sort: (r) => r.ev.startAt,
         csv: (r) => `${date(r.ev.startAt, "yyyy-MM-dd")} → ${date(r.ev.endAt, "yyyy-MM-dd")}`,
       },

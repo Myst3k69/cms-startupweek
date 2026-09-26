@@ -4,8 +4,15 @@
  */
 import type { Evaluation, EventSession, Invoice, ProgramSlot, Quote } from "@/lib/domain/types";
 import { invoiceTotal } from "@/lib/domain/selectors";
+import { date, dateRange } from "@/lib/format";
 
 export const DAY = 86_400_000;
+
+/** Dates d'une session : « 15 oct. 2026 » pour un événement d'une journée, sinon « 24 → 31 oct. 2026 ». */
+export function sessionDates(ev: Pick<EventSession, "startAt" | "endAt">): string {
+  if (ev.startAt.slice(0, 10) === ev.endAt.slice(0, 10) || new Date(ev.startAt).toDateString() === new Date(ev.endAt).toDateString()) return date(ev.startAt, "d MMM yyyy");
+  return dateRange(ev.startAt, ev.endAt);
+}
 
 /**
  * Public d'une session :
@@ -134,7 +141,7 @@ export function billedByEvent(invoices: Invoice[], quotes: Quote[] = []): Map<st
     if (!i.eventId || i.status === "annulee" || i.status === "brouillon") return;
     const cur = get(i.eventId);
     cur.billed += invoiceTotal(i).ttc;
-    if (i.kind !== "avoir") cur.collected += i.paidCents;
+    cur.collected += i.kind === "avoir" ? -i.paidCents : i.paidCents;
     m.set(i.eventId, cur);
   });
   quotes.forEach((q) => {
