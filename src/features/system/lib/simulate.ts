@@ -148,13 +148,17 @@ export function simulateIntake(form: IntakeForm, payload: unknown): SimResult {
     const templates = crm().emailTemplates;
     const tpl = templates.find((t) => t.replacesN8n && matchesWorkflow(t.replacesN8n, meta.n8n)) ?? findTemplate("accuse_reception", meta.label.split(" ")[0].toLowerCase());
     const ev = norm.eventCode ? crm().events.find((e) => e.code.toUpperCase() === norm.eventCode) : undefined;
+    const prenom = draft.name.includes("@") ? "" : draft.name.split(" ")[0];
+    const fallbackBody = "Bonjour {{prenom}},\n\nMerci pour votre message : l'équipe StartupWeek vous répond sous 48 h.\n\nL'équipe StartupWeek";
+    const body = tpl?.body ?? fallbackBody;
     const mail = sendEmail({
       to: draft.email,
       template: tpl,
       subject: tpl ? undefined : "Nous avons bien reçu votre demande",
-      body: tpl ? undefined : "Bonjour {{prenom}},\n\nMerci pour votre message : l'équipe StartupWeek vous répond sous 48 h.\n\nL'équipe StartupWeek",
+      // Prénom inconnu (newsletter) : « Bonjour, » plutôt que « Bonjour , ».
+      body: prenom ? body : body.replace(/\s*\{\{\s*prenom\s*\}\}/, ""),
       vars: {
-        prenom: draft.name.includes("@") ? "" : draft.name.split(" ")[0],
+        prenom,
         session: ev?.name ?? norm.eventCode ?? "",
         code_session: ev?.code ?? norm.eventCode ?? "",
         date_debut: ev ? new Date(ev.startAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "",

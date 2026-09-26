@@ -77,7 +77,7 @@ export function AttestationDoc({ applicationId }: { applicationId: ID }) {
 
       {/* ── Certificat de réalisation ── */}
       <PrintPage>
-        <DocHeader reference={docRef("CR", ev.startAt, app.number)} title="Certificat" subtitle="de réalisation" />
+        <DocHeader reference={docRef("CR", ev.startAt, app.number)} />
         <DocTitle title="Certificat de réalisation" subtitle="Modèle établi par le ministère chargé de la formation professionnelle" />
 
         <div className="space-y-4 text-[13px] print:text-[10.5pt]">
@@ -126,7 +126,7 @@ export function AttestationDoc({ applicationId }: { applicationId: ID }) {
 
       {/* ── Attestation de fin de formation ── */}
       <PrintPage>
-        <DocHeader reference={docRef("AF", ev.startAt, app.number)} title="Attestation" subtitle="de fin de formation" />
+        <DocHeader reference={docRef("AF", ev.startAt, app.number)} />
         <DocTitle title="Attestation de fin de formation" subtitle="Article L.6353-1 du Code du travail" />
 
         <p className="mb-4">

@@ -68,7 +68,7 @@ export function InvoicesTab({ status, onStatusChange }: { status: InvoiceStatusF
         sort: (i) => i.number || "~",
       },
       { key: "kind", header: "Type", render: (i) => <span className="whitespace-nowrap text-xs text-muted-foreground">{KIND_SHORT[i.kind]}</span>, sort: (i) => KIND_SHORT[i.kind], csv: (i) => labelOf(INVOICE_KINDS, i.kind), hideBelow: "lg" },
-      { key: "client", header: "Client", render: (i) => <PartyCell doc={i} compact />, sort: (i) => partyName(i, lk), className: "max-w-40 xl:max-w-48" },
+      { key: "client", header: "Client", render: (i) => <PartyCell doc={i} compact className="max-w-40 xl:max-w-48" />, sort: (i) => partyName(i, lk) },
       { key: "session", header: "Session", render: (i) => (i.eventId ? <SessionLink id={i.eventId} short /> : <span className="text-faint">—</span>), csv: (i) => (i.eventId ? lk.events.get(i.eventId)?.code ?? "" : ""), hideBelow: "lg" },
       { key: "issued", header: "Émise le", render: (i) => <span className="tabular whitespace-nowrap text-xs">{i.number ? date(i.issuedAt) : "—"}</span>, sort: (i) => i.issuedAt, csv: (i) => (i.number ? date(i.issuedAt, "dd/MM/yyyy") : ""), hideBelow: "sm" },
       {
@@ -146,33 +146,25 @@ export function InvoicesTab({ status, onStatusChange }: { status: InvoiceStatusF
     ...STATUS_ORDER.map((s) => ({ value: s, label: labelOf(INVOICE_STATUSES, s), count: counts[s] ?? 0 })),
   ];
 
+  const sequenceCheck = currentAudit ? (
+    currentAudit.missing.length === 0 && currentAudit.duplicates === 0 ? (
+      <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" title="Contrôle de la numérotation légale (séquentielle, sans trou)">
+        <CheckCircle2 className="size-3.5 text-success" aria-hidden="true" />
+        Numérotation {settings.invoicePrefix}-{currentAudit.year} continue : {currentAudit.max} pièces, aucun numéro manquant
+      </p>
+    ) : (
+      <p className="inline-flex items-center gap-1.5 text-xs font-medium text-danger-text">
+        <TriangleAlert className="size-3.5" aria-hidden="true" />
+        Rupture de séquence {currentAudit.year} : {currentAudit.missing.slice(0, 4).map((n) => String(n).padStart(4, "0")).join(", ")}
+        {currentAudit.missing.length > 4 ? "…" : ""}
+      </p>
+    )
+  ) : null;
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="scrollbar-thin -mx-1 overflow-x-auto px-1">
-          <Segmented value={status} onChange={onStatusChange} options={segments} />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {currentAudit ? (
-            currentAudit.missing.length === 0 && currentAudit.duplicates === 0 ? (
-              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" title="Contrôle de la numérotation légale (séquentielle, sans trou)">
-                <CheckCircle2 className="size-3.5 text-success" aria-hidden="true" />
-                Séquence {settings.invoicePrefix}-{currentAudit.year} continue ({currentAudit.max} pièces)
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-danger-text">
-                <TriangleAlert className="size-3.5" aria-hidden="true" />
-                Rupture de séquence {currentAudit.year} : {currentAudit.missing.slice(0, 4).map((n) => String(n).padStart(4, "0")).join(", ")}
-                {currentAudit.missing.length > 4 ? "…" : ""}
-              </span>
-            )
-          ) : null}
-          {editable ? (
-            <LinkButton href="/facturation/factures/nouvelle" size="sm">
-              <FilePlus2 aria-hidden="true" /> Nouvelle facture
-            </LinkButton>
-          ) : null}
-        </div>
+      <div className="scrollbar-thin -mx-1 overflow-x-auto px-1 pb-0.5">
+        <Segmented value={status} onChange={onStatusChange} options={segments} />
       </div>
 
       <DataTable
@@ -188,9 +180,16 @@ export function InvoicesTab({ status, onStatusChange }: { status: InvoiceStatusF
         emptyDescription="Les factures d'acompte et de solde sont créées automatiquement quand une candidature est acceptée puis inscrite."
         rowClassName={(i) => (effectiveInvoiceStatus(i, now) === "en_retard" ? "bg-danger-soft/40" : undefined)}
         toolbar={
-          <Button variant="secondary" size="sm" onClick={exportJournal} title="Écritures comptables 411 / 706 / 44571 pour l'expert-comptable">
-            <BookOpenCheck aria-hidden="true" /> <span className="hidden sm:inline">Journal des ventes</span>
-          </Button>
+          <>
+            <Button variant="secondary" size="sm" onClick={exportJournal} title="Journal des ventes : écritures 411 / 706 / 44571 pour l'expert-comptable (CSV)">
+              <BookOpenCheck aria-hidden="true" /> <span className="hidden sm:inline">Journal</span>
+            </Button>
+            {editable ? (
+              <LinkButton href="/facturation/factures/nouvelle" size="sm" aria-label="Nouvelle facture">
+                <FilePlus2 aria-hidden="true" /> <span className="hidden sm:inline">Nouvelle</span>
+              </LinkButton>
+            ) : null}
+          </>
         }
         bulkActions={
           editable
@@ -225,6 +224,7 @@ export function InvoicesTab({ status, onStatusChange }: { status: InvoiceStatusF
             : undefined
         }
       />
+      {sequenceCheck}
     </div>
   );
 }

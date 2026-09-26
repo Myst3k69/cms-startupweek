@@ -2,20 +2,24 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertTriangle, CalendarDays, CalendarX2, Globe2, MapPin, Users } from "lucide-react";
+import { AlertTriangle, Building2, CalendarDays, CalendarX2, Globe2, MapPin, Radio, Users } from "lucide-react";
 import { Badge, EmptyState, Progress, StatusBadge } from "@/components/ui";
 import { EVENT_MODES, EVENT_STATUSES, labelOf } from "@/lib/domain/constants";
 import { daysUntil, sessionStats } from "@/lib/domain/selectors";
 import type { Application, EventSession } from "@/lib/domain/types";
 import { dateRange, money } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { OrgLink } from "@/components/shared/entity-links";
 import { SessionImage } from "../bits";
+import { audienceLabel, sessionAudience } from "../../lib/sessions";
 
-export function SessionCard({ ev, applications, now }: { ev: EventSession; applications: Application[]; now: number }) {
+export function SessionCard({ ev, applications, now, billed }: { ev: EventSession; applications: Application[]; now: number; billed?: number }) {
   const st = sessionStats(ev, applications);
+  const audience = sessionAudience(ev);
+  const b2c = audience === "b2c";
   const d = daysUntil(ev.startAt, now);
   const running = d <= 0;
-  const underMin = !running && d <= 21 && st.belowMinimum && ev.status !== "annule";
+  const underMin = b2c && !running && d <= 21 && st.belowMinimum && ev.status !== "annule";
   const full = st.remaining === 0;
   const tone = full ? "warning" : st.fillRate >= 70 ? "success" : underMin ? "danger" : "accent";
 
@@ -53,34 +57,57 @@ export function SessionCard({ ev, applications, now }: { ev: EventSession; appli
           <span>{ev.region}</span>
         </p>
 
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="tabular text-lg font-semibold text-foreground">{ev.priceCents ? money(ev.priceCents) : "Gratuit"}</span>
-          {ev.publicPriceCents && ev.publicPriceCents > ev.priceCents ? <span className="tabular text-sm text-faint line-through">{money(ev.publicPriceCents)}</span> : null}
-          {ev.priceCents ? <span className="text-xs text-muted-foreground">TTC</span> : null}
-        </div>
+        {b2c ? (
+          <>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="tabular text-lg font-semibold text-foreground">{money(ev.priceCents)}</span>
+              {ev.publicPriceCents && ev.publicPriceCents > ev.priceCents ? <span className="tabular text-sm text-faint line-through">{money(ev.publicPriceCents)}</span> : null}
+              <span className="text-xs text-muted-foreground">TTC</span>
+            </div>
 
-        <div className="mt-3">
-          <div className="mb-1.5 flex items-baseline justify-between text-xs">
-            <span className="inline-flex items-center gap-1 text-muted-foreground">
-              <Users className="size-3.5" aria-hidden="true" />
-              <span className="tabular font-medium text-foreground">
-                {st.enrolled}/{ev.capacity}
-              </span>
-              inscrits
-            </span>
-            <span className={cn("tabular font-medium", full ? "text-warning-text" : "text-muted-foreground")}>
-              {full ? "Complet" : `${st.remaining} place${st.remaining > 1 ? "s" : ""} restante${st.remaining > 1 ? "s" : ""}`}
-            </span>
+            <div className="mt-3">
+              <div className="mb-1.5 flex items-baseline justify-between text-xs">
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  <Users className="size-3.5" aria-hidden="true" />
+                  <span className="tabular font-medium text-foreground">
+                    {st.enrolled}/{ev.capacity}
+                  </span>
+                  inscrits
+                </span>
+                <span className={cn("tabular font-medium", full ? "text-warning-text" : "text-muted-foreground")}>
+                  {full ? "Complet" : `${st.remaining} place${st.remaining > 1 ? "s" : ""} restante${st.remaining > 1 ? "s" : ""}`}
+                </span>
+              </div>
+              <Progress value={st.fillRate} tone={tone} label={`Remplissage ${st.fillRate} %`} />
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-2 text-xs">
+              <Link href={`/candidatures?session=${ev.id}`} className="relative z-10 text-muted-foreground hover:text-accent-text hover:underline">
+                {st.pipeline} candidature{st.pipeline > 1 ? "s" : ""} en cours
+              </Link>
+              <span className="tabular text-muted-foreground">CA {money(st.revenue)}</span>
+            </div>
+          </>
+        ) : audience === "b2b" ? (
+          <div className="mt-3 space-y-2 rounded-md bg-surface-2/70 px-3 py-2.5 text-xs">
+            <p className="flex items-center gap-1.5 font-medium text-foreground">
+              <Building2 className="size-3.5 text-muted-foreground" aria-hidden="true" />
+              {audienceLabel(ev)} · {ev.capacity} participants
+            </p>
+            <p className="relative z-10 truncate text-muted-foreground">
+              Client : <OrgLink id={ev.orgId} />
+            </p>
+            <p className="tabular text-muted-foreground">{billed ? `Facturé ${money(billed)}` : "Facturation sur devis (pas de candidatures individuelles)"}</p>
           </div>
-          <Progress value={st.fillRate} tone={tone} label={`Remplissage ${st.fillRate} %`} />
-        </div>
-
-        <div className="mt-3 flex items-center justify-between gap-2 text-xs">
-          <Link href={`/candidatures?session=${ev.id}`} className="relative z-10 text-muted-foreground hover:text-accent-text hover:underline">
-            {st.pipeline} candidature{st.pipeline > 1 ? "s" : ""} en cours
-          </Link>
-          <span className="tabular text-muted-foreground">CA {money(st.revenue)}</span>
-        </div>
+        ) : (
+          <div className="mt-3 rounded-md bg-surface-2/70 px-3 py-2.5 text-xs">
+            <p className="flex items-center gap-1.5 font-medium text-foreground">
+              <Radio className="size-3.5 text-muted-foreground" aria-hidden="true" />
+              {audienceLabel(ev)} · {ev.capacity} places
+            </p>
+            <p className="mt-1 text-muted-foreground">Inscriptions libres via le site, sans candidature ni facturation.</p>
+          </div>
+        )}
 
         {underMin ? (
           <p className="mt-3 flex items-start gap-1.5 rounded-md bg-danger-soft px-2.5 py-1.5 text-xs font-medium text-danger-text">
@@ -88,7 +115,7 @@ export function SessionCard({ ev, applications, now }: { ev: EventSession; appli
             Sous le seuil minimum : {st.enrolled}/{ev.minCapacity} inscrits à J-{d}
           </p>
         ) : null}
-        {!ev.publishedOnSite && ev.status !== "annule" ? (
+        {!ev.publishedOnSite && ev.status !== "annule" && audience !== "b2b" ? (
           <Badge tone="neutral" className="mt-3 self-start">
             Non publiée sur le site
           </Badge>
@@ -98,14 +125,14 @@ export function SessionCard({ ev, applications, now }: { ev: EventSession; appli
   );
 }
 
-export function SessionCards({ events, applications, now }: { events: EventSession[]; applications: Application[]; now: number }) {
+export function SessionCards({ events, applications, now, billed }: { events: EventSession[]; applications: Application[]; now: number; billed: Map<string, { billed: number }> }) {
   if (!events.length) {
     return <EmptyState icon={CalendarX2} title="Aucune session à venir" description="Aucune session à venir ne correspond à ces filtres. Consultez la vue Liste pour l'historique." />;
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {events.map((ev) => (
-        <SessionCard key={ev.id} ev={ev} applications={applications} now={now} />
+        <SessionCard key={ev.id} ev={ev} applications={applications} now={now} billed={billed.get(ev.id)?.billed} />
       ))}
     </div>
   );

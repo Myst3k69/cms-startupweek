@@ -8,10 +8,11 @@ import { sessionStats } from "@/lib/domain/selectors";
 import type { Application, Evaluation, EventSession } from "@/lib/domain/types";
 import { date, dateRange, money } from "@/lib/format";
 import { Rating } from "../bits";
-import { satisfactionOf } from "../../lib/sessions";
+import { audienceLabel, satisfactionOf, sessionAudience, type SessionAudience } from "../../lib/sessions";
 
 interface Row {
   ev: EventSession;
+  audience: SessionAudience;
   enrolled: number;
   fillRate: number;
   revenue: number;
@@ -20,16 +21,37 @@ interface Row {
   responses: number;
 }
 
-export function SessionList({ events, applications, evaluations }: { events: EventSession[]; applications: Application[]; evaluations: Evaluation[] }) {
+export function SessionList({
+  events,
+  applications,
+  evaluations,
+  billed,
+}: {
+  events: EventSession[];
+  applications: Application[];
+  evaluations: Evaluation[];
+  billed: Map<string, { billed: number; collected: number }>;
+}) {
   const router = useRouter();
   const rows = React.useMemo<Row[]>(
     () =>
       events.map((ev) => {
         const st = sessionStats(ev, applications);
         const sat = satisfactionOf(evaluations, ev.id);
-        return { ev, enrolled: st.enrolled, fillRate: st.fillRate, revenue: st.revenue, collected: st.collected, satisfaction: sat.avg, responses: sat.count };
+        const audience = sessionAudience(ev);
+        const b = billed.get(ev.id);
+        return {
+          ev,
+          audience,
+          enrolled: st.enrolled,
+          fillRate: st.fillRate,
+          revenue: audience === "b2c" ? st.revenue : (b?.billed ?? 0),
+          collected: audience === "b2c" ? st.collected : (b?.collected ?? 0),
+          satisfaction: sat.avg,
+          responses: sat.count,
+        };
       }),
-    [events, applications, evaluations],
+    [events, applications, evaluations, billed],
   );
 
   const columns = React.useMemo<Column<Row>[]>(
@@ -77,19 +99,24 @@ export function SessionList({ events, applications, evaluations }: { events: Eve
       {
         key: "fill",
         header: "Remplissage",
-        render: (r) => (
-          <div className="w-28">
-            <div className="tabular mb-1 flex justify-between text-xs">
-              <span className="text-foreground">
-                {r.enrolled}/{r.ev.capacity}
-              </span>
-              <span className="text-muted-foreground">{r.fillRate} %</span>
+        render: (r) =>
+          r.audience === "b2c" ? (
+            <div className="w-28">
+              <div className="tabular mb-1 flex justify-between text-xs">
+                <span className="text-foreground">
+                  {r.enrolled}/{r.ev.capacity}
+                </span>
+                <span className="text-muted-foreground">{r.fillRate} %</span>
+              </div>
+              <Progress value={r.fillRate} tone={r.fillRate >= 100 ? "warning" : r.fillRate >= 70 ? "success" : "accent"} label={`Remplissage ${r.fillRate} %`} />
             </div>
-            <Progress value={r.fillRate} tone={r.fillRate >= 100 ? "warning" : r.fillRate >= 70 ? "success" : "accent"} label={`Remplissage ${r.fillRate} %`} />
-          </div>
-        ),
-        sort: (r) => r.fillRate,
-        csv: (r) => `${r.enrolled}/${r.ev.capacity}`,
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              {audienceLabel(r.ev)} · {r.ev.capacity} {r.audience === "b2b" ? "pers." : "places"}
+            </span>
+          ),
+        sort: (r) => (r.audience === "b2c" ? r.fillRate : -1),
+        csv: (r) => (r.audience === "b2c" ? `${r.enrolled}/${r.ev.capacity}` : `${audienceLabel(r.ev)} (${r.ev.capacity})`),
       },
       { key: "revenue", header: "CA", render: (r) => money(r.revenue), sort: (r) => r.revenue, csv: (r) => (r.revenue / 100).toFixed(2), align: "right", hideBelow: "md" },
       { key: "collected", header: "Encaissé", render: (r) => money(r.collected), sort: (r) => r.collected, csv: (r) => (r.collected / 100).toFixed(2), align: "right", hideBelow: "xl" },

@@ -48,7 +48,7 @@ export function ConventionDoc({ applicationId }: { applicationId: ID }) {
   const disabilityLead = users.find((u) => u.id === settings.disabilityLeadId);
   const price = priceParts(app.amountDueCents || ev.priceCents, settings);
   const days = programDays(ev);
-  const party = company ? "le client" : "le stagiaire";
+  const party = company ? "du client" : "du stagiaire";
   const ref = docRef("CF", ev.startAt, app.number);
   const balanceDate = balanceDueDate(ev, settings);
 
@@ -85,7 +85,7 @@ export function ConventionDoc({ applicationId }: { applicationId: ID }) {
         }
       />
       <PrintPage>
-        <DocHeader title={company ? "Convention" : "Contrat"} subtitle="de formation professionnelle" reference={ref} date={app.agreementSignedAt ?? new Date(now).toISOString()} />
+        <DocHeader reference={ref} date={app.agreementSignedAt ?? new Date(now).toISOString()} />
         <DocTitle title={title} subtitle={legalBasis} />
 
         <section className="mb-5 grid gap-4 sm:grid-cols-2 print:grid-cols-2">
@@ -231,7 +231,7 @@ export function ConventionDoc({ applicationId }: { applicationId: ID }) {
           </p>
           <p>
             <strong>Du fait de l'organisme</strong> : si le nombre minimum de {ev.minCapacity} participants n'est pas atteint à la clôture des inscriptions ({date(ev.registrationDeadline, "d MMMM yyyy")}) ou en cas de force majeure, l'organisme peut reporter ou annuler la session ; les
-            sommes versées sont alors intégralement remboursées ou, au choix de {party}, reportées sur une session ultérieure.
+            sommes versées sont alors intégralement remboursées ou, au choix {party}, reportées sur une session ultérieure.
           </p>
           <p>
             <strong>Abandon et force majeure</strong> : si, par suite de force majeure dûment reconnue, le stagiaire est empêché de suivre la formation, il peut rompre {company ? "la convention" : "le contrat"} ; seules les prestations effectivement

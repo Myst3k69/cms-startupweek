@@ -8,7 +8,7 @@ import { isRunning, isUpcoming, sessionStats } from "@/lib/domain/selectors";
 import { money, percent } from "@/lib/format";
 import { useCollection, useNow, useSession } from "@/lib/hooks";
 import { REGIONS } from "../../lib/labels";
-import { average, DAY } from "../../lib/sessions";
+import { average, billedByEvent, DAY, sessionAudience } from "../../lib/sessions";
 import { replaceQuery } from "../../lib/url";
 import { SessionCalendar } from "./session-calendar";
 import { SessionCards } from "./session-cards";
@@ -24,6 +24,8 @@ export function SessionsPage({ initialView }: { initialView?: string }) {
   const events = useCollection("events");
   const applications = useCollection("applications");
   const evaluations = useCollection("evaluations");
+  const invoices = useCollection("invoices");
+  const billed = React.useMemo(() => billedByEvent(invoices), [invoices]);
 
   const [view, setView] = React.useState<View>(initialView === "calendrier" || initialView === "liste" ? initialView : "cartes");
   const [status, setStatus] = React.useState("");
@@ -42,13 +44,23 @@ export function SessionsPage({ initialView }: { initialView?: string }) {
   );
 
   const stats = React.useMemo(() => {
+    // Jauge, remplissage et seuil : uniquement les StartupWeek B2C (les webinaires et sessions B2B n'ont pas de candidatures).
     let seats = 0;
     let sold = 0;
     let revenue = 0;
     let collected = 0;
+    let b2b = 0;
     let pipeline = 0;
     let underMin = 0;
     upcoming.forEach((e) => {
+      const audience = sessionAudience(e);
+      if (audience === "b2b") {
+        const b = billed.get(e.id);
+        b2b += b?.billed ?? 0;
+        collected += b?.collected ?? 0;
+        return;
+      }
+      if (audience !== "b2c") return;
       const st = sessionStats(e, applications);
       seats += e.capacity;
       sold += st.enrolled;
@@ -63,7 +75,8 @@ export function SessionsPage({ initialView }: { initialView?: string }) {
     return {
       seats,
       sold,
-      revenue,
+      revenue: revenue + b2b,
+      b2b,
       collected,
       pipeline,
       underMin,
@@ -71,7 +84,7 @@ export function SessionsPage({ initialView }: { initialView?: string }) {
       satisfaction: average(sats.map((s) => s.satisfaction)),
       responses: sats.length,
     };
-  }, [upcoming, filtered, applications, evaluations, now]);
+  }, [upcoming, filtered, applications, evaluations, billed, now]);
 
   const hasFilters = Boolean(status || mode || region || kind);
 
@@ -106,8 +119,13 @@ export function SessionsPage({ initialView }: { initialView?: string }) {
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Sessions à venir" value={upcoming.length} icon={CalendarDays} hint={`${stats.published} publiée${stats.published > 1 ? "s" : ""} sur le site${stats.underMin ? ` · ${stats.underMin} sous le seuil` : ""}`} />
-        <StatCard label="Places vendues" value={`${stats.sold}/${stats.seats}`} icon={Ticket} hint={`${stats.seats ? percent((stats.sold / stats.seats) * 100) : "0 %"} de remplissage · ${stats.pipeline} en pipeline`} />
-        <StatCard label="CA signé à venir" value={money(stats.revenue)} icon={Euro} hint={`${money(stats.collected)} déjà encaissés`} />
+        <StatCard
+          label="Places vendues (B2C)"
+          value={`${stats.sold}/${stats.seats}`}
+          icon={Ticket}
+          hint={`${stats.seats ? percent((stats.sold / stats.seats) * 100) : "0 %"} de remplissage StartupWeek · ${stats.pipeline} en pipeline`}
+        />
+        <StatCard label="CA signé à venir" value={money(stats.revenue)} icon={Euro} hint={`${money(stats.collected)} encaissés${stats.b2b ? ` · dont B2B ${money(stats.b2b)}` : ""}`} />
         <StatCard
           label="Satisfaction à chaud"
           value={stats.satisfaction === undefined ? "—" : `${stats.satisfaction.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}/5`}
@@ -138,9 +156,9 @@ export function SessionsPage({ initialView }: { initialView?: string }) {
         {view === "cartes" ? <span className="text-xs text-muted-foreground sm:ml-auto">Sessions à venir et en cours, par date de début</span> : null}
       </div>
 
-      {view === "cartes" ? <SessionCards events={upcoming} applications={applications} now={now} /> : null}
+      {view === "cartes" ? <SessionCards events={upcoming} applications={applications} now={now} billed={billed} /> : null}
       {view === "calendrier" ? <SessionCalendar events={filtered} now={now} /> : null}
-      {view === "liste" ? <SessionList events={filtered} applications={applications} evaluations={evaluations} /> : null}
+      {view === "liste" ? <SessionList events={filtered} applications={applications} evaluations={evaluations} billed={billed} /> : null}
 
       {creating ? <SessionCreateModal onClose={() => setCreating(false)} /> : null}
     </div>

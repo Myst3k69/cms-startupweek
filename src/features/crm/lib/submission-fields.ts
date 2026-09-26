@@ -2,7 +2,7 @@
  * Libellés FR des champs spécifiques des 8 formulaires du site (`Submission.fields`)
  * et « humanisation » des valeurs brutes (slugs, tranches, booléens).
  */
-import { labelOf, PROJECT_STAGES, type Option } from "@/lib/domain/constants";
+import { labelOf, PROJECT_STAGES } from "@/lib/domain/constants";
 import type { LeadSource, SubmissionType } from "@/lib/domain/types";
 
 export const FIELD_LABELS: Record<string, string> = {
@@ -284,7 +284,3 @@ export const SUBMISSION_SOURCE: Record<SubmissionType, LeadSource> = {
   reclamation: "site_contact",
   newsletter: "newsletter",
 };
-
-export function optionsWithAll<V extends string>(options: Option<V>[], allLabel: string) {
-  return [{ value: "", label: allLabel }, ...options.map((o) => ({ value: o.value, label: o.label }))];
-}

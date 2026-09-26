@@ -81,9 +81,9 @@ export function DocHeader({ title, reference, date: docDate, subtitle, compact }
           <p>{l.contact}</p>
         </div>
       </div>
-      {title ? (
+      {title || reference || docDate ? (
         <div className="text-left sm:text-right print:text-right">
-          <p className="font-display text-lg font-semibold uppercase tracking-wide text-foreground print:text-[13pt]">{title}</p>
+          {title ? <p className="font-display text-lg font-semibold uppercase tracking-wide text-foreground print:text-[13pt]">{title}</p> : null}
           {subtitle ? <p className="text-xs text-muted-foreground">{subtitle}</p> : null}
           {reference ? <p className="mt-1 font-mono text-xs text-foreground">Réf. {reference}</p> : null}
           {docDate ? <p className="text-xs text-muted-foreground">Établi le {date(docDate, "d MMMM yyyy")}</p> : null}

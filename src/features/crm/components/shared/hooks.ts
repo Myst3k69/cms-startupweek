@@ -3,25 +3,12 @@
 import { useCallback, useMemo } from "react";
 import { useCrm } from "@/lib/store";
 import type { EntityRef } from "@/lib/domain/types";
-import { contactName } from "@/lib/domain/selectors";
 import { entityHref, entityLabel, ENTITY_KIND_LABEL } from "../../lib/entity-ref";
 
 /** Options de sélection des membres actifs de l'équipe. */
 export function useUserOptions() {
   const users = useCrm((s) => s.users);
   return useMemo(() => users.filter((u) => u.active).map((u) => ({ value: u.id, label: u.name })), [users]);
-}
-
-/** Options de sélection des contacts (triés par nom). */
-export function useContactOptions() {
-  const contacts = useCrm((s) => s.contacts);
-  return useMemo(
-    () =>
-      [...contacts]
-        .sort((a, b) => contactName(a).localeCompare(contactName(b), "fr"))
-        .map((c) => ({ value: c.id, label: `${contactName(c)} — ${c.email}` })),
-    [contacts],
-  );
 }
 
 export function useOrgOptions() {

@@ -43,8 +43,14 @@ export function parseInline(src: string): Inline[] {
       out.push({ t: "text", v: rest });
       break;
     }
-    if (m.index > 0) out.push({ t: "text", v: rest.slice(0, m.index) });
     const tok = m[0];
+    // « _ » intra-mot (snake_case) : pas d'italique.
+    if (m[3] && tok.startsWith("_") && (/\w/.test(rest[m.index - 1] ?? "") || /\w/.test(rest[m.index + tok.length] ?? ""))) {
+      out.push({ t: "text", v: rest.slice(0, m.index + 1) });
+      rest = rest.slice(m.index + 1);
+      continue;
+    }
+    if (m.index > 0) out.push({ t: "text", v: rest.slice(0, m.index) });
     if (m[1]) out.push({ t: "code", v: tok.slice(1, -1) });
     else if (m[2]) out.push({ t: "strong", c: parseInline(tok.slice(2, -2)) });
     else if (m[3]) out.push({ t: "em", c: parseInline(tok.slice(1, -1)) });

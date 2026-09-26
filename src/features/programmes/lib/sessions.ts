@@ -2,7 +2,8 @@
  * Dérivations pures propres aux sessions (jours de formation, durée du programme,
  * satisfaction, NPS, codes). Toujours `now` en paramètre (rendu pur).
  */
-import type { Evaluation, EventSession, ProgramSlot } from "@/lib/domain/types";
+import type { Evaluation, EventSession, Invoice, ProgramSlot } from "@/lib/domain/types";
+import { invoiceTotal } from "@/lib/domain/selectors";
 
 export const DAY = 86_400_000;
 
@@ -96,17 +97,36 @@ export function satisfactionOf(evals: Evaluation[], eventId: string): { avg?: nu
 }
 
 /**
- * Score d'une évaluation ramené sur 10 (positionnement / acquis) — tolère les différentes
- * échelles possibles (/5, /10, /100) des grilles de scores.
+ * Score d'une évaluation ramené sur 10 (positionnement / acquis).
+ * Grilles du référentiel StartupWeek : positionnement noté /10, acquis et satisfaction notés /5.
  */
 export function evalScore10(ev: Evaluation): number | undefined {
   const values = Object.values(ev.scores ?? {}).filter((v) => typeof v === "number");
-  let v = average(values);
-  if (v === undefined && typeof ev.objectivesReached === "number") v = ev.objectivesReached;
-  if (v === undefined) return undefined;
-  if (v <= 5) return Math.round(v * 2 * 10) / 10;
-  if (v <= 10) return Math.round(v * 10) / 10;
-  return Math.round(v) / 10;
+  const avg = average(values);
+  let scale: number;
+  let v: number | undefined;
+  if (avg !== undefined) {
+    v = avg;
+    const max = Math.max(...values);
+    scale = ev.kind === "positionnement" ? 10 : ev.kind === "acquis" ? 5 : max > 10 ? 100 : max > 5 ? 10 : 5;
+  } else if (typeof ev.objectivesReached === "number") {
+    v = ev.objectivesReached;
+    scale = 5;
+  } else return undefined;
+  return Math.round((v / scale) * 100) / 10;
+}
+
+/** Montant facturé (TTC, avoirs déduits) et encaissé par session, toutes factures non annulées. */
+export function billedByEvent(invoices: Invoice[]): Map<string, { billed: number; collected: number }> {
+  const m = new Map<string, { billed: number; collected: number }>();
+  invoices.forEach((i) => {
+    if (!i.eventId || i.status === "annulee" || i.status === "brouillon") return;
+    const cur = m.get(i.eventId) ?? { billed: 0, collected: 0 };
+    cur.billed += invoiceTotal(i).ttc;
+    if (i.kind !== "avoir") cur.collected += i.paidCents;
+    m.set(i.eventId, cur);
+  });
+  return m;
 }
 
 /** Prochain code libre pour un préfixe (SW-0024…). */

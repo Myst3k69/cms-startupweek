@@ -127,7 +127,7 @@ export function QualiopiDashboard() {
   const evidenceStats = React.useMemo(() => {
     const expired = data.evidences.filter((e) => e.validUntil && Date.parse(e.validUntil) < now).length;
     const soon = data.evidences.filter((e) => e.validUntil && Date.parse(e.validUntil) >= now && Date.parse(e.validUntil) - now < 60 * DAY).length;
-    const withoutProof = applicable.filter((i) => !evidenceCount.get(i.code) && !i.autoSource).length;
+    const withoutProof = applicable.filter((i) => !evidenceCount.get(i.code)).length;
     return { total: data.evidences.length, expired, soon, withoutProof };
   }, [data.evidences, now, applicable, evidenceCount]);
 
