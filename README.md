@@ -66,7 +66,7 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 ```
 
 - **Données** : `src/lib/domain/types.ts` est le contrat unique, traduit 1-pour-1 en SQL (camelCase ↔ snake_case).
-- **Mode production** : `NEXT_PUBLIC_CRM_DATA_MODE=supabase` → chaque mutation est répercutée dans le schéma `crm` (RLS avec la session utilisateur). Voir **[docs/SUPABASE.md](docs/SUPABASE.md)** — **la production (https://cms-startupweek.vercel.app) tourne en mode `supabase` depuis le 26/09/2026** : connexion par lien magique, données lues et écrites dans le schéma `crm` (encore sans données métier : import Airtable à faire).
+- **Mode production** : `NEXT_PUBLIC_CRM_DATA_MODE=supabase` → chaque mutation est répercutée dans le schéma `crm` (RLS avec la session utilisateur). Voir **[docs/SUPABASE.md](docs/SUPABASE.md)** — **la production (https://cms-startupweek.vercel.app) tourne en mode `supabase` depuis le 26/09/2026** : connexion par lien magique, données lues et écrites dans le schéma `crm` ; sessions gérées dans le CRM depuis le 26/09/2026 (import Airtable effectué — la base ne contenait que 13 sessions et 2 ressources réelles).
 - **Conventions de code** : **[docs/CONVENTIONS.md](docs/CONVENTIONS.md)**.
 
 ## Statut
@@ -79,7 +79,7 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 | Schéma SQL, RLS, triggers, vues | ✅ appliqués sur le projet Supabase « startupweek » le 26/09/2026 et vérifiés sur la vraie base (empreintes identiques au test local, tables du site inchangées, scénario facture / paiement / synchro `public.event` / droits exécuté puis annulé) — schéma `crm` vide |
 | Connexion de l'équipe (mode `supabase`) | ✅ lien magique Supabase Auth (PKCE), chargement des données depuis la base, écritures ordonnées avec annulation si la base refuse — testé de bout en bout en local (PostgREST + faux service Auth + Chromium) ; migration `20260926122058` (rattachement automatique des membres, journal sans doublon) **appliquée en production le 26/09/2026** |
 | Bascule effective sur Supabase | ✅ le 26/09/2026 : schéma `crm` exposé, URL de redirection, variables Vercel, deux administrateurs ; première connexion réelle réussie — voir [docs/SUPABASE.md § 3-4](docs/SUPABASE.md). Emails déclenchés depuis l'interface pas encore réellement envoyés |
-| Import des données Airtable | ⏳ mapping documenté ([docs/SUPABASE.md § 8](docs/SUPABASE.md)), script en cours |
+| Import des données Airtable | ✅ 26/09/2026 : 13 sessions et 2 ressources (le reste n'était que des tests) ; synchro n8n des sessions coupée, le CRM publie le site — [docs/SUPABASE.md § 8](docs/SUPABASE.md). Formulaires du site encore vers Airtable (phase 2) |
 | Endpoints `/api/intake`, Stripe, Qonto | ✍️ écrits et testés en local (*dry-run* sans variables d'environnement) — à tester en préproduction avec les vraies API |
 | Envoi réel des emails (Resend) | ⏳ prévu côté serveur (intake) ; les emails déclenchés depuis l'interface sont journalisés en démo |
 | Documents légaux (convention, CGV, attestation) | ⚠️ modèles à faire valider juridiquement (voir le point L.6353-6 dans la proposition) |

@@ -6,6 +6,8 @@ Ce document décrit comment passer le back-office du mode démo (données dans l
 >
 > **Bascule effectuée le 26/09/2026** : le back-office de production (https://cms-startupweek.vercel.app) tourne en mode `supabase`. Première connexion réelle par lien magique réussie (email reçu, retour sur `/auth/callback`, compte rattaché à son membre `crm.team_members`). Administrateurs créés : Aurélien Chiren (rattaché) et Caroline Borja (rattachée automatiquement à sa première connexion). Le schéma `crm` ne contient pas encore de données métier : **import Airtable à faire (§ 8)**.
 >
+> **Import et phase 1 effectués le 26/09/2026 (§ 8.4, § 9)** : la base Airtable ne contenait, hors tests, que les 13 sessions SW-0011 → SW-0023 et 2 ressources — importées. **Les sessions se gèrent désormais dans le CRM** (qui publie `public.event`) : workflows n8n « Sync Airtable -> Supabase » et « Create or update Event » désactivés. Les candidatures arrivent encore dans Airtable (phase 2 à faire) : une inscription payée doit être saisie dans le CRM pour que les places restantes du site soient à jour.
+>
 > **Migrations appliquées sur le projet Supabase « startupweek »** (production, PostgreSQL 17), directement et non sur une branche (les branches exigent l'offre Pro ; l'organisation est en offre gratuite) — versions `20260926103012`, `20260926103117`, `20260926103336`, `20260926103516`. Au moment de la migration, le schéma `crm` était **vide** (hors référentiel Qualiopi et ligne `settings`). Vérifications faites sur la vraie base :
 > - avant : colonnes, enums et contrainte `event_code` de `public.event` / `template` / `administrative_resource(_event)` identiques à ce qu'attend la migration 3 ; empreinte des tables `public.*` du site relevée ;
 > - après : empreintes des objets `crm` (colonnes, contraintes, index, triggers, fonctions, policies, vues, RLS, droits `anon` / `authenticated` / `service_role`, données du référentiel) **identiques** à celles d'une base locale ayant reçu les mêmes fichiers ; tables, triggers, policies et fonctions du schéma `public` inchangés (seules les lignes de `public.event` ont bougé, réécrites par le workflow n8n `mRWu02E5EofDrUf2` qui tourne toutes les 5 min) ;
@@ -320,6 +322,18 @@ Rapprochement automatique volontairement prudent : transaction créditrice dont 
 
 Base : « CRM Startup Week ». Aucun script d'import n'est livré ; recommandation : export via l'API Airtable → transformation (script Node ponctuel) → insertion avec le client service_role, **table par table dans l'ordre ci-dessous**, en renseignant `airtable_record_id` (colonne unique prévue sur les tables importées) pour pouvoir rejouer l'import sans doublon (`upsert … on conflict (airtable_record_id)`).
 
+### 8.0 Résultat de l'analyse (26/09/2026)
+
+| Table Airtable | Contenu | Traitement |
+| --- | --- | --- |
+| Events | 13 sessions réelles | importées (§ 8.4) |
+| Ressources | 2 réelles, 1 test, 1 vide | 2 importées, test et vide supprimés |
+| Contacts, Candidature, Form Submissions | 1 enregistrement de test chacun | supprimés |
+| Digital Starter Kit | 6 tests | supprimés |
+| Companies, Reclamation, Partenariats, Accompagnements, Messages contact, Demandes entreprise | vides | — |
+
+La base « CRM Startup Week backup » (44 contacts factices) n'est pas importée. Les correspondances ci-dessous restent la référence si des données devaient être reprises plus tard.
+
 ### 8.1 Correspondance
 
 | Ordre | Airtable | → `crm` | Points clés |
@@ -377,12 +391,19 @@ order by 1;
 
 ---
 
+### 8.4 Import réalisé le 26/09/2026
+
+- **Sessions** : `insert … select` depuis `public.event` (copie exacte d'Airtable par n8n : 234 champs comparés, 0 écart), heures fixées à 09:00 (début), 18:00 (fin) et 23:59 (date limite), heure de Paris ; `inscriptions_ouvertes`, publiées. Essai préalable dans une transaction annulée. Après import, le CRM a republié `public.event` : seuls changements, `min_places` vide → 0 (non affiché par le site) et SW-0011 9 → 10 places (la candidature de test n'est plus comptée).
+- **Ressources** : l'unique fichier réel (PDF « Ressource d'acculturation digitale pour étudiants admis », 139 603 octets) est hébergé dans Supabase Storage, bucket public `ressources` (PDF uniquement, 20 Mo max) : `…/storage/v1/object/public/ressources/acculturation-digitale.pdf`. « Acculturation digitale » (premium) importée et reliée à sa ligne `public.administrative_resource` ; le modèle `public.template` du même nom (hors CRM) pointe vers le même fichier. « guide pratique marrakech » importée **sans fichier** (elle pointait vers ce même PDF) : non publiée, à compléter dans le CRM.
+- **Nettoyage du site** : liens Airtable expirés remplacés ; supprimés : 3 doublons « Acculturation digitale » et 3 modèles factices (`public.template`), ressources « TEST CLAUDE (maj) », « Informations pratiques — Lisbonne 2026 » (`example.com`) et « guide pratique marrakech » (`public.administrative_resource`). **Restent** « Maquette Landing Page » et « Pitch Deck Startup », dont le lien est expiré : `public.content` les référence (`on delete cascade`, 2 contenus d'un compte interne) — à traiter à part.
+- **Ajouter un fichier** : Dashboard → Storage → `ressources` → *Upload*, copier l'URL publique dans la ressource du CRM. Le bucket est public : quiconque a le lien peut télécharger, y compris un contenu premium (comme auparavant avec les liens Airtable). Une fonction Edge `crm-import-ressource` a servi au dépôt initial ; elle est neutralisée (réponse 410) et peut être supprimée depuis le Dashboard.
+
 ## 9. Ordre de décommissionnement des workflows n8n
 
 Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le retour arrière.
 
 1. **Phase 0 — migrations** (§ 2) : ✅ faite le 26/09/2026 ; aucun impact sur le site tant que `crm.sessions` / `crm.resources` / `crm.applications` sont vides.
-2. **Phase 1 — sessions & ressources** (le CRM devient la source de vérité du site) :
+2. **Phase 1 — sessions & ressources** (le CRM devient la source de vérité du site) — ✅ **faite le 26/09/2026** : points 2 et 5 réalisés, point 3 pour « Create or update Event » (les deux webhooks de ressources restent actifs mais ne sont plus appelés), point 4 inclus dans le workflow de synchro désactivé ; point 1 (geler Airtable) à faire par l'équipe. Retour arrière : réactiver les deux workflows dans n8n.
    1. geler les modifications dans Airtable *Events* / *Ressources* ;
    2. désactiver « Sync Airtable -> Supabase (polling, remplace automatisations Airtable) » (`mRWu02E5EofDrUf2`) — sinon Airtable et le CRM écrivent tous deux `public.event` ;
    3. désactiver « Create or update Event » (`qZ1uM01BISgdzSIw`), « Ressources copy » (`y5Giw9ESoq1cqNFN`), « add  ressources for event(s) » (`WwrQLJOswqX2fjLI`) ;
@@ -426,4 +447,4 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 - Synchronisation en temps réel entre collègues (Supabase Realtime) — aujourd'hui : bouton *Recharger depuis la base*.
 - Envoi des emails programmés (`crm.email_messages` au statut `programme`, ex. séquence Digital Starter Kit) : un cron d'envoi reste à écrire ; seuls les accusés de réception sont envoyés immédiatement.
 - Types TypeScript générés (`supabase gen types typescript --schema crm`) pour supprimer les casts du client service_role.
-- Script d'import Airtable (§ 8).
+- Phase 2 : formulaires du site → CRM (§ 5, § 9) ; d'ici là, les candidatures arrivent dans Airtable.
