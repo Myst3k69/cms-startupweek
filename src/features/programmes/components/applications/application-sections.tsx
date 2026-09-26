@@ -289,7 +289,7 @@ export function QualiopiChecklist({ app, event, canEdit }: { app: Application; e
   const stampText = (field: string, done: boolean, verb = "Validé") => {
     const a = stampFromLog(activities, "applications", app.id, field);
     if (!done) return undefined;
-    if (!a) return `${verb} (date non tracée — reprise Airtable)`;
+    if (!a) return `${verb} (date non tracée : donnée migrée)`;
     const who = a.actorId ? users.get(a.actorId)?.name : undefined;
     return `${verb} le ${dateTime(a.at)}${who ? ` par ${who}` : ""}`;
   };
@@ -311,7 +311,10 @@ export function QualiopiChecklist({ app, event, canEdit }: { app: Application; e
     positioning: {
       detail:
         typeof app.positioningScore === "number"
-          ? stampText("positioningScore", true, `Note ${String(app.positioningScore).replace(".", ",")}/10 — saisie`)
+          ? (() => {
+              const a = stampFromLog(activities, "applications", app.id, "positioningScore");
+              return `Note ${String(app.positioningScore).replace(".", ",")}/10${a ? ` · saisie le ${dateTime(a.at)}` : ""}`;
+            })()
           : "Questionnaire de positionnement à faire passer avant l'entrée.",
       control: (
         <PositioningInput
