@@ -265,9 +265,11 @@ function ContactView({ contact, initialTab }: { contact: Contact; initialTab?: s
               </div>
             </div>
             <div className="flex flex-wrap gap-2 lg:justify-end">
-              <Button size="sm" onClick={() => setComposing(true)}>
-                <Mail /> Email
-              </Button>
+              {canEdit("emails") ? (
+                <Button size="sm" onClick={() => setComposing(true)}>
+                  <Mail /> Email
+                </Button>
+              ) : null}
               <Button size="sm" variant="secondary" onClick={() => setTasking(true)} disabled={!canEdit("relances")}>
                 <CheckSquare /> Tâche
               </Button>
@@ -552,7 +554,7 @@ function ContactView({ contact, initialTab }: { contact: Contact; initialTab?: s
             </ul>
           </Card>
         ) : (
-          <EmptyState icon={Mail} title="Aucun email" description="Aucun email envoyé à ce contact depuis le CRM." action={<Button size="sm" onClick={() => setComposing(true)}>Écrire un email</Button>} />
+          <EmptyState icon={Mail} title="Aucun email" description="Aucun email envoyé à ce contact depuis le CRM." action={canEdit("emails") ? <Button size="sm" onClick={() => setComposing(true)}>Écrire un email</Button> : undefined} />
         )
       ) : null}
 

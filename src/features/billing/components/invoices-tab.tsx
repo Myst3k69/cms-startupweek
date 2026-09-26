@@ -11,7 +11,7 @@ import { date, money } from "@/lib/format";
 import { Button, DataTable, LinkButton, Segmented, useToast, type Column, type FilterDef } from "@/components/ui";
 import { SessionLink } from "@/components/shared/entity-links";
 import { accountingAmount, displayNumber, downloadCsv, isCollectible, isNumbered, numberingAudit, partyName } from "../lib";
-import { runReminderStep } from "../actions";
+import { runReminderStep, sendDueSoonNotice } from "../actions";
 import { DueHint, InvoiceStatusBadge, PartyCell, useBillingLookups } from "./shared";
 
 export type InvoiceStatusFilter = InvoiceStatus | "tous";
@@ -198,8 +198,9 @@ export function InvoicesTab({ status, onStatusChange }: { status: InvoiceStatusF
                       let sent = 0;
                       const failed: string[] = [];
                       for (const i of eligible) {
-                        const r = runReminderStep(i.id);
-                        if (r.ok) sent++;
+                        // Pas encore échue : simple rappel (le niveau de relance ne monte pas).
+                        const ok = new Date(i.dueAt).getTime() > now ? sendDueSoonNotice(i.id) : runReminderStep(i.id).ok;
+                        if (ok) sent++;
                         else failed.push(i.number);
                       }
                       clear();

@@ -251,6 +251,67 @@ create trigger payments_refresh_invoice
   after insert or update or delete on crm.payments
   for each row execute function crm.tg_payments_refresh_invoice();
 
+-- Garde-fou « write-through » : l'interface upsert des lignes complètes, parfois
+-- périmées (paid_cents lu avant un paiement Stripe). Dès qu'une facture a des
+-- paiements, paid_cents et le statut payée / partielle sont recalculés ici,
+-- quelle que soit la valeur envoyée. Sans paiement enregistré (import, saisie
+-- manuelle), la valeur fournie est conservée.
+create or replace function crm.tg_invoices_payment_state()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_paid  integer;
+  v_total integer;
+begin
+  if not exists (select 1 from crm.payments p where p.invoice_id = new.id) then
+    return new;
+  end if;
+  select coalesce(sum(p.amount_cents), 0)::integer into v_paid
+  from crm.payments p
+  where p.invoice_id = new.id and p.status in ('reussi', 'rembourse');
+  new.paid_cents := v_paid;
+  if new.kind <> 'avoir' and new.status not in ('brouillon', 'annulee') then
+    v_total := crm.lines_total_cents(new.lines);
+    if v_total > 0 and v_paid >= v_total then
+      new.status := 'payee';
+    elsif v_paid > 0 then
+      new.status := 'partielle';
+    elsif new.status in ('payee', 'partielle') then
+      new.status := case when new.due_at < now() then 'en_retard' else 'emise' end;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+create trigger invoices_payment_state
+  before update on crm.invoices
+  for each row execute function crm.tg_invoices_payment_state();
+
+-- Même garde-fou pour le montant encaissé dénormalisé sur la candidature.
+create or replace function crm.tg_applications_paid_state()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if exists (select 1 from crm.invoices i where i.application_id = new.id) then
+    new.amount_paid_cents := coalesce((
+      select sum(i.paid_cents)
+      from crm.invoices i
+      where i.application_id = new.id and i.kind <> 'avoir' and i.status <> 'annulee'
+    ), 0);
+  end if;
+  return new;
+end;
+$$;
+create trigger applications_paid_state
+  before update on crm.applications
+  for each row execute function crm.tg_applications_paid_state();
+
 create or replace function crm.tg_invoices_lines_changed()
 returns trigger
 language plpgsql
@@ -311,28 +372,31 @@ as $$
   end;
 $$;
 
--- Modification de la capacité sans changement explicite de statut → bascule automatique.
--- (Un statut choisi explicitement par l'équipe est toujours respecté.)
+-- • Une session ne peut jamais être « inscriptions_ouvertes » sans place libre (y compris
+--   si l'interface renvoie un statut périmé) → « complet ».
+-- • Capacité modifiée sans changement explicite de statut → bascule automatique dans les
+--   deux sens (comme l'ancien schedule n8n : « complet » + place libre → réouverture).
+--   Pour fermer les inscriptions alors qu'il reste des places, avancer registration_deadline
+--   (aucune réouverture automatique après la date limite).
 create or replace function crm.tg_sessions_capacity()
 returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  v_remaining integer;
 begin
-  if new.status = old.status and new.capacity is distinct from old.capacity then
-    new.status := crm.next_capacity_status(
-      new.status,
-      greatest(new.capacity - crm.session_registered_count(new.id), 0),
-      new.capacity,
-      new.registration_deadline
-    );
+  if new.status = 'inscriptions_ouvertes'
+     or (tg_op = 'UPDATE' and new.status = old.status and new.capacity is distinct from old.capacity) then
+    v_remaining := greatest(new.capacity - crm.session_registered_count(new.id), 0);
+    new.status := crm.next_capacity_status(new.status, v_remaining, new.capacity, new.registration_deadline);
   end if;
   return new;
 end;
 $$;
 create trigger sessions_capacity
-  before update of capacity on crm.sessions
+  before insert or update of capacity, status on crm.sessions
   for each row execute function crm.tg_sessions_capacity();
 
 -- Recalcule une session après un mouvement de candidature : bascule de statut

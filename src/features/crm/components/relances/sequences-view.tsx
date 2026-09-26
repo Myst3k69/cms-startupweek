@@ -12,12 +12,12 @@ import { SequenceDrawer } from "./sequence-drawer";
 
 /** Relances absentes des 13 workflows n8n, désormais automatisées par le CRM. */
 const N8N_GAPS: { trigger: SequenceTrigger; title: string; detail: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { trigger: "demande_sans_reponse", title: "SLA 48 h des demandes", detail: "La promesse « réponse sous 24-48 h » des accusés n8n n'était jamais suivie : tâche + alerte à H+24, escalade à H+48.", icon: BellRing },
-  { trigger: "digital_starter_kit", title: "Nurturing Digital Starter Kit", detail: "Les téléchargements du kit finissaient dans une table Airtable sans suite : séquence J+0 / J+3 / J+7 vers la candidature.", icon: Download },
-  { trigger: "devis_envoye", title: "Relance des devis", detail: "Aucune relance B2B après envoi d'un devis : email J+5, appel J+10, dernier rappel avant expiration.", icon: FileSignature },
-  { trigger: "facture_echue", title: "Impayés (acompte / solde)", detail: "Rien n'existait pour l'acompte 30 % ni le solde à J-30 : relances J+3, J+10 puis mise en demeure.", icon: Receipt },
-  { trigger: "session_j_moins_7", title: "J-7 avant session", detail: "Convocation, programme, accès et règlement intérieur (Qualiopi ind. 9) envoyés automatiquement.", icon: CalendarClock },
-  { trigger: "evaluation_froid", title: "Évaluation à froid J+60", detail: "Questionnaire à froid + nouvelles du projet (Qualiopi ind. 30), relance si pas de réponse.", icon: ClipboardCheck },
+  { trigger: "demande_sans_reponse", title: "SLA 48 h des demandes", detail: "Les accusés n8n promettaient « réponse sous 24-48 h » sans aucun suivi : tâche prioritaire, alerte interne puis escalade.", icon: BellRing },
+  { trigger: "digital_starter_kit", title: "Nurturing Digital Starter Kit", detail: "Les téléchargements du kit restaient dans une table Airtable sans suite : nurturing puis appel de découverte.", icon: Download },
+  { trigger: "devis_envoye", title: "Relance des devis B2B", detail: "Aucune relance après l'envoi d'un devis école / entreprise : emails et appel jusqu'à l'acceptation ou l'expiration.", icon: FileSignature },
+  { trigger: "facture_echue", title: "Impayés (acompte / solde)", detail: "Rien n'existait pour l'acompte de 30 % ni le solde à J-30 : relances progressives puis appel.", icon: Receipt },
+  { trigger: "session_j_moins_7", title: "Préparation J-7", detail: "Rappel pratique, positionnement et vérification logistique / aménagements avant chaque session.", icon: CalendarClock },
+  { trigger: "evaluation_froid", title: "Évaluation à froid J+60", detail: "Questionnaire à froid et nouvelles du projet (Qualiopi ind. 30), avec relance des non-répondants.", icon: ClipboardCheck },
 ];
 const NEW_TRIGGERS = new Set<SequenceTrigger>(N8N_GAPS.map((g) => g.trigger));
 

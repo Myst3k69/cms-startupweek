@@ -157,6 +157,7 @@ export function TesterTab() {
             ) : (
               <>
                 {http.status === 401 ? <p className="mb-2 text-xs text-warning-text">Signature absente ou invalide : renseignez le secret configuré côté serveur (ou utilisez la simulation).</p> : null}
+                {http.status === 403 ? <p className="mb-2 text-xs text-warning-text">Origine refusée : ajoutez l'URL du back-office à ALLOWED_ORIGINS (variable d'environnement du CRM) pour tester depuis le navigateur.</p> : null}
                 <pre className="scrollbar-thin max-h-96 overflow-auto rounded-md border border-border bg-surface-2 p-3 font-mono text-[11px] leading-relaxed text-foreground">
                   <code>{pretty(http.body) || "(corps vide)"}</code>
                 </pre>

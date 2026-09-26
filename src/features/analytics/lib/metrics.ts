@@ -137,9 +137,12 @@ export function trafficSeries(traffic: TrafficDay[], period: Period, r: Range, n
   const labels: string[] = [];
   const visitors: number[] = [];
   const pageviews: number[] = [];
+  // Le jour en cours n'est pas encore consolidé : la série s'arrête au dernier jour disponible.
+  const lastKey = traffic.reduce((m, d) => (d.date.slice(0, 10) > m ? d.date.slice(0, 10) : m), "");
   for (let i = 0; i < r.days; i++) {
     const d = addDays(r.start, i);
     const k = format(d, "yyyy-MM-dd");
+    if (lastKey && k > lastKey) break;
     labels.push(format(d, "d MMM", { locale: fr }).replace(".", ""));
     visitors.push(byDay.get(k)?.visitors ?? 0);
     pageviews.push(byDay.get(k)?.pageviews ?? 0);
@@ -314,10 +317,17 @@ export function revenueSeries(invoices: Invoice[], buckets: { start: number; end
 
 export const STAGE_PROBABILITY: Partial<Record<Application["status"], number>> = { nouvelle: 0.1, qualifiee: 0.25, entretien: 0.45, acceptee: 0.8 };
 
-export function forecast(events: EventSession[], applications: Application[], deals: Deal[], now: number) {
+/**
+ * Prévisionnel des sessions à venir. Remplissage et seuil minimum : bootcamps StartupWeek
+ * (inscriptions via candidatures) démarrant dans l'horizon donné — les webinaires gratuits
+ * et les Startup Village (B2B) ont leur propre logique d'inscription.
+ */
+export function forecast(events: EventSession[], applications: Application[], deals: Deal[], now: number, horizonDays = 90) {
   const upcoming = events.filter((e) => isUpcoming(e, now) && e.status !== "brouillon");
   const ids = new Set(upcoming.map((e) => e.id));
   const byId = new Map(upcoming.map((e) => [e.id, e]));
+  // Webinaires et sessions B2B (orgId) : pas de candidatures individuelles ⇒ exclus du remplissage et du seuil.
+  const soon = upcoming.filter((e) => e.kind === "startup_week" && !e.orgId && t(e.startAt) - now <= horizonDays * DAY);
   let enrolled = 0;
   let collected = 0;
   let fillSum = 0;
@@ -326,6 +336,9 @@ export function forecast(events: EventSession[], applications: Application[], de
     const st = sessionStats(ev, applications);
     enrolled += st.revenue;
     collected += st.collected;
+  }
+  for (const ev of soon) {
+    const st = sessionStats(ev, applications);
     fillSum += st.fillRate;
     if (st.belowMinimum) below.push({ ev, enrolled: st.enrolled });
   }
@@ -342,7 +355,9 @@ export function forecast(events: EventSession[], applications: Application[], de
     pipeline: Math.round(pipeline),
     b2b: Math.round(b2b),
     total: Math.round(enrolled + pipeline + b2b),
-    fillRate: upcoming.length ? Math.round(fillSum / upcoming.length) : 0,
+    soon,
+    horizonDays,
+    fillRate: soon.length ? Math.round(fillSum / soon.length) : 0,
     below: below.sort((a, b) => a.ev.startAt.localeCompare(b.ev.startAt)),
   };
 }

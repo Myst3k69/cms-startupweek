@@ -105,7 +105,7 @@ export const QUALIOPI_REFERENTIEL: ReferentielIndicator[] = [
     title:
       "Lorsque le prestataire met en œuvre des prestations conduisant à une certification professionnelle, il s'assure de l'adéquation du ou des contenus de la prestation aux exigences de la certification visée.",
     expectation: "Le contenu de la formation couvre le référentiel de compétences de la certification préparée.",
-    evidenceHints: ["Tableau de correspondance programme / référentiel", "Convention avec le certificateur"],
+    evidenceHints: ["Tableau de correspondance programme / référentiel", "Convention avec le certificateur", "Grille d'évaluation alignée sur le référentiel de certification"],
     applicability: CERTIF,
     applicableToStartupWeek: false,
   },
@@ -166,7 +166,7 @@ export const QUALIOPI_REFERENTIEL: ReferentielIndicator[] = [
     title:
       "Pour les formations en alternance, le prestataire, en lien avec l'entreprise, anticipe avec l'apprenant les missions confiées, à court, moyen et long terme, et assure la coordination et la progressivité des apprentissages réalisés en centre de formation et en entreprise.",
     expectation: "Coordination formalisée entre centre de formation et entreprise pour les parcours en alternance.",
-    evidenceHints: ["Livret d'apprentissage", "Comptes rendus tuteur / formateur"],
+    evidenceHints: ["Livret d'apprentissage", "Comptes rendus tuteur / formateur", "Calendrier d'alternance"],
     applicability: "Uniquement les formations en alternance",
     applicableToStartupWeek: false,
   },
@@ -175,7 +175,7 @@ export const QUALIOPI_REFERENTIEL: ReferentielIndicator[] = [
     criterion: 3,
     title: "Le prestataire met en œuvre un accompagnement socio-professionnel, éducatif et relatif à l'exercice de la citoyenneté.",
     expectation: "Accompagnement socio-professionnel des apprentis formalisé.",
-    evidenceHints: ["Actions d'accompagnement socio-professionnel", "Partenariats associatifs"],
+    evidenceHints: ["Actions d'accompagnement socio-professionnel", "Partenariats associatifs", "Suivi individuel des apprentis"],
     applicability: APPRENTISSAGE,
     applicableToStartupWeek: false,
   },
@@ -185,7 +185,7 @@ export const QUALIOPI_REFERENTIEL: ReferentielIndicator[] = [
     title:
       "Le prestataire informe les apprentis de leurs droits et devoirs en tant qu'apprentis et salariés ainsi que des règles applicables en matière de santé et de sécurité en milieu professionnel.",
     expectation: "Information des apprentis sur leurs droits, devoirs et règles de santé-sécurité.",
-    evidenceHints: ["Livret d'accueil apprenti", "Émargement séance d'information"],
+    evidenceHints: ["Livret d'accueil apprenti", "Émargement séance d'information", "Règlement intérieur remis à l'apprenti"],
     applicability: APPRENTISSAGE,
     applicableToStartupWeek: false,
   },
@@ -195,7 +195,7 @@ export const QUALIOPI_REFERENTIEL: ReferentielIndicator[] = [
     title:
       "Lorsque le prestataire met en œuvre des formations conduisant à une certification professionnelle, il s'assure que les conditions de présentation des bénéficiaires à la certification respectent les exigences formelles de l'autorité de certification.",
     expectation: "Les modalités d'inscription et de passage de la certification respectent les exigences du certificateur.",
-    evidenceHints: ["Procédure d'inscription à la certification", "Échanges avec le certificateur"],
+    evidenceHints: ["Procédure d'inscription à la certification", "Échanges avec le certificateur", "Dossiers de candidature à la certification"],
     applicability: CERTIF,
     applicableToStartupWeek: false,
   },
@@ -236,7 +236,7 @@ export const QUALIOPI_REFERENTIEL: ReferentielIndicator[] = [
     title:
       "Le prestataire dispose d'un personnel dédié à l'appui à la mobilité nationale et internationale, d'un référent handicap et d'un conseil de perfectionnement.",
     expectation: "Référent mobilité, référent handicap et conseil de perfectionnement en place (CFA).",
-    evidenceHints: ["Nomination du référent mobilité", "Comptes rendus du conseil de perfectionnement"],
+    evidenceHints: ["Nomination du référent mobilité", "Comptes rendus du conseil de perfectionnement", "Lettre de nomination du référent handicap"],
     applicability: APPRENTISSAGE,
     applicableToStartupWeek: false,
   },
@@ -321,7 +321,7 @@ export const QUALIOPI_REFERENTIEL: ReferentielIndicator[] = [
     title:
       "Lorsque les prestations dispensées au bénéficiaire comprennent des périodes de formation en situation de travail, le prestataire mobilise son réseau de partenaires socio-économiques pour co-construire l'ingénierie de formation et favoriser l'accueil en entreprise.",
     expectation: "Réseau de partenaires socio-économiques mobilisé pour les périodes en situation de travail.",
-    evidenceHints: ["Conventions avec entreprises d'accueil", "Ingénierie co-construite"],
+    evidenceHints: ["Conventions avec entreprises d'accueil", "Ingénierie co-construite", "Planning des périodes en entreprise"],
     applicability: "Uniquement les formations en situation de travail (alternance, AFEST)",
     applicableToStartupWeek: false,
   },
@@ -331,7 +331,7 @@ export const QUALIOPI_REFERENTIEL: ReferentielIndicator[] = [
     title:
       "Le prestataire développe des actions qui concourent à l'insertion professionnelle ou la poursuite d'étude par la voie de l'apprentissage ou par toute autre voie permettant de développer leurs connaissances et leurs compétences.",
     expectation: "Actions favorisant l'insertion professionnelle ou la poursuite d'études des apprentis.",
-    evidenceHints: ["Actions d'insertion", "Suivi des sorties"],
+    evidenceHints: ["Actions d'insertion", "Suivi des sorties", "Partenariats avec entreprises et écoles"],
     applicability: APPRENTISSAGE,
     applicableToStartupWeek: false,
   },

@@ -23,6 +23,8 @@ export interface DocModel {
   number: string;
   draft?: boolean;
   meta: { label: string; value: string }[];
+  /** « Facturé à », « Client » (avoir), « Destinataire » (devis). */
+  clientLabel: string;
   client: DocParty;
   subject: string[];
   lines: LineItem[];
@@ -108,7 +110,7 @@ export function DocumentSheet({ model, settings, className }: { model: DocModel;
           )}
         </div>
         <div className="min-w-0 rounded-md border border-border-strong p-3">
-          <p className="eyebrow mb-1.5 text-muted-foreground">{model.title === "Devis" ? "Destinataire" : "Facturé à"}</p>
+          <p className="eyebrow mb-1.5 text-muted-foreground">{model.clientLabel}</p>
           <p className="font-semibold">{model.client.name}</p>
           {model.client.lines.map((l, i) => (
             <p key={i} className="text-muted-foreground">

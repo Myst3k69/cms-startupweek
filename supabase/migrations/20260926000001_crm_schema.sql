@@ -357,7 +357,7 @@ create table if not exists crm.submissions (
   complaint_id    text,      -- FK ajoutée plus bas
   assignee_id     text references crm.team_members (id) on delete set null,
   sla_due_at      timestamptz,
-  answered_at     timestamptz,   -- NB : typé `ID` dans types.ts (coquille) — stocké en date
+  answered_at     timestamptz,
   idempotency_key text,          -- leadId du tunnel candidature, sinon empreinte du payload
   utm             jsonb,
   consent         jsonb not null default '{"gdpr": false, "marketing": false}'::jsonb,

@@ -75,7 +75,7 @@ export function computeAlerts(s: AlertInput, now: number): Alert[] {
     .forEach((e) => {
       const d = daysUntil(e.startAt, now);
       const st = sessionStats(e, s.applications);
-      if (d > 0 && d <= 21 && st.belowMinimum) {
+      if (d > 0 && d <= 21 && st.belowMinimum && !e.orgId) {
         out.push({
           id: `min-${e.id}`,
           tone: "warning",

@@ -144,6 +144,10 @@ export function CockpitHome({ data }: { data: DashboardData }) {
                       </span>
                     </span>
                     <span className="hidden sm:block">
+                      {e.orgId ? (
+                        <span className="text-[11px] text-muted-foreground">Session B2B · {e.capacity} participants</span>
+                      ) : (
+                        <>
                       <span className="mb-1 flex justify-between text-[11px] text-muted-foreground">
                         <span className="tabular">
                           {e.stats.enrolled}/{e.capacity} inscrits
@@ -151,6 +155,8 @@ export function CockpitHome({ data }: { data: DashboardData }) {
                         <span className="tabular">{e.stats.pipeline} en cours</span>
                       </span>
                       <Progress value={e.stats.fillRate} tone={e.stats.fillRate >= 80 ? "success" : e.stats.belowMinimum && e.daysLeft < 21 ? "warning" : "accent"} label={`Remplissage ${e.code}`} />
+                        </>
+                      )}
                     </span>
                     <span className="text-right">
                       <StatusBadge options={EVENT_STATUSES} value={e.status} className="hidden md:inline-flex" />

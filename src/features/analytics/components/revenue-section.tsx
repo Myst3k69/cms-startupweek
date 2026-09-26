@@ -93,8 +93,8 @@ export function RevenueSection({ period, range, now }: { period: Period; range: 
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <MiniStat label="CA facturé HT" value={moneyCompact(kpis.revenue)} />
             <MiniStat label="Panier moyen B2C" value={kpis.basket ? money(kpis.basket) : "—"} hint={kpis.basketAllTime ? "toutes périodes (aucune inscription récente)" : "inscriptions de la période, TTC"} />
-            <MiniStat label="Remplissage moyen" value={fc.upcoming.length ? percent(fc.fillRate) : "—"} hint={`${fc.upcoming.length} session${fc.upcoming.length > 1 ? "s" : ""} à venir`} />
-            <MiniStat label="Sous le minimum" value={number(fc.below.length)} hint={fc.below.length ? fc.below.slice(0, 2).map((b) => b.ev.code).join(", ") : "aucune session à risque"} />
+            <MiniStat label="Remplissage moyen" value={fc.soon.length ? percent(fc.fillRate) : "—"} hint={`${fc.soon.length} bootcamp${fc.soon.length > 1 ? "s" : ""} dans les ${fc.horizonDays} j`} />
+            <MiniStat label="Sous le minimum" value={number(fc.below.length)} hint={fc.below.length ? `${fc.below.slice(0, 3).map((b) => b.ev.code).join(", ")} (départ < ${fc.horizonDays} j)` : `aucun départ à risque sous ${fc.horizonDays} j`} />
           </div>
         </CardContent>
       </Card>

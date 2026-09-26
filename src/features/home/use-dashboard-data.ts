@@ -189,8 +189,9 @@ export function computeDashboard(s: Source, now: number, user?: User): Dashboard
     .sort((a, b) => ts(a.startAt) - ts(b.startAt))
     .map((e) => ({ ...e, stats: sessionStats(e, s.applications), daysLeft: Math.ceil((ts(e.startAt) - now) / DAY) }));
   const running = s.events.filter((e) => isRunning(e, now));
-  const next6 = upcoming.slice(0, 6);
-  const avgFill = next6.length ? Math.round(next6.reduce((a, e) => a + e.stats.fillRate, 0) / next6.length) : 0;
+    // Remplissage : sessions B2C uniquement (les sessions B2B écoles/entreprises n'ont pas de candidatures individuelles).
+  const b2c = upcoming.filter((e) => !e.orgId).slice(0, 6);
+  const avgFill = b2c.length ? Math.round(b2c.reduce((a, e) => a + e.stats.fillRate, 0) / b2c.length) : 0;
   const enrolledUpcoming = upcoming.reduce((a, e) => a + e.stats.enrolled, 0);
 
   // ── Qualité

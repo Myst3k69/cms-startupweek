@@ -84,7 +84,7 @@ export function FunnelSection({ range }: { range: Range }) {
     [apps, split, contacts],
   );
 
-  const steps = [{ label: "Visiteurs du site", value: visitors }, ...FUNNEL_STEPS.map((label, i) => ({ label, value: counts[i] }))];
+  const steps = FUNNEL_STEPS.map((label, i) => ({ label, value: counts[i] }));
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -96,8 +96,12 @@ export function FunnelSection({ range }: { range: Range }) {
           </div>
         </CardHeader>
         <CardContent>
-          {apps.length === 0 && visitors === 0 ? (
-            <NoData>Pas encore de données sur la période.</NoData>
+          <p className="mb-3 text-xs text-muted-foreground">
+            En amont : <span className="tabular font-medium text-foreground">{number(visitors)}</span> visiteurs du site · visiteur → candidature :{" "}
+            <span className="tabular font-medium text-foreground">{visitors ? percent((counts[0] / visitors) * 100, 2) : "—"}</span>
+          </p>
+          {apps.length === 0 ? (
+            <NoData>Aucune candidature sur la période.</NoData>
           ) : (
             <>
               <Funnel steps={steps} format={(v) => number(v)} />

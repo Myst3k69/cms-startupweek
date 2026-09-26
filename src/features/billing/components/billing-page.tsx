@@ -94,9 +94,12 @@ export function BillingPage() {
         className="mb-0"
       />
 
-      <BillingOverview invoices={invoices} payments={payments} offers={offers} lookups={lookups} now={now} />
+      <BillingOverview invoices={invoices} payments={payments} offers={offers} lookups={lookups} now={now} onOpenReminders={() => {
+          onTab("relances");
+          document.getElementById("billing-tabs")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }} />
 
-      <section aria-label="Détail de la facturation" className="space-y-4">
+      <section id="billing-tabs" aria-label="Détail de la facturation" className="scroll-mt-20 space-y-4">
         <Tabs<Tab>
           value={tab}
           onChange={onTab}

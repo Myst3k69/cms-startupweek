@@ -141,7 +141,7 @@ export interface Submission extends BaseEntity {
   complaintId?: ID;
   assigneeId?: ID;
   slaDueAt?: ISODate; // promesse « réponse sous 24-48h »
-  answeredAt?: ID;
+  answeredAt?: ISODate;
   idempotencyKey?: string; // leadId du tunnel
   utm?: Utm;
   consent: Consent;

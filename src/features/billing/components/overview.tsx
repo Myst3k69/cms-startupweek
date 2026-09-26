@@ -20,12 +20,14 @@ export function BillingOverview({
   offers,
   lookups,
   now,
+  onOpenReminders,
 }: {
   invoices: Invoice[];
   payments: Payment[];
   offers: Offer[];
   lookups: BillingLookups;
   now: number;
+  onOpenReminders?: () => void;
 }) {
   const [caView, setCaView] = React.useState<"session" | "offre">("session");
 
@@ -120,14 +122,19 @@ export function BillingOverview({
         <StatCard label={`CA facturé HT · ${kpis.monthLabel}`} value={money(kpis.caMonth)} hint={`Année ${kpis.year} : ${money(kpis.caYear)} HT`} icon={Receipt} />
         <StatCard label="Encaissé sur 30 jours" value={money(kpis.cash30)} delta={cashDelta} deltaLabel="vs 30 j préc." trend={cashTrend} icon={Banknote} />
         <StatCard label="À encaisser" value={money(kpis.receivable.total)} hint={`${kpis.openCount} facture${kpis.openCount > 1 ? "s" : ""} ouverte${kpis.openCount > 1 ? "s" : ""}`} icon={HandCoins} />
-        <StatCard
-          label="En retard"
-          value={money(kpis.overdueAmount)}
-          hint={kpis.overdueCount ? `${kpis.overdueCount} facture${kpis.overdueCount > 1 ? "s" : ""} échue${kpis.overdueCount > 1 ? "s" : ""} — voir les relances` : "Aucune facture échue"}
-          icon={AlarmClock}
-          href={kpis.overdueCount ? "/facturation?onglet=relances" : undefined}
-          className={kpis.overdueCount ? "border-danger/30" : undefined}
-        />
+        {kpis.overdueCount && onOpenReminders ? (
+          <button type="button" onClick={onOpenReminders} className="block h-full w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`${kpis.overdueCount} factures en retard : ouvrir les relances`}>
+            <StatCard
+              label="En retard"
+              value={money(kpis.overdueAmount)}
+              hint={`${kpis.overdueCount} facture${kpis.overdueCount > 1 ? "s" : ""} échue${kpis.overdueCount > 1 ? "s" : ""} — voir les relances`}
+              icon={AlarmClock}
+              className="border-danger/30 transition-colors hover:border-danger/60"
+            />
+          </button>
+        ) : (
+          <StatCard label="En retard" value={money(kpis.overdueAmount)} hint={kpis.overdueCount ? `${kpis.overdueCount} facture${kpis.overdueCount > 1 ? "s" : ""} échue${kpis.overdueCount > 1 ? "s" : ""}` : "Aucune facture échue"} icon={AlarmClock} />
+        )}
         <StatCard
           label="DSO estimé"
           value={kpis.dso === null ? "—" : `${kpis.dso} j`}

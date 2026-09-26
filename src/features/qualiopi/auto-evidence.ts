@@ -174,7 +174,7 @@ export function computeAutoEvidence(source: AutoEvidenceSource, data: QualiopiDa
         verdict,
         score: started.length ? pct(started.length - missing.length, started.length) : 0,
         summary: started.length
-          ? `${st.sheets} feuille(s) d'émargement par demi-journée, assiduité ${fmtPct(st.rate)}${missing.length ? ` — ${missing.length} session(s) sans émargement : ${missing.map((m) => m.code).join(", ")}` : ""}.`
+          ? `${st.sheets} feuille(s) d'émargement par demi-journée, assiduité ${fmtPct(st.rate)}${missing.length ? ` — ${missing.length} session(s) sans émargement : ${missing.slice(-5).map((m) => m.code).join(", ")}${missing.length > 5 ? "…" : ""}` : ""}.`
           : "Aucune session démarrée : les feuilles d'émargement seront générées dès la première session.",
         metrics: [
           { label: "Feuilles (demi-journées)", value: String(st.sheets) },

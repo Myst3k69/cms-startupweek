@@ -7,6 +7,7 @@ import { acknowledgeComplaint, createTask, ensureContactFromSubmission, findTemp
 import type { ComplaintType, DealType, ID, Persona, Submission } from "@/lib/domain/types";
 import { DEAL_STAGE_PROBABILITY } from "@/lib/domain/constants";
 import { FORM_META, normalizeLocal, type IntakeForm } from "./intake";
+import { matchesWorkflow } from "./n8n";
 
 export interface SimStep {
   label: string;
@@ -142,19 +143,28 @@ export function simulateIntake(form: IntakeForm, payload: unknown): SimResult {
 
   crm().update("submissions", sub.id, patch);
 
-  // Accusé de réception (les réclamations ont le leur ; newsletter / kit : email du kit).
-  if (form !== "reclamation" && form !== "newsletter") {
-    const tpl = form === "starter-kit" ? findTemplate("nurturing", "kit") : findTemplate("accuse_reception", meta.label.split(" ")[0].toLowerCase());
-    const first = draft.name.split(" ")[0];
+  // Accusé de réception / email de bienvenue (le template qui remplace le workflow n8n ; les réclamations ont le leur).
+  if (form !== "reclamation") {
+    const templates = crm().emailTemplates;
+    const tpl = templates.find((t) => t.replacesN8n && matchesWorkflow(t.replacesN8n, meta.n8n)) ?? findTemplate("accuse_reception", meta.label.split(" ")[0].toLowerCase());
+    const ev = norm.eventCode ? crm().events.find((e) => e.code.toUpperCase() === norm.eventCode) : undefined;
     const mail = sendEmail({
       to: draft.email,
       template: tpl,
-      subject: tpl ? undefined : form === "starter-kit" ? "Votre Digital Starter Kit" : "Nous avons bien reçu votre demande",
+      subject: tpl ? undefined : "Nous avons bien reçu votre demande",
       body: tpl ? undefined : "Bonjour {{prenom}},\n\nMerci pour votre message : l'équipe StartupWeek vous répond sous 48 h.\n\nL'équipe StartupWeek",
-      vars: { prenom: first, session: norm.eventCode ?? "", code_session: norm.eventCode ?? "" },
+      vars: {
+        prenom: draft.name.includes("@") ? "" : draft.name.split(" ")[0],
+        session: ev?.name ?? norm.eventCode ?? "",
+        code_session: ev?.code ?? norm.eventCode ?? "",
+        date_debut: ev ? new Date(ev.startAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "",
+        entreprise: draft.company ?? "",
+        offre: f.serviceName ?? f.offer ?? f.accompagnementType ?? "",
+        lien_kit: "https://www.startupweek.tech/digital-starter-kit",
+      },
       related: { entity: "submissions", id: sub.id },
     });
-    steps.push({ label: form === "starter-kit" ? "Email du kit envoyé" : "Accusé de réception envoyé", detail: `« ${mail.subject} » → ${draft.email}`, href: "/emails" });
+    steps.push({ label: form === "starter-kit" ? "Email du kit envoyé" : form === "newsletter" ? "Email de bienvenue envoyé" : "Accusé de réception envoyé", detail: `« ${mail.subject} » → ${draft.email}`, href: "/emails" });
   }
 
   if (draft.slaDueAt) {
@@ -170,7 +180,7 @@ export function simulateIntake(form: IntakeForm, payload: unknown): SimResult {
   }
 
   // Compteur de la règle d'automatisation correspondante.
-  const rule = crm().automations.find((r) => r.active && r.replacesN8n?.includes(meta.n8n)) ?? crm().automations.find((r) => r.active && r.trigger === "formulaire_recu");
+  const rule = crm().automations.find((r) => r.active && r.replacesN8n?.some((w) => matchesWorkflow(w, meta.n8n))) ?? crm().automations.find((r) => r.active && r.trigger === "formulaire_recu");
   if (rule) {
     crm().update("automations", rule.id, { runs: rule.runs + 1, lastRunAt: new Date().toISOString() });
     logSystem("automations", rule.id, `Règle « ${rule.name} » exécutée (${meta.label}, simulation)`);

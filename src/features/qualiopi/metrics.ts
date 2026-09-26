@@ -85,6 +85,8 @@ export interface HalfDaySlot {
 }
 
 const halfOf = (hhmm: string): HalfDay => (hhmm < "13:00" ? "matin" : "apres_midi");
+const byDateThenHalf = (a: { date: string; halfDay: HalfDay }, b: { date: string; halfDay: HalfDay }) =>
+  a.date.localeCompare(b.date) || (a.halfDay === b.halfDay ? 0 : a.halfDay === "matin" ? -1 : 1);
 
 /** Demi-journées prévues au programme d'une session. */
 export function plannedHalfDays(ev: EventSession): HalfDaySlot[] {
@@ -103,7 +105,7 @@ export function plannedHalfDays(ev: EventSession): HalfDaySlot[] {
     if (p.speakerId && !cur.speakerIds.includes(p.speakerId)) cur.speakerIds.push(p.speakerId);
     map.set(key, cur);
   }
-  return [...map.values()].sort((a, b) => a.key.localeCompare(b.key));
+  return [...map.values()].sort(byDateThenHalf);
 }
 
 /**
@@ -116,12 +118,14 @@ export function sessionHalfDays(ev: EventSession, attendances: Attendance[]): Ha
   if (!recorded.length) return planned;
   const keys = Array.from(new Set(recorded.map((a) => `${a.date.slice(0, 10)}|${a.halfDay}`))).sort();
   const dates = Array.from(new Set(keys.map((k) => k.split("|")[0]))).sort();
-  return keys.map((key) => {
-    const [date, halfDay] = key.split("|") as [string, HalfDay];
-    const day = dates.indexOf(date) + 1;
-    const plan = planned.find((p) => p.key === key) ?? planned.find((p) => p.day === day && p.halfDay === halfDay);
-    return { key, day, date, halfDay, start: plan?.start, end: plan?.end, speakerIds: plan?.speakerIds ?? [] };
-  });
+  return keys
+    .map((key) => {
+      const [date, halfDay] = key.split("|") as [string, HalfDay];
+      const day = dates.indexOf(date) + 1;
+      const plan = planned.find((p) => p.key === key) ?? planned.find((p) => p.day === day && p.halfDay === halfDay);
+      return { key, day, date, halfDay, start: plan?.start, end: plan?.end, speakerIds: plan?.speakerIds ?? [] };
+    })
+    .sort(byDateThenHalf);
 }
 
 export const isPresent = (a: Pick<Attendance, "status">) => a.status === "present" || a.status === "retard";

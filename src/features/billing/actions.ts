@@ -2,11 +2,12 @@
  * Actions métier du module Facturation (brouillons, émission, avoirs, devis, relances, rapprochement Qonto, catalogue).
  *
  * Elles s'appuient sur les actions transverses de `@/lib/domain/actions` (createInvoice, recordPayment,
- * sendInvoiceReminder, nextNumber, sendEmail, createTask) et journalisent chaque étape dans la timeline.
+ * nextNumber, sendEmail, createTask) et journalisent chaque étape dans la timeline.
+ * Les relances reprennent l'effet de sendInvoiceReminder avec un modèle par niveau (voir sendReminderEmail).
  * En production, la même logique vit côté serveur (numérotation : crm.next_document_number()).
  */
 import { crm, findById } from "@/lib/store";
-import { createInvoice, createTask, findTemplate, nextNumber, recordPayment, sendEmail, sendInvoiceReminder } from "@/lib/domain/actions";
+import { createInvoice, createTask, nextNumber, recordPayment, sendEmail } from "@/lib/domain/actions";
 import { contactName, invoiceBalance, invoiceTotal } from "@/lib/domain/selectors";
 import { date, money } from "@/lib/format";
 import { uid } from "@/lib/utils";
@@ -162,7 +163,8 @@ export function duplicateInvoice(id: ID): Invoice | undefined {
 
 /**
  * Avoir total (même séquence de numérotation) : lignes identiques, montants négatifs.
- * Facture d'origine non réglée → annulée ; déjà réglée (même partiellement) → tâche de remboursement.
+ * La facture d'origine passe « annulée » (plus rien à encaisser) ; si elle avait déjà été réglée,
+ * même partiellement, une tâche de remboursement est créée.
  */
 export function createCreditNote(id: ID, reason?: string): Invoice | undefined {
   const s = crm();
@@ -184,8 +186,9 @@ export function createCreditNote(id: ID, reason?: string): Invoice | undefined {
     funder: inv.funder,
     notes: reason ? `Motif : ${reason}` : undefined,
   });
+  s.update("invoices", inv.id, { status: "annulee" }, { log: `Facture annulée par l'avoir ${credit.number}`, kind: "statut" });
   if (inv.paidCents > 0) {
-    s.log({ kind: "document", entity: "invoices", entityId: inv.id, actorId: s.sessionUserId, summary: `Avoir ${credit.number} émis — remboursement de ${money(inv.paidCents)} à effectuer` });
+    s.log({ kind: "document", entity: "invoices", entityId: inv.id, actorId: s.sessionUserId, summary: `Remboursement de ${money(inv.paidCents)} à effectuer (avoir ${credit.number})` });
     createTask({
       title: `Rembourser ${money(inv.paidCents)} — avoir ${credit.number} (${inv.number})`,
       kind: "paiement",
@@ -194,28 +197,52 @@ export function createCreditNote(id: ID, reason?: string): Invoice | undefined {
       related: { entity: "invoices", id: credit.id },
       automated: true,
     });
-  } else {
-    s.update("invoices", inv.id, { status: "annulee" }, { log: `Facture annulée par l'avoir ${credit.number}`, kind: "statut" });
   }
   return credit;
 }
 
-/** Envoi de la facture par email (PDF + lien de paiement). */
+/** Modèle d'email « facturation » dont le nom ou l'objet correspond (sans repli sur un autre modèle). */
+function billingTemplate(match: RegExp, exclude?: RegExp) {
+  return crm().emailTemplates.find((t) => t.category === "facturation" && match.test(`${t.name} ${t.subject}`) && !(exclude && exclude.test(t.name)));
+}
+
+/**
+ * Variables d'email d'une facture. Les deux conventions coexistent : `numero`/`echeance`
+ * (actions transverses) et `numero_facture`/`date_echeance` (modèles d'emails du seed).
+ */
+function invoiceVars(inv: Invoice, amountCents: number) {
+  const { contact } = recipientOf(inv);
+  const ev = findById("events", inv.eventId);
+  const numero = inv.number;
+  const echeance = date(inv.dueAt, "d MMMM yyyy");
+  return {
+    prenom: contact?.firstName ?? "",
+    numero,
+    numero_facture: numero,
+    montant: money(amountCents, true),
+    echeance,
+    date_echeance: echeance,
+    lien_paiement: inv.stripePaymentLink ?? `virement IBAN ${crm().settings.iban} (référence ${numero})`,
+    session: ev?.name ?? "",
+  };
+}
+
+/** Envoi de la facture par email (PDF + lien de paiement). Modèle « Facture d'acompte » pour un acompte. */
 export function sendInvoiceEmail(id: ID) {
   const inv = findById("invoices", id);
   if (!inv || !inv.number) return false;
-  const { contact, to } = recipientOf(inv);
+  const { to } = recipientOf(inv);
   if (!to) return false;
-  const tpl = findTemplate("facturation", "facture");
-  const useTpl = tpl && !/relance|rappel/i.test(`${tpl.name} ${tpl.subject}`);
+  const tpl = inv.kind === "acompte" && inv.eventId ? billingTemplate(/acompte/i, /relance|rappel/i) : undefined;
+  const label = inv.kind === "avoir" ? "l'avoir" : inv.kind === "acompte" ? "la facture d'acompte" : inv.kind === "solde" ? "la facture de solde" : "la facture";
   sendEmail({
     to,
-    template: useTpl ? tpl : undefined,
-    subject: useTpl ? undefined : `${inv.kind === "avoir" ? "Avoir" : "Facture"} {{numero}} — StartupWeek`,
-    body: useTpl
+    template: tpl,
+    subject: tpl ? undefined : `${inv.kind === "avoir" ? "Avoir" : "Facture"} {{numero}} — StartupWeek`,
+    body: tpl
       ? undefined
-      : `Bonjour {{prenom}},\n\nVeuillez trouver ci-joint la ${inv.kind === "avoir" ? "note d'avoir" : "facture"} {{numero}} d'un montant de {{montant}}, payable avant le {{echeance}}.\n${inv.stripePaymentLink ? "Paiement sécurisé par carte : {{lien_paiement}}\n" : ""}Virement : IBAN ${crm().settings.iban}, en indiquant la référence {{numero}}.\n\nMerci pour votre confiance,\nL'équipe StartupWeek`,
-    vars: { prenom: contact?.firstName ?? "", numero: inv.number, montant: money(invoiceTotal(inv).ttc, true), echeance: date(inv.dueAt), lien_paiement: inv.stripePaymentLink ?? "" },
+      : `Bonjour {{prenom}},\n\nVeuillez trouver ci-joint ${label} {{numero}} d'un montant de {{montant}}${inv.kind === "avoir" ? "" : ", à régler avant le {{echeance}}"}.\n${inv.kind === "avoir" ? "" : "Règlement : {{lien_paiement}}\n"}\nMerci pour votre confiance,\nL'équipe StartupWeek`,
+    vars: invoiceVars(inv, Math.abs(invoiceTotal(inv).ttc)),
     related: { entity: "invoices", id: inv.id },
   });
   return true;
@@ -225,17 +252,40 @@ export function sendInvoiceEmail(id: ID) {
 export function sendDueSoonNotice(id: ID) {
   const inv = findById("invoices", id);
   if (!inv || !inv.number) return false;
-  const { contact, to } = recipientOf(inv);
+  const { to } = recipientOf(inv);
   if (!to) return false;
   sendEmail({
     to,
     subject: "Rappel : facture {{numero}} à régler avant le {{echeance}}",
-    body: "Bonjour {{prenom}},\n\nPetit rappel : la facture {{numero}} ({{montant}}) arrive à échéance le {{echeance}}.\nLien de paiement : {{lien_paiement}}\n\nL'équipe StartupWeek",
-    vars: { prenom: contact?.firstName ?? "", numero: inv.number, montant: money(invoiceBalance(inv), true), echeance: date(inv.dueAt), lien_paiement: inv.stripePaymentLink ?? "" },
+    body: "Bonjour {{prenom}},\n\nPetit rappel : la facture {{numero}} ({{montant}}) arrive à échéance le {{echeance}}.\nRèglement : {{lien_paiement}}\n\nL'équipe StartupWeek",
+    vars: invoiceVars(inv, invoiceBalance(inv)),
     related: { entity: "invoices", id: inv.id },
   });
   crm().update("invoices", inv.id, { lastReminderAt: iso(nowMs()) });
   return true;
+}
+
+/**
+ * Email de relance d'impayé, modèle choisi selon le niveau (J+3, J+10, mise en demeure).
+ * Même effet que sendInvoiceReminder (remindersSent + 1, lastReminderAt) mais avec le bon modèle
+ * par niveau et les variables attendues par les modèles du seed ({{numero_facture}}, {{date_echeance}}).
+ */
+function sendReminderEmail(inv: Invoice, level: number, to: string) {
+  const tpl = level === 1 ? billingTemplate(/j\+3\b/i) : level === 2 ? billingTemplate(/j\+10\b/i) : undefined;
+  const formal = level >= 3;
+  sendEmail({
+    to,
+    template: tpl,
+    subject: tpl ? undefined : formal ? "Mise en demeure — facture {{numero}} impayée" : "Rappel — facture {{numero}}",
+    body: tpl
+      ? undefined
+      : formal
+        ? `Bonjour,\n\nMalgré nos relances, la facture {{numero}} d'un montant de {{montant}}, échue le {{echeance}}, reste impayée.\nNous vous mettons en demeure de la régler sous 8 jours : {{lien_paiement}}.\nÀ défaut, des pénalités de retard seront appliquées conformément à nos CGV${inv.orgId ? ", ainsi que l'indemnité forfaitaire de 40 € pour frais de recouvrement" : ""}.\n\nL'équipe StartupWeek`
+        : "Bonjour {{prenom}},\n\nSauf erreur de notre part, la facture {{numero}} d'un montant de {{montant}} arrivée à échéance le {{echeance}} reste à régler.\nRèglement : {{lien_paiement}}\n\nL'équipe StartupWeek",
+    vars: invoiceVars(inv, invoiceBalance(inv)),
+    related: { entity: "invoices", id: inv.id },
+  });
+  crm().update("invoices", inv.id, { remindersSent: inv.remindersSent + 1, lastReminderAt: iso(nowMs()) });
 }
 
 /**
@@ -247,8 +297,8 @@ export function runReminderStep(id: ID): { ok: boolean; level: number; reason?: 
   if (!inv || !isCollectible(inv)) return { ok: false, level: inv?.remindersSent ?? 0, reason: "Facture soldée ou non émise" };
   const { contact, org, to } = recipientOf(inv);
   if (!to) return { ok: false, level: inv.remindersSent, reason: "Aucun email de facturation" };
-  sendInvoiceReminder(inv.id);
   const level = inv.remindersSent + 1;
+  sendReminderEmail(inv, level, to);
   const who = org?.name ?? contactName(contact);
   if (level === 2) {
     createTask({ title: `Appeler ${who} — facture ${inv.number} impayée (${money(invoiceBalance(inv))})`, kind: "appel", priority: "haute", dueInDays: 1, related: { entity: "invoices", id: inv.id }, automated: true });

@@ -79,7 +79,7 @@ export function DemandesPage({ initial }: { initial: DemandesFilters }) {
     const late = submissions.filter((s) => slaState(s, now) === "depasse").length;
     const soon = submissions.filter((s) => slaState(s, now) === "bientot").length;
     const recent = submissions.filter((s) => now - new Date(s.receivedAt).getTime() < 30 * DAY && s.status !== "spam");
-    const converted = recent.filter((s) => s.status === "convertie" || Boolean(s.dealId) || Boolean(s.applicationId)).length;
+    const converted = recent.filter((s) => s.status === "convertie" || Boolean(s.dealId)).length;
     const answered = recent.filter((s) => s.answeredAt);
     const avg = answered.length ? answered.reduce((a, s) => a + (new Date(s.answeredAt!).getTime() - new Date(s.receivedAt).getTime()), 0) / answered.length : NaN;
     const withinSla = answered.filter((s) => new Date(s.answeredAt!).getTime() - new Date(s.receivedAt).getTime() <= settings.slaHours * 3_600_000).length;

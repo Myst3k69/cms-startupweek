@@ -16,7 +16,8 @@ function clientParty(org: Organization | undefined, contact: Contact | undefined
     else if (org.city) lines.push([org.city, org.country].filter(Boolean).join(", "));
     if (org.siret) lines.push(`SIRET ${org.siret}`);
     if (org.vatNumber) lines.push(`TVA ${org.vatNumber}`);
-    if (contact) lines.push(`À l'attention de ${contact.firstName} ${contact.lastName}`);
+    // En subrogation, le contact est le stagiaire (cité en objet), pas l'interlocuteur du financeur.
+    if (contact && !funder?.subrogation) lines.push(`À l'attention de ${contact.firstName} ${contact.lastName}`);
     if (org.billingEmail) lines.push(org.billingEmail);
     if (funder?.subrogation) lines.push(`Subrogation de paiement${funder.agreementRef ? ` — accord n° ${funder.agreementRef}` : ""}`);
     return { name: org.name, lines };
@@ -31,18 +32,29 @@ function clientParty(org: Organization | undefined, contact: Contact | undefined
   return { name: "Client à renseigner", lines: [] };
 }
 
+/** « du 5 au 12 octobre 2026 » / « du 25 avril au 2 mai 2026 ». */
+function period(start: string, end: string) {
+  const s = new Date(start);
+  const e = new Date(end);
+  if (s.getFullYear() !== e.getFullYear()) return `du ${date(start, "d MMMM yyyy")} au ${date(end, "d MMMM yyyy")}`;
+  if (s.getMonth() !== e.getMonth()) return `du ${date(start, "d MMMM")} au ${date(end, "d MMMM yyyy")}`;
+  return `du ${date(start, "d")} au ${date(end, "d MMMM yyyy")}`;
+}
+
 function sessionSubject(ev: EventSession | undefined) {
   if (!ev) return [];
-  const out = [`${ev.name} (${ev.code})`, `Du ${dateRange(ev.startAt, ev.endAt)} — ${ev.mode === "distanciel" ? "en ligne" : ev.city}`];
+  const out = [`${ev.name} (${ev.code})`, `Session ${period(ev.startAt, ev.endAt)} — ${ev.mode === "distanciel" ? "en ligne" : ev.city}`];
   if (ev.isTraining && ev.durationHours) out.push(`Action de formation — durée ${ev.durationHours} h`);
   return out;
 }
 
-function legalMentions(settings: Settings, lines: { vatRate: number }[], opts: { quote?: boolean } = {}) {
+function legalMentions(settings: Settings, lines: { vatRate: number }[], opts: { quote?: boolean; creditNote?: boolean } = {}) {
   const id = legalIdentity(settings);
   const out: string[] = [];
   if (lines.some((l) => l.vatRate === 0)) out.push(VAT_EXEMPTION_TEXT);
-  if (!opts.quote) {
+  if (opts.creditNote) {
+    out.push("Avoir établi en application de l'article 272 du CGI ; il annule et remplace à due concurrence la facture d'origine.");
+  } else if (!opts.quote) {
     out.push(settings.latePenaltyText);
     if (!/escompte/i.test(settings.latePenaltyText)) out.push(NO_DISCOUNT_TEXT);
   } else {
@@ -99,6 +111,7 @@ export function useInvoiceModel(inv: Invoice): DocModel {
         ...(inv.kind !== "avoir" ? [{ label: "Date d'échéance", value: date(inv.dueAt, "d MMMM yyyy") }] : []),
         ...(ev ? [{ label: "Date de la prestation", value: dateRange(ev.startAt, ev.endAt) }] : []),
       ],
+      clientLabel: inv.kind === "avoir" ? "Client" : "Facturé à",
       client: clientParty(org, contact, inv.funder),
       subject,
       lines: inv.lines,
@@ -113,9 +126,12 @@ export function useInvoiceModel(inv: Invoice): DocModel {
               iban: settings.iban,
               reference: draft ? "communiquée à l'émission" : inv.number,
               link: inv.stripePaymentLink,
-              methods: [METHOD_TEXT[inv.preferredMethod]],
+              methods: [
+                METHOD_TEXT[inv.preferredMethod],
+                ...(inv.preferredMethod !== "virement" && inv.preferredMethod !== "opco" ? ["Virement bancaire également accepté (coordonnées ci-dessous)"] : []),
+              ],
             },
-      mentions: legalMentions(settings, inv.lines),
+      mentions: legalMentions(settings, inv.lines, { creditNote: inv.kind === "avoir" }),
       notes: inv.notes,
     } satisfies DocModel;
   }, [inv, invoices, settings, contact, org, ev]);
@@ -139,13 +155,14 @@ export function useQuoteModel(q: Quote): DocModel {
         { label: "Date", value: date(q.issuedAt, "d MMMM yyyy") },
         { label: "Valable jusqu'au", value: date(q.validUntil, "d MMMM yyyy") },
       ],
+      clientLabel: "Destinataire",
       client: clientParty(org, contact),
       subject,
       lines: q.lines,
       sign: 1,
       terms: [
         `Proposition valable jusqu'au ${date(q.validUntil, "d MMMM yyyy")}.`,
-        `Modalités : acompte de ${settings.depositPercent} % à la commande, solde à J-${settings.balanceDaysBefore} avant le démarrage.`,
+        `Règlement selon nos conditions générales de vente (acompte de ${settings.depositPercent} % à la commande), sauf conditions particulières précisées en notes.`,
         `Montant total : ${money(quoteTotal(q).ht, true)} HT soit ${money(quoteTotal(q).ttc, true)} TTC.`,
       ],
       payment: { iban: settings.iban, reference: q.number || displayNumber(q), methods: ["Virement bancaire (Qonto) ou carte bancaire (Stripe)", "Prise en charge OPCO possible (subrogation)"] },

@@ -146,3 +146,12 @@ export const CUTOVER_STEPS: { title: string; detail: string }[] = [
   { title: "Couper les webhooks n8n", detail: "Désactiver les 8 workflows de formulaire, puis le polling « Sync Airtable -> Supabase »." },
   { title: "Archiver Airtable", detail: "Export CSV de la base « CRM Startup Week » (preuve), puis passage en lecture seule." },
 ];
+
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+
+/** Rapproche un nom de workflow déclaré sur une règle (libellé parfois enrichi) d'un workflow de la carte. */
+export function matchesWorkflow(declared: string, workflow: string): boolean {
+  const a = norm(declared);
+  const b = norm(workflow);
+  return a === b || a.startsWith(`${b} `) || a.startsWith(`${b}(`);
+}

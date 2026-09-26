@@ -129,7 +129,7 @@ function OrgView({ org }: { org: Organization }) {
                 }}
               />
             ) : null}
-            {mainContact || org.billingEmail ? (
+            {canEdit("emails") && (mainContact || org.billingEmail) ? (
               <Button size="sm" variant="secondary" onClick={() => setComposing(true)}>
                 <Mail /> Email
               </Button>

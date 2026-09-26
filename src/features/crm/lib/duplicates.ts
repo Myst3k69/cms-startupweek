@@ -116,7 +116,7 @@ export function mergeContacts(keepId: ID, removeId: ID): { moved: number } | und
         source: keep.consent.source ?? drop.consent.source,
       },
     },
-    { log: `Fusion avec le doublon ${contactName(drop)} <${drop.email}> — ${moved} élément${moved > 1 ? "s" : ""} réaffecté${moved > 1 ? "s" : ""}`, kind: "modification" },
+    { log: `Fusion avec le doublon ${contactName(drop)} <${drop.email.trim()}> — ${moved} élément${moved > 1 ? "s" : ""} réaffecté${moved > 1 ? "s" : ""}`, kind: "modification" },
   );
   s.remove("contacts", drop.id);
   return { moved };

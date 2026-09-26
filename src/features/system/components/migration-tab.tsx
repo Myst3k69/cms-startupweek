@@ -6,7 +6,7 @@ import { Code2, Database, LayoutGrid, Workflow } from "lucide-react";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, Progress } from "@/components/ui";
 import { useCollection } from "@/lib/hooks";
 import { number } from "@/lib/format";
-import { CUTOVER_STEPS, MIGRATION_STATUS, N8N_WORKFLOWS, type MigrationStatus, type N8nWorkflow } from "../lib/n8n";
+import { CUTOVER_STEPS, MIGRATION_STATUS, N8N_WORKFLOWS, matchesWorkflow, type MigrationStatus, type N8nWorkflow } from "../lib/n8n";
 
 const KIND_ICON: Record<N8nWorkflow["replacedBy"][number]["kind"], React.ComponentType<{ className?: string }>> = {
   endpoint: Code2,
@@ -22,7 +22,7 @@ export function MigrationTab() {
     N8N_WORKFLOWS.forEach((w) => c[w.status]++);
     return c;
   }, []);
-  const rulesFor = React.useCallback((name: string) => rules.filter((r) => r.replacesN8n?.some((w) => w.toLowerCase() === name.toLowerCase())), [rules]);
+  const rulesFor = React.useCallback((name: string) => rules.filter((r) => r.replacesN8n?.some((w) => matchesWorkflow(w, name))), [rules]);
   const inScope = N8N_WORKFLOWS.length - counts.hors_perimetre;
   const covered = counts.remplace + counts.a_decommissionner;
 
