@@ -1,8 +1,9 @@
 # StartupWeek OS — CRM & back-office 100 % custom
 
-Le back-office de **StartupWeek** (bootcamp MVP 7 jours) : CRM, demandes entrantes, pipeline, relances, candidatures, sessions & émargement, projets des candidats, intervenants, **Qualiopi**, **facturation (acompte / solde, Stripe, Qonto)**, ressources, contenus du site, analytics et automatisations — pour remplacer Airtable + les workflows n8n.
+Le back-office de **StartupWeek** (bootcamp MVP 7 jours) : CRM, demandes entrantes, pipeline, relances, candidatures, sessions & émargement, projets des candidats, intervenants, **Qualiopi**, **facturation (acompte / solde, Stripe, Qonto)**, ressources, contenus du site, **StartupWeek Academy (e-learning)**, analytics et automatisations — pour remplacer Airtable + les workflows n8n.
 
 ➡️ Pourquoi et comment : **[docs/PROPOSITION.md](docs/PROPOSITION.md)** (analyse de l'existant, bénéfices, limites, plan de mise en production).
+➡️ E-learning : **[docs/ACADEMY.md](docs/ACADEMY.md)** (création des formations, accès des candidats, API pour « Mon espace » du site, vente Stripe, formation type de 50 h).
 
 ## Démarrer
 
@@ -56,7 +57,7 @@ src/
   app/print/…            documents imprimables A4 (facture, devis, convention, convocation, attestation, émargement, programme, livret d'accueil)
   app/api/…              intake des formulaires du site, webhook Stripe, synchro Qonto, health, recherche de lieux (IA)
   components/            ui (primitives), charts, layout (AppShell, ⌘K, alertes), shared
-  features/<domaine>/    home, crm, programmes, qualiopi, documents, billing, site, analytics, system
+  features/<domaine>/    home, crm, programmes, qualiopi, documents, billing, site, academy, analytics, system
   lib/domain/            types (contrat de données), constantes, sélecteurs, actions métier, alertes
   lib/store/             store zustand (CRUD générique + journal d'activité)
   lib/data/              seed de démo, référentiel Qualiopi, synchro Supabase
@@ -80,8 +81,10 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 | Connexion de l'équipe (mode `supabase`) | ✅ lien magique Supabase Auth (PKCE), chargement des données depuis la base, écritures ordonnées avec annulation si la base refuse — testé de bout en bout en local (PostgREST + faux service Auth + Chromium) ; migration `20260926122058` (rattachement automatique des membres, journal sans doublon) **appliquée en production le 26/09/2026** |
 | Bascule effective sur Supabase | ✅ le 26/09/2026 : schéma `crm` exposé, URL de redirection, variables Vercel, deux administrateurs ; première connexion réelle réussie — voir [docs/SUPABASE.md § 3-4](docs/SUPABASE.md). Emails déclenchés depuis l'interface pas encore réellement envoyés |
 | Import des données Airtable | ✅ 26/09/2026 : 13 sessions et 2 ressources (le reste n'était que des tests) ; synchro n8n des sessions coupée, le CRM publie le site — [docs/SUPABASE.md § 8](docs/SUPABASE.md). Formulaires du site encore vers Airtable (phase 2) |
+| Analytics du site (trafic + statistiques par article) | ✅ 26/09/2026 : mesure sans cookie écrite par le site dans `crm.traffic_days` / `crm.content_stats_days` (migration `20260926220247` appliquée en production) — [docs/SUPABASE.md § 5 quinquies](docs/SUPABASE.md). Les chiffres arrivent dès le déploiement du site (`/api/event`) ; posts LinkedIn / Instagram / newsletter : saisie manuelle |
 | Endpoints `/api/intake`, Stripe, Qonto | ✍️ écrits et testés en local (*dry-run* sans variables d'environnement) — à tester en préproduction avec les vraies API |
 | Envoi réel des emails (Resend) | ⏳ prévu côté serveur (intake) ; les emails déclenchés depuis l'interface sont journalisés en démo |
+| StartupWeek Academy (e-learning) | ✅ 26/09/2026 : back-office complet (formations, parcours, éditeur de leçons à 7 types de blocs et variantes par profil, aperçu apprenant en 3 directions artistiques, apprenants, livrables, cohortes, certificat FOAD), accès automatique des inscrits, API apprenant et vente Stripe testées de bout en bout en local (PostgreSQL + PostgREST) ; migration `20260926220123_crm_academy` **appliquée en production** ; formation type « Construire son MVP avec l'IA » (50 h). « Mon espace » du site reste à construire — [docs/ACADEMY.md](docs/ACADEMY.md) |
 | Documents légaux (convention, CGV, attestation) | ⚠️ modèles à faire valider juridiquement (voir le point L.6353-6 dans la proposition) |
-| Logistique des sessions (onglet « Logistique » : lieu & sourcing, devis & paiements fournisseurs, activités, intervenants, chambres & arrivées, infos pratiques, rétroplanning) + répertoire « Lieux » + livret d'accueil | ✅ en démo (vérifié dans le navigateur, clair / sombre / mobile 390 px) ; ⏳ migration `20260927100000` à appliquer en production — [docs/SUPABASE.md § 5 quater](docs/SUPABASE.md) |
+| Logistique des sessions (onglet « Logistique » : lieu & sourcing, devis & paiements fournisseurs, activités, intervenants, chambres & arrivées, infos pratiques, rétroplanning) + répertoire « Lieux » + livret d'accueil | ✅ en démo (vérifié dans le navigateur, clair / sombre / mobile 390 px) ; ⏳ migration `20260927100000` à appliquer en production — [docs/SUPABASE.md § 5 septies](docs/SUPABASE.md) |
 | Assistant IA de sourcing de lieux (`/api/lieux/recherche`, Claude + recherche web) | ✍️ écrit, **non testé avec une vraie clé** : nécessite `ANTHROPIC_API_KEY` ; exemples fictifs en démo |

@@ -13,6 +13,10 @@ import { crm, findById } from "@/lib/store";
 import type {
   Application,
   ApplicationStatus,
+  AssignmentStatus,
+  Enrollment,
+  EnrollmentSource,
+  Persona,
   Contact,
   EmailTemplate,
   EntityRef,
@@ -30,7 +34,9 @@ import type {
 import { contactName, invoiceBalance, invoiceTotal } from "./selectors";
 import { date, money } from "@/lib/format";
 import { labelOf, APPLICATION_STATUSES } from "./constants";
-import { normalizeEmail, renderTemplate, uid } from "@/lib/utils";
+import { normalizeEmail, uid } from "@/lib/utils";
+import { fillEmailTemplate } from "@/lib/email-template";
+import { remoteSync } from "@/lib/data/sync";
 
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -49,7 +55,19 @@ export function findTemplate(category: TemplateCategory, keyword?: string): Emai
   return list.find((t) => `${t.name} ${t.subject}`.toLowerCase().includes(k));
 }
 
-/** Envoie (démo : journalise) un email à partir d'un template + variables échappées. */
+/** Règlement à indiquer dans un email : lien de paiement Stripe, sinon virement (IBAN + référence). */
+export function paymentText(inv: { stripePaymentLink?: string; number?: string } | undefined): string {
+  if (inv?.stripePaymentLink) return inv.stripePaymentLink;
+  const iban = crm().settings.iban;
+  return iban ? `par virement sur le compte ${iban}${inv?.number ? ` (référence ${inv.number})` : ""}` : "";
+}
+
+/**
+ * Envoie un email à partir d'un modèle + variables (texte brut, échappé à l'envoi).
+ * Base connectée : l'email part dans la file d'envoi (statut « programme », heure =
+ * maintenant ou plus tard) ; le serveur l'envoie, puis note « envoyé » / « erreur »
+ * et journalise sur l'élément lié. Mode démo : marqué envoyé et journalisé aussitôt.
+ */
 export function sendEmail(opts: {
   to: string;
   templateId?: ID;
@@ -62,24 +80,26 @@ export function sendEmail(opts: {
 }) {
   const tpl = opts.template ?? (opts.templateId ? findById("emailTemplates", opts.templateId) : undefined);
   const vars = opts.vars ?? {};
-  const subject = renderTemplate(opts.subject ?? tpl?.subject ?? "(sans objet)", vars);
-  const body = renderTemplate(opts.body ?? tpl?.body ?? "", vars);
-  const scheduled = opts.scheduledAt && new Date(opts.scheduledAt).getTime() > nowMs();
+  const subject = fillEmailTemplate(opts.subject ?? tpl?.subject ?? "(sans objet)", vars).replace(/\s+/g, " ").trim();
+  const body = fillEmailTemplate(opts.body ?? tpl?.body ?? "", vars);
+  const scheduled = Boolean(opts.scheduledAt && new Date(opts.scheduledAt).getTime() > nowMs());
+  const live = remoteSync.active;
   const msg = crm().create(
     "emails",
     {
-      to: opts.to,
+      to: normalizeEmail(opts.to),
       subject,
       body,
       templateId: tpl?.id,
-      status: scheduled ? "programme" : "envoye",
-      scheduledAt: opts.scheduledAt,
-      sentAt: scheduled ? undefined : iso(nowMs()),
+      status: live || scheduled ? "programme" : "envoye",
+      scheduledAt: scheduled ? opts.scheduledAt : live ? iso(nowMs()) : undefined,
+      sentAt: live || scheduled ? undefined : iso(nowMs()),
       related: opts.related,
     },
     { log: false },
   );
-  if (opts.related) {
+  // Base connectée : le serveur journalise l'envoi réel (ou l'échec) sur l'élément lié.
+  if (opts.related && (!live || scheduled)) {
     crm().log({ kind: "email", entity: opts.related.entity, entityId: opts.related.id, actorId: crm().sessionUserId, summary: `${scheduled ? "Email programmé" : "Email envoyé"} : « ${subject} »` });
   }
   return msg;
@@ -218,7 +238,15 @@ export function sendInvoiceReminder(invoiceId: ID) {
     template: tpl,
     subject: tpl ? undefined : "Rappel — facture {{numero_facture}}",
     body: tpl ? undefined : `Bonjour,\n\nSauf erreur de notre part, la facture {{numero_facture}} d'un montant de {{montant}} arrivée à échéance le {{date_echeance}} reste à régler.\nLien de paiement : {{lien_paiement}}\n\nL'équipe StartupWeek`,
-    vars: { prenom: contact?.firstName ?? "", numero_facture: inv.number, montant: money(invoiceBalance(inv), true), date_echeance: date(inv.dueAt), lien_paiement: inv.stripePaymentLink ?? "" },
+    vars: {
+      prenom: contact?.firstName ?? "",
+      numero: inv.number,
+      numero_facture: inv.number,
+      montant: money(invoiceBalance(inv), true),
+      echeance: date(inv.dueAt, "d MMMM yyyy"),
+      date_echeance: date(inv.dueAt, "d MMMM yyyy"),
+      lien_paiement: paymentText(inv),
+    },
     related: { entity: "invoices", id: inv.id },
   });
   s.update("invoices", inv.id, { remindersSent: inv.remindersSent + 1, lastReminderAt: iso(nowMs()) });
@@ -271,13 +299,15 @@ export function changeApplicationStatus(applicationId: ID, status: ApplicationSt
     const inv = createApplicationInvoice(app.id, "acompte");
     if (contact) {
       const tpl = findTemplate("candidature", ev?.mode === "distanciel" ? "distanciel" : "présentiel") ?? findTemplate("candidature", "accept");
-      sendEmail({ to: contact.email, template: tpl, vars: { ...vars, lien_paiement: inv?.stripePaymentLink }, related });
+      sendEmail({ to: contact.email, template: tpl, vars: { ...vars, lien_paiement: paymentText(inv) }, related });
     }
     createTask({ title: `Vérifier le paiement de l'acompte — ${contactName(contact)}`, kind: "paiement", dueInDays: 5, related, automated: true });
   }
   if (status === "inscrite") {
     if (contact) s.update("contacts", contact.id, { lifecycle: "participant" });
     createApplicationInvoice(app.id, "solde");
+    // StartupWeek Academy : accès automatique aux formations liées à la session.
+    enrollFromApplication(app.id);
     if (ev) {
       const d = new Date(ev.startAt).getTime() - 7 * DAY;
       createTask({ title: `Envoyer la convocation — ${contactName(contact)} (${ev.code})`, kind: "qualiopi", dueAt: iso(Math.max(now + DAY, d)), related, automated: true });
@@ -293,6 +323,7 @@ export function changeApplicationStatus(applicationId: ID, status: ApplicationSt
   if (status === "desistee" && ev) {
     s.log({ kind: "systeme", entity: "events", entityId: ev.id, summary: `Place libérée (désistement de ${contactName(contact)})` });
   }
+  if (status === "desistee") suspendApplicationEnrollments(app.id);
   return true;
 }
 
@@ -536,4 +567,164 @@ export function generateLogisticsPlan(eventId: ID, playbook: { key: string; days
   }
   if (created) s.log({ kind: "systeme", entity: "events", entityId: ev.id, actorId: s.sessionUserId, summary: `Rétroplanning logistique : ${created} tâche${created > 1 ? "s" : ""} créée${created > 1 ? "s" : ""}` });
   return created;
+}
+
+/* ───────────────────────────── StartupWeek Academy ───────────────────────────── */
+
+/**
+ * Ouvre l'accès d'un contact à une formation. Idempotent : une inscription existante
+ * (même formation, même contact) est réactivée et son accès prolongé si besoin.
+ * En base : contrainte unique (course_id, contact_id).
+ */
+export function enrollInCourse(opts: {
+  courseId: ID;
+  contactId: ID;
+  source: EnrollmentSource;
+  persona?: Persona;
+  eventId?: ID;
+  applicationId?: ID;
+  cohortId?: ID;
+  pathId?: ID;
+  invoiceId?: ID;
+  /** Début du décompte d'accès (défaut : maintenant). */
+  accessFrom?: string;
+  /** Fin d'accès imposée (cohorte) ; sinon début + durée d'accès de la formation. */
+  expiresAt?: string;
+  silent?: boolean;
+}): { enrollment: Enrollment; created: boolean } | undefined {
+  const s = crm();
+  const course = findById("courses", opts.courseId);
+  const contact = findById("contacts", opts.contactId);
+  if (!course || !contact) return undefined;
+  const now = nowMs();
+  const from = Math.max(now, opts.accessFrom ? new Date(opts.accessFrom).getTime() : now);
+  const expiresAt = opts.expiresAt ?? iso(from + course.accessDays * DAY);
+  const existing = s.enrollments.find((e) => e.courseId === course.id && e.contactId === contact.id);
+  if (existing) {
+    const later = new Date(expiresAt).getTime() > new Date(existing.expiresAt).getTime();
+    const reopen = existing.status === "expiree" || existing.status === "suspendue";
+    if (!later && !reopen) return { enrollment: existing, created: false };
+    s.update(
+      "enrollments",
+      existing.id,
+      {
+        status: existing.completedAt ? "terminee" : "active",
+        expiresAt: later ? expiresAt : existing.expiresAt,
+        eventId: existing.eventId ?? opts.eventId,
+        applicationId: existing.applicationId ?? opts.applicationId,
+        cohortId: existing.cohortId ?? opts.cohortId,
+        invoiceId: existing.invoiceId ?? opts.invoiceId,
+      },
+      { log: `Accès prolongé jusqu'au ${date(later ? expiresAt : existing.expiresAt)}`, kind: "statut" },
+    );
+    return { enrollment: findById("enrollments", existing.id)!, created: false };
+  }
+  const app = opts.applicationId ? findById("applications", opts.applicationId) : undefined;
+  const enrollment = s.create(
+    "enrollments",
+    {
+      courseId: course.id,
+      contactId: contact.id,
+      source: opts.source,
+      status: "active",
+      persona: opts.persona ?? app?.persona ?? "non_tech",
+      eventId: opts.eventId,
+      applicationId: opts.applicationId,
+      cohortId: opts.cohortId,
+      pathId: opts.pathId,
+      invoiceId: opts.invoiceId,
+      grantedAt: iso(now),
+      expiresAt,
+      progressPercent: 0,
+      timeSpentMinutes: 0,
+    },
+    { log: `Accès ouvert à « ${course.title} »` },
+  );
+  s.log({ kind: "systeme", entity: "contacts", entityId: contact.id, actorId: s.sessionUserId, summary: `Accès StartupWeek Academy : « ${course.title} » jusqu'au ${date(expiresAt)}` });
+  if (!opts.silent) {
+    sendEmail({
+      to: contact.email,
+      subject: "Votre accès à StartupWeek Academy : {{formation}}",
+      body:
+        "Bonjour {{prenom}},\n\nVotre accès à la formation « {{formation}} » est ouvert jusqu'au {{date_fin}}.\nRetrouvez-la dans votre espace : {{lien_espace}}\n\nLes leçons se débloquent au fil de votre progression. Une question ? Répondez simplement à cet email.\n\nL'équipe StartupWeek",
+      vars: { prenom: contact.firstName, formation: course.title, date_fin: date(expiresAt, "d MMMM yyyy"), lien_espace: "https://www.startupweek.tech/mon-espace" },
+      related: { entity: "enrollments", id: enrollment.id },
+    });
+  }
+  return { enrollment, created: true };
+}
+
+/** Candidature « inscrite » : accès aux formations liées à sa session (6 mois après la fin de la session). */
+export function enrollFromApplication(applicationId: ID): number {
+  const s = crm();
+  const app = findById("applications", applicationId);
+  if (!app) return 0;
+  const ev = findById("events", app.eventId);
+  let created = 0;
+  for (const course of s.courses) {
+    if (course.status === "archivee" || !course.eventIds.includes(app.eventId)) continue;
+    const r = enrollInCourse({ courseId: course.id, contactId: app.contactId, source: "session", persona: app.persona, eventId: app.eventId, applicationId: app.id, accessFrom: ev?.endAt });
+    if (r?.created) created++;
+  }
+  return created;
+}
+
+/** Rattrapage : donne l'accès à tous les inscrits des sessions liées à une formation. */
+export function syncCourseEnrollments(courseId: ID): number {
+  const s = crm();
+  const course = findById("courses", courseId);
+  if (!course) return 0;
+  const apps = s.applications.filter((a) => a.status === "inscrite" && course.eventIds.includes(a.eventId));
+  let created = 0;
+  for (const app of apps) {
+    const ev = findById("events", app.eventId);
+    const r = enrollInCourse({ courseId, contactId: app.contactId, source: "session", persona: app.persona, eventId: app.eventId, applicationId: app.id, accessFrom: ev?.endAt });
+    if (r?.created) created++;
+  }
+  return created;
+}
+
+/** Désistement : les accès obtenus par cette candidature sont suspendus. */
+export function suspendApplicationEnrollments(applicationId: ID) {
+  const s = crm();
+  for (const e of s.enrollments.filter((x) => x.applicationId === applicationId && x.source === "session" && x.status === "active")) {
+    s.update("enrollments", e.id, { status: "suspendue" }, { log: "Accès suspendu (désistement)", kind: "statut" });
+  }
+}
+
+/** Cohorte école / entreprise : accès de chaque membre à chaque formation, jusqu'à la fin de la cohorte. */
+export function enrollCohort(cohortId: ID): number {
+  const s = crm();
+  const cohort = findById("cohorts", cohortId);
+  if (!cohort) return 0;
+  let created = 0;
+  for (const courseId of cohort.courseIds) {
+    for (const contactId of cohort.contactIds) {
+      const r = enrollInCourse({ courseId, contactId, source: "cohorte", cohortId: cohort.id, eventId: cohort.eventId, expiresAt: cohort.endsAt, accessFrom: cohort.startsAt });
+      if (r?.created) created++;
+    }
+  }
+  if (created) s.log({ kind: "systeme", entity: "cohorts", entityId: cohort.id, actorId: s.sessionUserId, summary: `${created} accès ouverts pour la cohorte « ${cohort.name} »` });
+  return created;
+}
+
+/** Correction d'un livrable par un formateur. */
+export function reviewAssignment(id: ID, review: { status: AssignmentStatus; feedback: string; grade?: number }) {
+  const s = crm();
+  const a = findById("assignments", id);
+  if (!a) return;
+  s.update(
+    "assignments",
+    id,
+    { status: review.status, feedback: review.feedback, grade: review.grade, reviewerId: s.sessionUserId, reviewedAt: iso(nowMs()) },
+    { log: review.status === "valide" ? "Livrable validé" : "Livrable à reprendre", kind: "statut" },
+  );
+}
+
+/** Certificat de réalisation (FOAD) émis pour une inscription. */
+export function issueCertificate(enrollmentId: ID) {
+  const s = crm();
+  const e = findById("enrollments", enrollmentId);
+  if (!e) return;
+  s.update("enrollments", e.id, { certificateIssuedAt: iso(nowMs()) }, { log: "Certificat de réalisation émis", kind: "document" });
 }

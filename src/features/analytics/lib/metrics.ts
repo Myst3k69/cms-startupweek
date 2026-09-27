@@ -13,6 +13,7 @@ import type {
   EventMode,
   EventSession,
   Evaluation,
+  ID,
   Invoice,
   Offer,
   Organization,
@@ -20,7 +21,7 @@ import type {
   Submission,
   TrafficDay,
 } from "@/lib/domain/types";
-import { ACTIVE_PIPELINE, invoiceTotal, isUpcoming, lastMonths, lastWeeks, sessionStats } from "@/lib/domain/selectors";
+import { ACTIVE_PIPELINE, invoiceTotal, isUpcoming, lastMonths, lastWeeks, sessionStats, type ContentPerformance } from "@/lib/domain/selectors";
 import { LEAD_SOURCES, PERSONAS, labelOf } from "@/lib/domain/constants";
 
 export const DAY = 86_400_000;
@@ -77,12 +78,12 @@ export function pctDelta(cur: number, prev: number): number | undefined {
 export type SourceKey = keyof TrafficDay["sources"];
 export const TRAFFIC_SOURCES: { key: SourceKey; label: string }[] = [
   { key: "direct", label: "Direct" },
-  { key: "google", label: "Google (SEO)" },
+  { key: "google", label: "Google & moteurs (SEO)" },
   { key: "linkedin", label: "LinkedIn" },
   { key: "instagram", label: "Instagram" },
   { key: "meta_ads", label: "Meta Ads" },
   { key: "newsletter", label: "Newsletter" },
-  { key: "partenaires", label: "Partenaires" },
+  { key: "partenaires", label: "Partenaires & autres sites" },
 ];
 
 export interface TrafficTotals {
@@ -502,9 +503,11 @@ export function submissionHeatmap(submissions: Submission[], now: number) {
 
 /* ───────────── Contenus ───────────── */
 
-export function topContents(contents: ContentItem[], metric: "views" | "leads" | "clicks", n = 6) {
+export function topContents(contents: ContentItem[], perf: Map<ID, ContentPerformance>, metric: "views" | "leads" | "clicks", n = 6) {
+  const value = (c: ContentItem) => perf.get(c.id)?.[metric] ?? 0;
   return contents
     .filter((c) => c.status === "publie")
-    .sort((a, b) => b.metrics[metric] - a.metrics[metric])
-    .slice(0, n);
+    .sort((a, b) => value(b) - value(a))
+    .slice(0, n)
+    .map((c) => ({ content: c, value: value(c), leads: perf.get(c.id)?.leads ?? 0 }));
 }

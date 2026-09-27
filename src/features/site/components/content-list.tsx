@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { DataTable, StatusBadge, type Column, type FilterDef } from "@/components/ui";
 import { UserChip } from "@/components/shared/entity-links";
+import { useContentPerformance } from "@/lib/hooks";
 import { CHANNELS, CONTENT_STATUSES, CONTENT_TYPES, labelOf } from "@/lib/domain/constants";
 import type { ContentItem, User } from "@/lib/domain/types";
 import { date, number } from "@/lib/format";
@@ -11,6 +12,7 @@ import { CHANNEL_COLOR, contentDate } from "../lib/content";
 
 export function ContentList({ items, users }: { items: ContentItem[]; users: Map<string, User> }) {
   const router = useRouter();
+  const perf = useContentPerformance();
 
   const columns = React.useMemo<Column<ContentItem>[]>(
     () => [
@@ -46,11 +48,11 @@ export function ContentList({ items, users }: { items: ContentItem[]; users: Map
         csv: (r) => contentDate(r) ?? "",
         render: (r) => <span className="tabular whitespace-nowrap text-muted-foreground">{date(contentDate(r))}</span>,
       },
-      { key: "views", header: "Vues", align: "right", sort: (r) => r.metrics.views, render: (r) => number(r.metrics.views) },
-      { key: "clicks", header: "Clics", align: "right", sort: (r) => r.metrics.clicks, render: (r) => number(r.metrics.clicks), hideBelow: "md" },
-      { key: "leads", header: "Leads", align: "right", sort: (r) => r.metrics.leads, render: (r) => <span className="font-medium">{number(r.metrics.leads)}</span> },
+      { key: "views", header: "Vues", align: "right", sort: (r) => perf.get(r.id)?.views ?? 0, render: (r) => number(perf.get(r.id)?.views ?? 0) },
+      { key: "clicks", header: "Clics", align: "right", sort: (r) => perf.get(r.id)?.clicks ?? 0, render: (r) => number(perf.get(r.id)?.clicks ?? 0), hideBelow: "md" },
+      { key: "leads", header: "Leads", align: "right", sort: (r) => perf.get(r.id)?.leads ?? 0, render: (r) => <span className="font-medium">{number(perf.get(r.id)?.leads ?? 0)}</span> },
     ],
-    [users],
+    [users, perf],
   );
 
   const filters = React.useMemo<FilterDef<ContentItem>[]>(

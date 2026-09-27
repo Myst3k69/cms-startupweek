@@ -46,6 +46,15 @@ export const ENTITY_LABEL: Record<EntityName, string> = {
   expenses: "Dépense fournisseur",
   outings: "Activité",
   stays: "Séjour",
+  courses: "Formation Academy",
+  courseModules: "Module Academy",
+  lessons: "Leçon Academy",
+  academyPaths: "Parcours Academy",
+  enrollments: "Inscription Academy",
+  lessonProgress: "Progression Academy",
+  assignments: "Livrable Academy",
+  learnerConnections: "Connexion Academy",
+  cohorts: "Cohorte Academy",
 };
 
 export const ACTIVITY_KIND_LABEL: Record<ActivityKind, string> = {
@@ -71,6 +80,21 @@ export function entityHref(entity: EntityName, id: string): string | undefined {
       return `/sessions/${id}`;
     case "contents":
       return `/contenus/${id}`;
+    case "courses":
+      return `/academy/formations/${id}`;
+    case "enrollments":
+      return `/academy/apprenants/${id}`;
+    case "assignments":
+      return "/academy?onglet=livrables";
+    case "cohorts":
+      return "/academy?onglet=cohortes";
+    case "academyPaths":
+      return "/academy?onglet=parcours";
+    case "courseModules":
+    case "lessons":
+    case "lessonProgress":
+    case "learnerConnections":
+      return "/academy";
     case "submissions":
       return "/demandes";
     case "deals":

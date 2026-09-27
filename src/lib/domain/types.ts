@@ -109,6 +109,8 @@ export interface Contact extends BaseEntity {
   score: number; // 0-100, calculé (engagement + fit)
   lastContactAt?: ISODate;
   notes?: string;
+  /** Jeton du lien de désinscription des emails marketing (attribué par la base). */
+  unsubscribeToken?: string;
 }
 
 /** Demande entrante = toute soumission de formulaire du site (remplace Form Submissions + tables métier). */
@@ -241,12 +243,21 @@ export interface EmailMessage extends BaseEntity {
   subject: string;
   body: string;
   templateId?: ID;
+  /** « programme » = en file : envoyé par le serveur à scheduledAt (maintenant ou plus tard). */
   status: EmailStatus;
   scheduledAt?: ISODate;
   sentAt?: ISODate;
   openedAt?: ISODate;
   related?: EntityRef;
   sequenceId?: ID;
+  /** Tentatives d'envoi (3 au plus). */
+  attempts?: number;
+  /** Réservé par un envoi en cours depuis cet instant. */
+  sendingAt?: ISODate;
+  /** Dernière erreur d'envoi, ou raison du non-envoi (variable non remplie, consentement…). */
+  error?: string;
+  /** Identifiant du message chez le fournisseur (Message-ID SMTP). */
+  providerId?: string;
 }
 
 /* ───────────────────────────── Sessions & événements ───────────────────────────── */
@@ -705,6 +716,8 @@ export interface Quote extends BaseEntity {
   sentAt?: ISODate;
   acceptedAt?: ISODate;
   invoiceId?: ID;
+  /** Jeton du lien public vers le devis (/documents/<jeton>), attribué par la base. */
+  publicToken?: string;
 }
 
 /** CGV StartupWeek : acompte de 30 % à l'inscription, solde à J-30. */
@@ -728,6 +741,8 @@ export interface Invoice extends BaseEntity {
   paidCents: Cents;
   preferredMethod: PaymentMethod;
   stripePaymentLink?: string;
+  /** Jeton du lien public vers la facture (/documents/<jeton>), attribué par la base. */
+  publicToken?: string;
   funder?: { name: string; subrogation: boolean; agreementRef?: string };
   remindersSent: number;
   lastReminderAt?: ISODate;
@@ -764,7 +779,7 @@ export interface BankTransaction extends BaseEntity {
 /* ───────────────────────────── Ressources & contenus ───────────────────────────── */
 
 export type ResourceCategory = "business_plan" | "pitch_deck" | "maquette" | "financier" | "administratif" | "digital" | "pedagogique" | "qualiopi" | "juridique" | "autre";
-export type ResourceFormat = "pdf" | "docx" | "xlsx" | "figma" | "notion" | "video" | "lien" | "zip";
+export type ResourceFormat = "pdf" | "docx" | "xlsx" | "figma" | "notion" | "video" | "lien" | "zip" | "texte";
 export type Visibility = "public" | "participants" | "premium" | "interne";
 
 export interface Resource extends BaseEntity {
@@ -802,6 +817,11 @@ export interface ContentItem extends BaseEntity {
   eventId?: ID;
   scheduledAt?: ISODate;
   publishedAt?: ISODate;
+  /**
+   * Chiffres saisis à la main (posts LinkedIn / Instagram, newsletter…). Les articles
+   * du blog sont mesurés sur le site (ContentStatDay) : affichage = saisie + mesure,
+   * via contentPerformance().
+   */
   metrics: { views: number; clicks: number; leads: number };
   /** Blog : rubrique affichée (« Méthodologie »…). FAQ : clé de catégorie (FAQ_CATEGORIES). */
   category?: string;
@@ -840,6 +860,248 @@ export interface ContentMeta {
   mobileImage?: string;
 }
 
+/* ───────────────────────────── StartupWeek Academy (e-learning) ───────────────────────────── */
+
+/**
+ * Structure : Parcours → Formations → Modules → Leçons → Blocs.
+ * Le CRM est l'outil auteur (création, publication, attribution, suivi) ; les apprenants
+ * suivent les formations dans « Mon espace » du site, qui lit et écrit via l'API
+ * /api/academy/learner/* (voir docs/ACADEMY.md).
+ */
+export type CourseStatus = "brouillon" | "relecture" | "publiee" | "archivee";
+export type CourseLevel = "debutant" | "intermediaire" | "avance";
+
+export interface Course extends BaseEntity {
+  title: string;
+  slug: string;
+  subtitle: string;
+  description: string; // Markdown (page catalogue)
+  status: CourseStatus;
+  level: CourseLevel;
+  personas: Persona[]; // profils visés (vide = tous)
+  audience: string; // public visé
+  objectives: string[]; // objectifs opérationnels et évaluables (Qualiopi ind. 5)
+  prerequisites: string;
+  durationHours: number; // durée annoncée (FOAD : durée estimée des activités)
+  priceCents: Cents; // TTC, vente seule sur le catalogue (0 = non vendue seule)
+  vatRate: number; // 0 (exonération formation) ou 20
+  inCatalog: boolean; // proposée à l'achat sur le site
+  accessDays: number; // durée d'accès après attribution (6 mois = 183 j)
+  sequential: boolean; // leçon N+1 débloquée quand la leçon N est terminée
+  eventIds: ID[]; // sessions dont les inscrits reçoivent l'accès automatiquement
+  coverUrl?: string;
+  tags: string[];
+  authorIds: ID[]; // membres de l'équipe
+  speakerIds: ID[]; // formateurs référents (assistance pédagogique)
+  // Qualiopi / FOAD (art. D.6313-3-1 du Code du travail)
+  isTraining: boolean;
+  evaluationMethods: string;
+  assistance: string; // assistance technique et pédagogique : qui, comment, délai de réponse
+  accessibility: string;
+  passingScore: number; // % minimal aux quiz évalués
+  certificateMinProgress: number; // % de leçons terminées pour le certificat de réalisation
+  stripePriceId?: string; // prix Stripe (sinon prix calculé depuis priceCents)
+  publishedAt?: ISODate;
+}
+
+export interface CourseModule extends BaseEntity {
+  courseId: ID;
+  position: number; // 0, 1, 2…
+  title: string;
+  summary: string;
+  objectives: string[];
+}
+
+interface LessonBlockBase {
+  id: ID;
+  /** Hyper-personnalisation : bloc réservé à ces profils (vide / absent = tous). */
+  personas?: Persona[];
+}
+
+export interface TextBlock extends LessonBlockBase {
+  type: "texte";
+  markdown: string;
+}
+
+export interface VideoBlock extends LessonBlockBase {
+  type: "video";
+  title: string;
+  url: string; // YouTube (non répertoriée) — vide tant que la vidéo n'est pas tournée
+  durationMinutes: number;
+  script?: string; // plan / script de tournage (interne)
+  transcript?: string; // transcription (accessibilité)
+}
+
+export interface QuizOption {
+  id: ID;
+  label: string;
+  correct: boolean;
+}
+
+export interface QuizQuestion {
+  id: ID;
+  prompt: string;
+  kind: "unique" | "multiple";
+  options: QuizOption[];
+  explanation?: string;
+}
+
+export interface QuizBlock extends LessonBlockBase {
+  type: "quiz";
+  title: string;
+  graded: boolean; // compte dans l'évaluation des acquis
+  questions: QuizQuestion[];
+}
+
+export type DeliverableKind = "texte" | "lien" | "fichier" | "aucun";
+
+export interface ExerciseBlock extends LessonBlockBase {
+  type: "exercice";
+  title: string;
+  instructions: string; // Markdown
+  deliverable: DeliverableKind;
+  estimatedMinutes: number;
+  review: "formateur" | "auto"; // corrigé par un formateur, ou validé à la remise
+  rubric: string[]; // critères de réussite
+}
+
+export interface ResourceBlock extends LessonBlockBase {
+  type: "ressource";
+  resourceId: ID;
+  note?: string;
+}
+
+export interface PromptBlock extends LessonBlockBase {
+  type: "prompt";
+  title: string;
+  tool: string; // Claude, ChatGPT, Cursor…
+  prompt: string;
+  tips?: string;
+}
+
+export interface ChecklistItem {
+  id: ID;
+  label: string;
+}
+
+export interface ChecklistBlock extends LessonBlockBase {
+  type: "checklist";
+  title: string;
+  items: ChecklistItem[];
+}
+
+export type LessonBlock = TextBlock | VideoBlock | QuizBlock | ExerciseBlock | ResourceBlock | PromptBlock | ChecklistBlock;
+export type LessonBlockType = LessonBlock["type"];
+
+export interface Lesson extends BaseEntity {
+  courseId: ID;
+  moduleId: ID;
+  position: number; // ordre dans le module
+  title: string;
+  summary: string;
+  estimatedMinutes: number; // durée estimée (lecture + activités)
+  isPreview: boolean; // consultable depuis le catalogue sans inscription
+  blocks: LessonBlock[];
+}
+
+export interface AcademyPath extends BaseEntity {
+  title: string;
+  slug: string;
+  description: string;
+  status: CourseStatus;
+  personas: Persona[];
+  courseIds: ID[]; // ordre du parcours
+  priceCents: Cents; // TTC (0 = non vendu seul)
+  inCatalog: boolean;
+}
+
+export type EnrollmentSource = "session" | "achat" | "cohorte" | "manuel";
+export type EnrollmentStatus = "active" | "terminee" | "expiree" | "suspendue";
+
+export interface Enrollment extends BaseEntity {
+  courseId: ID;
+  contactId: ID;
+  source: EnrollmentSource;
+  status: EnrollmentStatus;
+  persona: Persona; // variante de contenu servie à l'apprenant
+  eventId?: ID;
+  applicationId?: ID;
+  cohortId?: ID;
+  pathId?: ID;
+  invoiceId?: ID;
+  grantedAt: ISODate;
+  expiresAt: ISODate;
+  startedAt?: ISODate;
+  lastActivityAt?: ISODate;
+  completedAt?: ISODate;
+  // Dénormalisés (recalculés à chaque activité de l'apprenant)
+  progressPercent: number; // % de leçons terminées
+  timeSpentMinutes: number;
+  quizAverage?: number; // % moyen aux quiz évalués
+  certificateIssuedAt?: ISODate;
+}
+
+export type LessonProgressStatus = "en_cours" | "terminee";
+
+export interface LessonProgress extends BaseEntity {
+  enrollmentId: ID;
+  lessonId: ID;
+  courseId: ID;
+  contactId: ID;
+  status: LessonProgressStatus;
+  startedAt: ISODate;
+  completedAt?: ISODate;
+  timeSpentSeconds: number;
+  quizScores: Record<string, number>; // id du bloc quiz → meilleur score (%)
+  quizAttempts: number;
+  checklist: Record<string, string[]>; // id du bloc checklist → items cochés
+}
+
+export type AssignmentStatus = "soumis" | "a_reprendre" | "valide";
+
+/** Livrable remis par un apprenant (bloc « exercice »). */
+export interface Assignment extends BaseEntity {
+  enrollmentId: ID;
+  lessonId: ID;
+  blockId: ID;
+  courseId: ID;
+  contactId: ID;
+  submittedAt: ISODate;
+  content: string;
+  url?: string;
+  status: AssignmentStatus;
+  feedback?: string;
+  grade?: number; // /20
+  reviewerId?: ID;
+  reviewedAt?: ISODate;
+}
+
+/** Connexion d'un apprenant (preuve de réalisation FOAD : relevé de connexions). */
+export interface LearnerConnection extends BaseEntity {
+  enrollmentId: ID;
+  contactId: ID;
+  courseId: ID;
+  startedAt: ISODate;
+  endedAt: ISODate;
+  durationSeconds: number;
+  lessonIds: ID[];
+  device?: string;
+}
+
+/** Cohorte : groupe d'apprenants d'une école / entreprise (accès collectif). */
+export interface Cohort extends BaseEntity {
+  name: string;
+  orgId?: ID;
+  eventId?: ID;
+  courseIds: ID[];
+  contactIds: ID[];
+  seats: number;
+  startsAt: ISODate;
+  endsAt: ISODate; // fin d'accès
+  invoiceId?: ID;
+  notes?: string;
+}
+
 /* ───────────────────────────── Analytics & automatisations ───────────────────────────── */
 
 export interface TrafficDay {
@@ -850,6 +1112,26 @@ export interface TrafficDay {
   sources: Record<"direct" | "google" | "linkedin" | "instagram" | "meta_ads" | "newsletter" | "partenaires", number>;
   formStarts: number;
   formSubmits: number;
+}
+
+/**
+ * Audience d'un contenu publié sur le site, par jour (crm.content_stats_days) —
+ * écrite par le site (mesure sans cookie), jamais depuis l'interface.
+ * Aujourd'hui : articles du blog (page /blog/<slug>).
+ */
+export interface ContentStatDay {
+  id: ID;
+  contentId: ID;
+  date: ISODate; // YYYY-MM-DD (Europe/Paris)
+  views: number;
+  /** Lecteurs uniques du jour. */
+  visitors: number;
+  /** Clics sur un lien de l'article (appel à l'action, lien interne ou externe). */
+  clicks: number;
+  /** Formulaires envoyés après lecture de l'article (dernier article lu, même jour ou veille). */
+  leads: number;
+  /** Lecteurs par source de visite. */
+  sources: Partial<TrafficDay["sources"]>;
 }
 
 export type AutomationTrigger =
@@ -927,6 +1209,10 @@ export interface Settings {
   stripeConnected: boolean;
   qontoConnected: boolean;
   emailProvider: "resend" | "smtp" | "brevo";
+  /** Accusés de réception et Digital Starter Kit des formulaires du site envoyés par le CRM (désactivé tant que n8n les envoie). */
+  siteFormEmails: boolean;
+  /** Lien du questionnaire de satisfaction à chaud (Tally, Google Forms…), envoyé en fin de session. */
+  satisfactionFormUrl: string;
   depositPercent: number; // acompte à l'inscription (CGV : 30 %)
   balanceDaysBefore: number; // solde exigible à J-x (CGV : 30)
   dataMode: "demo" | "supabase";
@@ -968,6 +1254,15 @@ export interface EntityMap {
   expenses: SessionExpense;
   outings: SessionActivity;
   stays: SessionStay;
+  courses: Course;
+  courseModules: CourseModule;
+  lessons: Lesson;
+  academyPaths: AcademyPath;
+  enrollments: Enrollment;
+  lessonProgress: LessonProgress;
+  assignments: Assignment;
+  learnerConnections: LearnerConnection;
+  cohorts: Cohort;
 }
 
 export type EntityName = keyof EntityMap;

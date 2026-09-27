@@ -155,14 +155,14 @@ NEXT_PUBLIC_CRM_DATA_MODE=supabase
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…
 SUPABASE_SECRET_KEY=sb_secret_…          # serveur uniquement (routes /api/*)
-ANTHROPIC_API_KEY=sk-ant-…               # serveur uniquement : assistant IA de sourcing de lieux (§ 5 quater)
+ANTHROPIC_API_KEY=sk-ant-…               # serveur uniquement : assistant IA de sourcing de lieux (§ 5 septies)
 ```
 
 ✅ Renseignées en Production le 26/09/2026 (`SUPABASE_SECRET_KEY` pas encore : routes `/api/*` inactives). Les variables `NEXT_PUBLIC_*` sont intégrées **au build** : redéployer après les avoir modifiées. Saisir la **valeur** (`https://…supabase.co`), pas le nom de la variable : une adresse invalide affiche désormais un message explicite sur `/connexion` et `supabasePublic: false` dans `/api/health` (auparavant : page « This page couldn't load »).
 
 ### 3.4 Limites connues du mode `supabase` (à lire avant usage réel)
 
-- **Emails déclenchés depuis l'interface** (acceptation, refus, relances, convocations…) : enregistrés dans `crm.email_messages` et le journal, **mais pas envoyés** — aucun envoi réel n'est branché côté interface (seuls les accusés de réception de `/api/intake` passent par Resend). À brancher avant de s'y fier. Par ailleurs `crm.email_templates` est **vide** en base (les modèles n'existent que dans le jeu de démo) : à créer dans *Emails → Modèles* ou à importer.
+- **Emails** : envoi réel par la file `crm.email_messages` (§ 5 quater) — actif dès que SMTP et le secret de la route d'envoi sont configurés ; d'ici là, les emails restent « Programmé » et l'interface le signale.
 - **Numéros de facture** : l'interface calcule le prochain numéro à partir des factures chargées et la base l'accepte en réalignant son compteur. Deux personnes émettant une facture au même instant obtiendraient le même numéro : la seconde est refusée par la base (doublon, index unique) et annulée à l'écran — à réémettre. Une facture émise ne peut plus changer de numéro ni être supprimée (émettre un avoir).
 - `invoices.paid_cents` / `status` et `applications.amount_paid_cents` sont recalculés par trigger à chaque paiement.
 - **Numéro de candidature** : attribué par la base (séquence), réalignée automatiquement quand un numéro est saisi à la main ou importé (migration `20260926173332_crm_applications_number_sync.sql`, **appliquée en production le 26/09/2026** et vérifiée : numéro manuel 50 → suivant 51 dans un bloc annulé, séquence remise ensuite sur le dernier numéro réel). Sans elle, la 1re étape d'une candidature du site a échoué le 26/09/2026 (numéro 1 déjà pris par une candidature créée par la simulation). La simulation de formulaires (*Automatisations → Testeur*) est désactivée en mode `supabase` : elle écrivait de fausses demandes dans la base réelle.
@@ -196,9 +196,10 @@ Le projet Supabase héberge aussi les comptes des participants du site : le rôl
 ```
 INTAKE_SIGNING_SECRET=<openssl rand -hex 32>
 ALLOWED_ORIGINS=https://www.startupweek.tech
-RESEND_API_KEY=re_…            # accusés de réception (sinon : pas d'email, la tâche SLA est créée quand même)
-EMAIL_FROM=StartupWeek <contact@startupweek.tech>
+# Emails : voir § 5 quater (SMTP_*, EMAIL_FROM, EMAIL_DISPATCH_SECRET…)
 ```
+
+Accusés de réception et Digital Starter Kit : envoyés par le CRM **seulement** si *Paramètres → Intégrations → Emails des formulaires du site* est activé (réponse `ack: "n8n"` sinon) — à activer en même temps que la désactivation des workflows n8n des formulaires, pour ne pas envoyer deux fois.
 
 Contrat de `POST /api/intake/<form>` (`form` ∈ `candidature`, `contact`, `entreprise`, `partenaire`, `reclamation`, `accompagnement`, `newsletter`, `starter-kit`) :
 
@@ -334,7 +335,96 @@ select at, summary, meta from crm.activities where entity_id = 'crm-scheduler' o
 
 Si les exécutions s'arrêtent (processus « pg_cron scheduler » absent de `pg_stat_activity`), Supabase recommande un redémarrage rapide du projet (*Settings → General*).
 
-## 5 quater. Logistique des sessions et répertoire des lieux
+## 5 quater. Envoi des emails
+
+Migration `20260926215925_crm_email_delivery.sql`, **appliquée en production le 26/09/2026** : définitions des 6 fonctions, contenu des 25 modèles, séquence, colonnes et triggers identiques (empreintes) à la base de test locale ; aucun nouvel avertissement des *advisors*. URL et secret de la route rangés dans Vault (`crm_email_dispatch_url`, `crm_email_dispatch_secret`) le même jour.
+
+**Principe.** Tout email du CRM passe par la file `crm.email_messages` :
+
+1. l'interface (réponse, facture, devis, relance, candidature, convocation, questionnaire…) ou le serveur (formulaires du site, séquence Digital Starter Kit) insère un message **« programme »** (heure d'envoi = maintenant ou plus tard) ;
+2. la base appelle `POST /api/emails/dispatch` du back-office via `pg_net` : trigger sur `crm.email_messages` pour un envoi immédiat, et le planificateur (§ 5 ter, chaque minute) pour les envois programmés, les nouveaux essais et le rattrapage ;
+3. la route réserve les messages dus (`crm.claim_due_emails`, verrou + tentative comptée), complète les liens personnels, contrôle le message, envoie en **SMTP** (boîte `contact@startupweek.tech`, comme n8n) et note le résultat.
+
+| Résultat | Statut | Détail |
+| --- | --- | --- |
+| Envoyé | `envoye` | horodatage, Message-ID (`provider_id`), trace « Email envoyé » sur l'élément lié et sur le contact |
+| Refus / panne SMTP | `programme` puis `erreur` | nouvel essai à +5 puis +10 min ; `erreur` au 3e échec, raison dans `error` (visible dans le journal) |
+| Variable non remplie (`{{…}}`) | `erreur` | jamais envoyé avec une variable brute ; la fenêtre de rédaction bloque déjà |
+| Email marketing (catégorie « nurturing ») sans consentement | `brouillon` | raison dans `error` ; contrôle au moment de l'envoi |
+
+**Liens personnels complétés à l'envoi.** `{{lien_document}}` → `/documents/<jeton>` : la facture ou le devis lié, consultable et imprimable en PDF sans compte (jeton non devinable `public_token`, brouillons jamais servis, seules les données imprimées sont transmises). Emails marketing : lien de désinscription en pied (`/desinscription/<jeton>`) et en-têtes `List-Unsubscribe` / `List-Unsubscribe-Post` (désinscription en un clic des messageries, `POST /api/unsubscribe/<jeton>`) → consentement marketing du contact à faux, horodaté.
+
+**Modèles.** 25 modèles de production insérés par la migration (source : `src/lib/data/email-templates.ts`, formulations reprises des emails n8n, vouvoiement sauf Digital Starter Kit) : accusés des 6 formulaires, Digital Starter Kit + suite J+3, entretien, acceptation présentiel / distanciel, refus, convocation, accusé de réclamation, questionnaire à chaud, facture, facture d'acompte, avoir, rappel avant échéance, relances J+3 / J+10, mise en demeure, devis, relances manuelles. Modifiables dans *Emails → Modèles* (un modèle modifié n'est jamais écrasé par une migration). Séquence `seq_dsk` (kit à J0, suite à J+3).
+
+**Configuration (une fois).**
+
+1. Vercel, projet `cms-startupweek` → *Settings → Environment Variables* (Production), puis redéployer :
+   ```
+   SMTP_HOST=<hôte SMTP de la boîte contact@ — identifiant n8n « smtp-startupweek »>
+   SMTP_PORT=465                  # 587 si le serveur utilise STARTTLS (SMTP_SECURE=false)
+   SMTP_USER=contact@startupweek.tech
+   SMTP_PASSWORD=<mot de passe de la boîte>
+   EMAIL_FROM=StartupWeek <contact@startupweek.tech>
+   EMAIL_DISPATCH_SECRET=<valeur du secret Vault crm_email_dispatch_secret, point 2>
+   EMAIL_BCC=aurelien.chiren@gmail.com   # facultatif : copie de chaque email (n8n mettait cette adresse en copie) — jamais au destinataire lui-même
+   PUBLIC_APP_URL=https://…              # facultatif : domaine des liens envoyés (défaut : URL de production Vercel)
+   ```
+2. Secret partagé : créé dans Vault le 26/09/2026 (valeur aléatoire tirée par la base, jamais écrite ailleurs). Pour le lire et le copier dans `EMAIL_DISPATCH_SECRET` : Supabase → SQL Editor :
+   ```sql
+   select decrypted_secret from vault.decrypted_secrets where name = 'crm_email_dispatch_secret';
+   ```
+   (Nouvel environnement : `select vault.create_secret('<URL>/api/emails/dispatch', 'crm_email_dispatch_url');` et `select vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'crm_email_dispatch_secret');`.)
+3. *Paramètres → Intégrations* : « Emails transactionnels » doit afficher les voyants email et route d'envoi au vert ; *Emails → Modèles → Envoyer un test*.
+4. *Paramètres → Organisation* : SIRET, adresse, téléphone, n° de déclaration d'activité et **IBAN** (mentions des factures, règlement par virement dans les emails). *Paramètres → Qualiopi* : lien du questionnaire de satisfaction (sinon l'envoi du questionnaire à chaud est bloqué).
+
+**Surveiller.**
+
+```sql
+select status, count(*) from crm.email_messages group by status;
+select "to", subject, attempts, error, scheduled_at from crm.email_messages where status in ('erreur', 'programme') order by scheduled_at desc limit 20;
+select id, status_code, left(content::text, 200), created from net._http_response order by created desc limit 10;  -- réponses de la route d'envoi
+```
+
+**Limites.** Pas de suivi d'ouverture ni de clic (SMTP) ; un rebond différé (boîte pleine, adresse morte signalée plus tard) arrive dans la boîte `contact@`, pas dans le CRM. Les séquences autres que Digital Starter Kit (J-7, J+1, relances automatiques de devis / factures…) ne sont pas exécutées automatiquement : leurs emails s'envoient depuis les fiches (boutons) ou la fenêtre de rédaction. Les réponses au questionnaire de satisfaction restent dans l'outil de formulaire choisi.
+
+## 5 quinquies. Mesure d'audience du site (sans cookie)
+
+Migration `20260926220247_crm_site_analytics.sql`, **appliquée en production le 26/09/2026** : droits vérifiés (`service_role` seul peut appeler la fonction ; `anon` et `authenticated` refusés ; tables d'empreintes illisibles hors service_role) ; scénario rejoué sur la vraie base dans un bloc annulé (page vue d'un article venant de Google, seconde vue, clic, formulaire commencé puis envoyé → 1 visiteur, 2 pages vues, 1 lecteur, 1 clic, 1 lead ; `crm.contents` et `public.blog_post` intacts ; rien de conservé) ; *advisors* : seulement `rls_enabled_no_policy` (INFO) sur `crm.site_salts` / `crm.site_visitors`, voulu. Validée auparavant en local : PostgreSQL 16 + PostgREST 12.2.3, site construit et piloté dans Chromium (visiteurs, sources, lecteurs uniques, clics, leads du jour et de la veille, opt-out, robots, requêtes d'un autre site, étapes du tunnel de candidature).
+
+**Avant** : `crm.traffic_days` vide et `crm.contents.metrics` à 0 pour les 75 contenus publiés — rien ne les alimentait ; la carte « Tracking » affirmait que Vercel Web Analytics était la source des chiffres (aucun import n'existait).
+
+| Événement | Émis par | Alimente |
+| --- | --- | --- |
+| Page vue | navigateur → `POST /api/event` du site (`components/SiteAnalytics.tsx`) | `crm.traffic_days` (visiteurs, pages vues, sources) ; pour `/blog/<slug>` : `crm.content_stats_days` (vues, lecteurs, sources) |
+| Clic sur un lien d'un article | navigateur → `/api/event` | `content_stats_days.clicks` |
+| Formulaire commencé (1er champ, une fois par page) | navigateur → `/api/event` | `traffic_days.form_starts` |
+| Formulaire envoyé | **serveur du site** (`mirrorToCrm`, toutes les routes `/api/submit-*` sauf réclamation ; tunnel de candidature : étape « capture » seulement) | `traffic_days.form_submits` ; `content_stats_days.leads` du dernier article lu (le jour même ou la veille) |
+
+- **Point d'entrée** : `crm.track_site_event(kind, path, ip, user_agent, referrer_host, utm_source, utm_medium)`, appelée par le site avec sa clé secrète (même client que le blog, aucune nouvelle variable). La route `/api/event` n'accepte pas « formulaire envoyé » : un lead ne peut pas être fabriqué depuis un navigateur.
+- **Vie privée** : aucun cookie ni stockage sur l'appareil. Un visiteur = `sha256(sel du jour | IP | user-agent)` calculé en base ; IP et user-agent ne sont pas enregistrés ; sels et empreintes (`crm.site_salts`, `crm.site_visitors`) effacés après 48 h par la tâche horaire `crm-site-visitors-purge`. Seuls restent des compteurs. Ignorés : robots, IP de `EXCLUDED_ANALYTICS_IPS` (cookie `analytics-excluded` posé par `proxy.ts`), navigateurs passés par `/disable-analytics`, préproduction, previews Vercel, localhost, espace membre.
+- **Définitions** : visiteurs = uniques **par jour**, additionnés sur une période ; source = UTM de la première page vue du jour, sinon domaine référent (Google et moteurs, LinkedIn, Instagram, messageries → newsletter, autres sites → « Partenaires & autres sites »), sinon « Direct » ; Meta Ads = `utm_source` meta… / *_ads, ou facebook / instagram avec `utm_medium` payant (cpc, paid…) — **les campagnes Meta doivent porter ces UTM** pour être reconnues.
+- **Articles** : un article est reconnu par son slug publié (`public.blog_post.slug` → `crm_id`) ; les statistiques restent attachées au contenu si le slug change ensuite. `crm.contents` n'est jamais modifié par la mesure (sinon : recopie vers le site et date « modifié le » à chaque vue). `contents.metrics` devient la **saisie manuelle** (posts LinkedIn / Instagram, newsletter : bouton « Mettre à jour les chiffres » dans l'éditeur) ; le CRM affiche saisie + mesure (`contentPerformance()`).
+- **CRM** : `content_stats_days` lisible par les sections Contenus et Analytics (aucune écriture depuis l'interface), chargée à la connexion avec `traffic_days` (les chiffres s'actualisent au rechargement). Fiche d'un article : vues, lecteurs, clics, leads sur 30 j / 90 j / 12 mois, histogramme, lecteurs par source. Page Analytics : la carte « Tracking » affiche la date de la dernière donnée reçue.
+- **Limites** : une partie des visiteurs échappe à toute mesure côté navigateur (bloqueurs, JavaScript désactivé) ; plusieurs personnes derrière la même IP avec le même navigateur comptent pour un ; la FAQ et les autres pages ne sont pas mesurées contenu par contenu (seulement dans le trafic global). Conversions vers Meta (API Conversions) / GA4 depuis le CRM : non implémentées.
+- **Politique de confidentialité du site** : elle ne mentionne aujourd'hui que Google Analytics — à compléter (mesure d'audience interne, sans cookie, base légale intérêt légitime, conservation des empreintes 48 h).
+
+```sql
+-- Contrôle rapide (SQL Editor)
+select date, visitors, pageviews, sources, form_starts, form_submits from crm.traffic_days order by date desc limit 7;
+select c.title, s.date, s.views, s.visitors, s.clicks, s.leads from crm.content_stats_days s join crm.contents c on c.id = s.content_id order by s.date desc, s.views desc limit 20;
+```
+
+## 5 sexies. StartupWeek Academy (e-learning)
+
+Migration `20260926220123_crm_academy.sql`, **appliquée en production le 26/09/2026** : 9 tables `crm.academy_*` (formations, modules, leçons, parcours, cohortes, inscriptions, progression, livrables, connexions), RLS par la nouvelle section `academy` (écriture : admin, pédagogie, formateur ; lecture : commercial, lecture — 36 policies), `crm.section_access()` étendue, entités Academy ajoutées à `crm.activities.entity`, audit hors session d'un membre. Vérifié après application : droits par rôle, RLS active sur les 9 tables, `anon` sans droit, `section_access('commercial', 'facturation')` inchangé.
+
+> **Attention pour les prochaines migrations** : toute nouvelle version de `crm.section_access()` doit conserver la section `academy` (sinon l'équipe perd l'accès à Academy), et toute nouvelle version de `activities_entity_check` doit garder les entités `courses`, `courseModules`, `lessons`, `academyPaths`, `enrollments`, `lessonProgress`, `assignments`, `learnerConnections`, `cohorts`.
+
+Testé avant application sur PostgreSQL 16 (émulation Supabase) + PostgREST 12.2.3 : matrice `section_access()` = `PERMISSIONS` (95/95), contraintes (slug unique, catalogue réservé aux formations publiées et payantes, leçon rattachée au module de la même formation, inscription unique par formation × contact, suppression d'une formation ayant des apprenants refusée), RLS (formateur corrige un livrable, commercial en lecture seule, compte non rattaché : 0 ligne, `anon` refusé), cascades à la suppression d'un contact ; parcours complet via les routes API sur la base : webhook Stripe `checkout.session.completed` → contact, facture `F-2026-0001` payée par trigger, paiement, accès de 183 jours ; rejeu → doublon détecté ; API apprenant signée (sommaire, leçon, connexions, checklist, fin de leçon, déblocage de la suivante).
+
+Formation type : `supabase/data/academy_mvp_ia.sql` (généré par `scripts/academy-sql.ts`, idempotent, statut « relecture »), **insérée en production le 26/09/2026** : fichier récupéré par la base au commit `065b349` (pg_net), empreinte MD5 `ae17ff58593827d19c36ff867a0b12e4` vérifiée avant exécution, puis réponse HTTP supprimée. Résultat : `crs_mvp_ia` « Construire son MVP avec l'IA » en relecture, 10 modules, 65 leçons, 3 000 min, 391 blocs (texte, prompts et questions identiques à la source : 418 850 et 36 074 caractères, 165 questions), liée aux 13 sessions SW-0011 → SW-0023, auteurs : les 2 administrateurs. Les 12 blocs « ressource » ont été retirés (les ressources de démo n'existent pas en base) : à rajouter depuis l'éditeur une fois les fichiers déposés dans *Ressources*. *Advisors* après application : aucune alerte de sécurité liée à Academy ; performance : INFO seulement (index encore inutilisés, 5 clés étrangères rarement utilisées sans index). Contrat de l'API apprenant, vente et variables : [ACADEMY.md](ACADEMY.md).
+
+## 5 septies. Logistique des sessions et répertoire des lieux
 
 Migration `20260927100000_crm_session_logistics.sql` — **pas encore appliquée en production** (à appliquer avant de déployer l'interface correspondante : sans elle, le chargement signale 5 tables introuvables et l'enregistrement des infos pratiques d'une session échoue).
 
@@ -477,7 +567,7 @@ order by 1;
 - **Sessions** : `insert … select` depuis `public.event` (copie exacte d'Airtable par n8n : 234 champs comparés, 0 écart), heures fixées à 09:00 (début), 18:00 (fin) et 23:59 (date limite), heure de Paris ; `inscriptions_ouvertes`, publiées. Essai préalable dans une transaction annulée. Après import, le CRM a republié `public.event` : seuls changements, `min_places` vide → 0 (non affiché par le site) et SW-0011 9 → 10 places (la candidature de test n'est plus comptée).
 - **Ressources** : l'unique fichier réel (PDF « Ressource d'acculturation digitale pour étudiants admis », 139 603 octets) est hébergé dans Supabase Storage, bucket public `ressources` (PDF uniquement, 20 Mo max) : `…/storage/v1/object/public/ressources/acculturation-digitale.pdf`. « Acculturation digitale » (premium) importée et reliée à sa ligne `public.administrative_resource` ; le modèle `public.template` du même nom (hors CRM) pointe vers le même fichier. « guide pratique marrakech » importée **sans fichier** (elle pointait vers ce même PDF) : non publiée, à compléter dans le CRM.
 - **Nettoyage du site** : liens Airtable expirés remplacés ; supprimés : 3 doublons « Acculturation digitale » et 3 modèles factices (`public.template`), ressources « TEST CLAUDE (maj) », « Informations pratiques — Lisbonne 2026 » (`example.com`) et « guide pratique marrakech » (`public.administrative_resource`). **Restent** « Maquette Landing Page » et « Pitch Deck Startup », dont le lien est expiré : `public.content` les référence (`on delete cascade`, 2 contenus d'un compte interne) — à traiter à part.
-- **Ajouter un fichier** : Dashboard → Storage → `ressources` → *Upload*, copier l'URL publique dans la ressource du CRM. Le bucket est public : quiconque a le lien peut télécharger, y compris un contenu premium (comme auparavant avec les liens Airtable). Une fonction Edge `crm-import-ressource` a servi au dépôt initial ; elle est neutralisée (réponse 410) et peut être supprimée depuis le Dashboard.
+- **Ajouter un fichier** : depuis le CRM, *Ressources* → *Ajouter une ressource* (ou « Déposez la nouvelle version » sur une ressource existante) : le fichier est envoyé dans le bucket `ressources` avec la session de l'utilisateur et son URL publique est enregistrée. PDF, Markdown, texte et ZIP, 20 Mo maximum ; dépôt réservé aux rôles ayant l'écriture sur « ressources » (admin, pédagogie) — migration `20260926214726_crm_resources_storage.sql`, **appliquée en production le 26/09/2026** (policies vérifiées : dépôt accepté pour l'admin, refusé pour un utilisateur Auth non rattaché). Un fichier envoyé puis abandonné (formulaire annulé) est supprimé ; un fichier enregistré ne l'est jamais (l'ancienne version garde son URL). Le bucket est public : quiconque a le lien peut télécharger, y compris un contenu premium (comme auparavant avec les liens Airtable). Une fonction Edge `crm-import-ressource` a servi au dépôt initial ; elle est neutralisée (réponse 410) et peut être supprimée depuis le Dashboard.
 
 ## 9. Ordre de décommissionnement des workflows n8n
 
@@ -503,6 +593,7 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 | Formulaires | Remettre les URLs `N8N_WEBHOOK_*` dans le site et réactiver les 8 workflows. Effet immédiat. |
 | Synchro site | `alter table crm.sessions disable trigger sessions_site_sync; alter table crm.resources disable trigger resources_site_sync; alter table crm.applications disable trigger applications_capacity;` puis réactiver le polling n8n (il réécrit `public.event` depuis Airtable). |
 | Paiements | Désactiver l'endpoint dans Stripe ; retirer le cron Qonto de `vercel.json`. |
+| Emails | Retirer `EMAIL_DISPATCH_SECRET` (ou les variables SMTP) dans Vercel : plus rien ne part, les emails restent en file « Programmé ». Revenir à n8n pour les formulaires : désactiver *Emails des formulaires du site*. |
 | Planificateur | `select cron.unschedule('crm-scheduler');` (plus de publication ni de rappel automatiques ; les contenus « Planifié » attendent) ; `select cron.unschedule('crm-cron-purge');` ; `drop extension pg_cron;` supprime toutes les tâches. |
 | Tout le CRM | `drop schema crm cascade;` — supprime tables, fonctions et triggers du CRM ; **aucune table `public.*` n'est modifiée structurellement** (seules leurs lignes ont pu être mises à jour par la synchro). Puis `supabase migration repair --status reverted 20260926103012 20260926103117 20260926103336 20260926103516`. |
 | Données | Restauration du backup / PITR pris avant la migration (§ 2.1). |
@@ -524,10 +615,9 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 
 ## 12. Reste à faire (hors de ce lot)
 
-- Envoi réel des emails déclenchés depuis l'interface (§ 3.4) et modèles d'emails en base (`crm.email_templates` vide).
 - Numérotation des factures attribuée par la base plutôt que par l'interface (supprime le risque de doublon simultané, § 3.4).
 - Synchronisation en temps réel entre collègues (Supabase Realtime) — aujourd'hui : bouton *Recharger depuis la base*.
-- Envoi des emails programmés (`crm.email_messages` au statut `programme`, ex. séquence Digital Starter Kit) : traitement à ajouter au planificateur (§ 5 ter) ; seuls les accusés de réception sont envoyés immédiatement.
+- Exécution automatique des séquences autres que Digital Starter Kit (J-7, J+1, relances de devis / factures) : déclencheurs à ajouter au planificateur (§ 5 ter) — les emails eux-mêmes partent déjà (§ 5 quater).
 - Publication réelle sur LinkedIn / Instagram (aujourd'hui : tâche de rappel, § 5 ter) — via n8n ou les API des réseaux (LinkedIn exige une application validée pour publier sur une page entreprise).
 - Types TypeScript générés (`supabase gen types typescript --schema crm`) pour supprimer les casts du client service_role.
 - Phase 2 : formulaires du site → CRM (§ 5, § 9) ; d'ici là, les candidatures arrivent dans Airtable.

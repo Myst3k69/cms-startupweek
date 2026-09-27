@@ -6,6 +6,7 @@ import type {
   Activity,
   ActivityKind,
   Collections,
+  ContentStatDay,
   EntityMap,
   EntityName,
   ID,
@@ -52,6 +53,15 @@ export const ID_PREFIX: Record<EntityName, string> = {
   expenses: "exp",
   outings: "out",
   stays: "sty",
+  courses: "crs",
+  courseModules: "mod",
+  lessons: "les",
+  academyPaths: "pth",
+  enrollments: "enr",
+  lessonProgress: "lpr",
+  assignments: "liv",
+  learnerConnections: "cnx",
+  cohorts: "coh",
 };
 
 export type NewEntity<K extends EntityName> = Omit<EntityMap[K], "id" | "createdAt" | "updatedAt"> & { id?: ID };
@@ -73,6 +83,8 @@ export interface CrmState extends Collections {
   settings: Settings;
   activities: Activity[];
   traffic: TrafficDay[];
+  /** Audience quotidienne des articles du blog (mesurée sur le site). */
+  contentStats: ContentStatDay[];
 
   create: <K extends EntityName>(collection: K, data: NewEntity<K>, opts?: MutationOptions) => EntityMap[K];
   update: <K extends EntityName>(collection: K, id: ID, patch: Partial<EntityMap[K]>, opts?: MutationOptions) => void;
@@ -109,6 +121,12 @@ const ENTITY_LABEL: Partial<Record<EntityName, string>> = {
   expenses: "Dépense",
   outings: "Activité",
   stays: "Séjour",
+  courses: "Formation",
+  lessons: "Leçon",
+  academyPaths: "Parcours",
+  enrollments: "Inscription Academy",
+  assignments: "Livrable",
+  cohorts: "Cohorte",
 };
 
 /** Paramètres par défaut (remplacés par le seed de démo ou la base). */
@@ -132,16 +150,18 @@ const DEFAULT_SETTINGS: Settings = {
   slaHours: 48,
   stripeConnected: false,
   qontoConnected: false,
-  emailProvider: "resend",
+  emailProvider: "smtp",
+  siteFormEmails: false,
+  satisfactionFormUrl: "",
   dataMode: "demo",
   depositPercent: 30,
   balanceDaysBefore: 30,
 };
 
 /** État vide : utilisé côté serveur et avant hydratation (le seed n'est généré que dans le navigateur). */
-function emptyState(): Collections & Pick<CrmState, "settings" | "activities" | "traffic"> {
+function emptyState(): Collections & Pick<CrmState, "settings" | "activities" | "traffic" | "contentStats"> {
   const collections = Object.fromEntries((Object.keys(ID_PREFIX) as EntityName[]).map((k) => [k, []])) as unknown as Collections;
-  return { ...collections, settings: DEFAULT_SETTINGS, activities: [], traffic: [] };
+  return { ...collections, settings: DEFAULT_SETTINGS, activities: [], traffic: [], contentStats: [] };
 }
 
 function freshSeed() {
@@ -236,6 +256,7 @@ export const useCrm = create<CrmState>()(
           ...data.collections,
           activities: data.activities,
           traffic: data.traffic,
+          contentStats: data.contentStats,
           settings: { ...DEFAULT_SETTINGS, ...data.settings, dataMode: "supabase" },
           sessionUserId: memberId,
           authNotice: undefined,

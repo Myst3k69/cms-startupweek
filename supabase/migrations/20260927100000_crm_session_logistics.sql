@@ -200,4 +200,6 @@ alter table crm.activities add constraint activities_entity_check check (entity 
   'events', 'speakers', 'applications', 'projects', 'attendances', 'evaluations', 'complaints', 'indicators',
   'evidences', 'improvementActions', 'watchItems', 'quotes', 'invoices', 'payments', 'bankTransactions',
   'resources', 'contents', 'automations', 'offers',
+  'courses', 'courseModules', 'lessons', 'academyPaths', 'enrollments', 'lessonProgress', 'assignments',   -- migration crm_academy
+  'learnerConnections', 'cohorts',
   'venues', 'venueOptions', 'expenses', 'outings', 'stays'));
