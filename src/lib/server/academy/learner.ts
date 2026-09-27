@@ -21,15 +21,23 @@ import {
   withoutAnswers,
   type LessonState,
 } from "@/lib/domain/academy";
-import type { Assignment, Course, Enrollment, ExerciseBlock, Lesson, LessonProgress, QuizBlock } from "@/lib/domain/types";
+import type { Assignment, Course, Enrollment, ExerciseBlock, Lesson, LessonBlock, LessonProgress, Persona, QuizBlock, ResourceBlock } from "@/lib/domain/types";
 import { newId, type AcademyRepo } from "./repo";
 
 const Email = z.string().trim().toLowerCase().email().max(254);
+const PersonaSchema = z.enum(["tech", "non_tech", "reconversion"]);
+const Id = z.string().min(1).max(160);
 
 export const LearnerRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("catalog") }),
   z.object({ action: z.literal("overview"), email: Email }),
   z.object({ action: z.literal("lesson"), email: Email, enrollmentId: z.string().min(1).max(80), lessonId: z.string().min(1).max(160) }),
+  // Leçon en accès libre (« aperçu gratuit » du catalogue) : sans compte.
+  z.object({ action: z.literal("preview"), courseSlug: z.string().min(1).max(120), lessonId: Id, persona: PersonaSchema.optional() }),
+  // L'apprenant choisit la variante de contenu adaptée à son profil.
+  z.object({ action: z.literal("set_persona"), email: Email, enrollmentId: z.string().min(1).max(80), persona: PersonaSchema }),
+  // Certificat de réalisation, une fois délivré par l'équipe (même après la fin de l'accès).
+  z.object({ action: z.literal("certificate"), email: Email, enrollmentId: z.string().min(1).max(80) }),
   z.object({
     action: z.literal("track"),
     email: Email,
@@ -79,6 +87,21 @@ function lessonOr404(ctx: Ctx, lessonId: string): Lesson | LearnerResult {
   if (!lesson) return fail(404, "LESSON_NOT_FOUND", "Leçon introuvable.");
   if (ctx.states.get(lesson.id) === "verrouillee") return fail(423, "LESSON_LOCKED", "Terminez la leçon précédente pour débloquer celle-ci.");
   return lesson;
+}
+
+/**
+ * Blocs servis à l'apprenant : variante de son profil, réponses retirées, et ressources
+ * résolues (titre, format, lien) — une ressource introuvable ou interne n'est pas servie.
+ */
+async function servedBlocks(repo: AcademyRepo, lesson: Lesson, persona: Persona | undefined) {
+  const blocks = blocksFor(lesson, persona).map(withoutAnswers);
+  const ids = blocks.flatMap((b) => (b.type === "ressource" ? [b.resourceId] : []));
+  const found = new Map((await repo.resources(ids)).map((r) => [r.id, r]));
+  return blocks.flatMap((b): (LessonBlock | (ResourceBlock & { resource: object }))[] => {
+    if (b.type !== "ressource") return [b];
+    const r = found.get(b.resourceId);
+    return r ? [{ ...b, resource: { title: r.title, description: r.description, format: r.format, url: r.url } }] : [];
+  });
 }
 
 const isResult = (v: unknown): v is LearnerResult => Boolean(v && typeof v === "object" && "status" in v && "body" in v);
@@ -205,8 +228,66 @@ export async function handleLearner(repo: AcademyRepo, req: LearnerRequest, nowM
     return { status: 200, body: { ok: true, dryRun: repo.dryRun, learner: { firstName: contact.firstName, lastName: contact.lastName }, enrollments: out } };
   }
 
+  if (req.action === "preview") {
+    const course = await repo.courseBySlug(req.courseSlug);
+    if (!course || course.status !== "publiee" || !course.inCatalog) return fail(404, "COURSE_NOT_FOUND", "Formation introuvable.");
+    const { modules, lessons } = await repo.outline(course.id);
+    const lesson = orderedLessons(course.id, modules, lessons).find((l) => l.id === req.lessonId);
+    if (!lesson || !lesson.isPreview) return fail(404, "LESSON_NOT_FOUND", "Cette leçon n'est pas en accès libre.");
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        dryRun: repo.dryRun,
+        course: { id: course.id, slug: course.slug, title: course.title },
+        lesson: { id: lesson.id, title: lesson.title, summary: lesson.summary, estimatedMinutes: lesson.estimatedMinutes, moduleId: lesson.moduleId, blocks: await servedBlocks(repo, lesson, req.persona) },
+      },
+    };
+  }
+
+  if (req.action === "certificate") {
+    const contact = await repo.contactByEmail(req.email);
+    const enrollment = await repo.enrollment(req.enrollmentId);
+    if (!contact || !enrollment || enrollment.contactId !== contact.id) return fail(404, "ENROLLMENT_NOT_FOUND", "Inscription introuvable pour ce compte.");
+    if (!enrollment.certificateIssuedAt) return fail(404, "CERTIFICATE_NOT_ISSUED", "Le certificat n'a pas encore été délivré.");
+    const course = await repo.course(enrollment.courseId);
+    if (!course) return fail(404, "COURSE_NOT_FOUND", "Formation introuvable.");
+    const [{ modules, lessons }, progress, connections, organization] = await Promise.all([repo.outline(course.id), repo.progressOf(enrollment.id), repo.connectionsOf(enrollment.id), repo.organization()]);
+    const ordered = orderedLessons(course.id, modules, lessons);
+    // Même calcul que le certificat imprimé du back-office : temps estimé des leçons terminées.
+    const doneMinutes = ordered.filter((l) => progress.some((p) => p.lessonId === l.id && p.status === "terminee")).reduce((sum, l) => sum + l.estimatedMinutes, 0);
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        dryRun: repo.dryRun,
+        certificate: {
+          reference: `CR-EL-${new Date(enrollment.grantedAt).getFullYear()}-${enrollment.id.slice(-6).toUpperCase()}`,
+          issuedAt: enrollment.certificateIssuedAt,
+          learner: { firstName: contact.firstName, lastName: contact.lastName },
+          course: { title: course.title, isTraining: course.isTraining, durationHours: course.durationHours, objectives: course.objectives },
+          startedAt: connections[0]?.startedAt ?? enrollment.startedAt ?? enrollment.grantedAt,
+          endedAt: connections[connections.length - 1]?.endedAt ?? enrollment.completedAt ?? enrollment.lastActivityAt ?? enrollment.grantedAt,
+          doneHours: Math.round((doneMinutes / 60) * 100) / 100,
+          connectedMinutes: Math.round(connections.reduce((sum, c) => sum + c.durationSeconds, 0) / 60),
+          progressPercent: enrollment.progressPercent,
+          quizAverage: enrollment.quizAverage,
+          organization,
+        },
+      },
+    };
+  }
+
   const ctx = await loadContext(repo, req.email, req.enrollmentId, nowMs);
   if (isResult(ctx)) return ctx;
+
+  if (req.action === "set_persona") {
+    if (ctx.enrollment.persona !== req.persona) {
+      await repo.updateEnrollment(ctx.enrollment.id, { persona: req.persona });
+      await repo.log("enrollments", ctx.enrollment.id, `Profil choisi par l'apprenant : ${req.persona}`);
+    }
+    return { status: 200, body: { ok: true, dryRun: repo.dryRun, persona: req.persona } };
+  }
 
   if (req.action === "lesson") {
     const lesson = lessonOr404(ctx, req.lessonId);
@@ -229,7 +310,7 @@ export async function handleLearner(repo: AcademyRepo, req: LearnerRequest, nowM
           summary: lesson.summary,
           estimatedMinutes: lesson.estimatedMinutes,
           moduleId: lesson.moduleId,
-          blocks: blocksFor(lesson, ctx.enrollment.persona).map(withoutAnswers),
+          blocks: await servedBlocks(repo, lesson, ctx.enrollment.persona),
         },
         progress: { status: row.status, quizScores: row.quizScores, checklist: row.checklist, timeSpentSeconds: row.timeSpentSeconds },
         assignments: assignments.map((a) => ({ blockId: a.blockId, status: a.status, submittedAt: a.submittedAt, content: a.content, url: a.url, feedback: a.feedback, grade: a.grade, reviewedAt: a.reviewedAt })),

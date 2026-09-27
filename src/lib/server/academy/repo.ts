@@ -7,7 +7,7 @@
  *
  * Conversion camelCase ↔ snake_case des clés de premier niveau, comme src/lib/data/sync.ts.
  */
-import type { Assignment, Contact, Course, CourseModule, Enrollment, EntityName, Invoice, LearnerConnection, Lesson, LessonProgress } from "@/lib/domain/types";
+import type { Assignment, Contact, Course, CourseModule, Enrollment, EntityName, Invoice, LearnerConnection, Lesson, LessonProgress, Resource, Settings } from "@/lib/domain/types";
 import type { CrmAdminClient } from "../supabase-admin";
 
 type Row = Record<string, unknown>;
@@ -18,6 +18,10 @@ const toPatch = (o: object): Row => Object.fromEntries(Object.entries(o).map(([k
 const fromDb = <T>(r: Row): T => Object.fromEntries(Object.entries(r).filter(([, v]) => v !== null).map(([k, v]) => [toCamel(k), v])) as T;
 
 export type ContactLite = Pick<Contact, "id" | "firstName" | "lastName" | "email" | "lifecycle">;
+/** Mentions de l'organisme de formation imprimées sur le certificat de réalisation. */
+/** Ressource de la bibliothèque telle que servie à l'apprenant (jamais les ressources internes). */
+export type ResourceLite = Pick<Resource, "id" | "title" | "description" | "format" | "url" | "visibility">;
+export type OrgIdentity = Pick<Settings, "legalName" | "brand" | "siret" | "nda" | "address" | "website">;
 
 export interface AcademyRepo {
   readonly dryRun: boolean;
@@ -37,6 +41,9 @@ export interface AcademyRepo {
   assignmentsOf(enrollmentId: string): Promise<Assignment[]>;
   saveAssignment(a: Omit<Assignment, "createdAt" | "updatedAt">, isNew: boolean): Promise<void>;
   lastConnection(enrollmentId: string): Promise<LearnerConnection | null>;
+  connectionsOf(enrollmentId: string): Promise<LearnerConnection[]>;
+  organization(): Promise<OrgIdentity | null>;
+  resources(ids: string[]): Promise<ResourceLite[]>;
   saveConnection(c: Omit<LearnerConnection, "createdAt" | "updatedAt">, isNew: boolean): Promise<void>;
   paymentExists(reference: string): Promise<boolean>;
   insertInvoice(i: Omit<Invoice, "id" | "createdAt" | "updatedAt" | "number"> & { number?: string }): Promise<{ id: string; number: string }>;
@@ -120,6 +127,16 @@ export class SupabaseRepo implements AcademyRepo {
   lastConnection(enrollmentId: string) {
     return this.one<LearnerConnection>(this.db.from("academy_connections").select("*").eq("enrollment_id", enrollmentId).order("ended_at", { ascending: false }).limit(1).maybeSingle());
   }
+  connectionsOf(enrollmentId: string) {
+    return this.many<LearnerConnection>(this.db.from("academy_connections").select("*").eq("enrollment_id", enrollmentId).order("started_at"));
+  }
+  async resources(ids: string[]) {
+    if (!ids.length) return [];
+    return this.many<ResourceLite>(this.db.from("resources").select("id, title, description, format, url, visibility").in("id", ids).neq("visibility", "interne"));
+  }
+  organization() {
+    return this.one<OrgIdentity>(this.db.from("settings").select("legal_name, brand, siret, nda, address, website").eq("id", true).maybeSingle());
+  }
   saveConnection(c: Omit<LearnerConnection, "createdAt" | "updatedAt">, isNew: boolean) {
     return isNew ? this.write(this.db.from("academy_connections").insert(toDb(c))) : this.write(this.db.from("academy_connections").update(toPatch(c)).eq("id", c.id));
   }
@@ -157,6 +174,8 @@ export interface MemoryData {
   learnerConnections: LearnerConnection[];
   invoices: Invoice[];
   payments: { reference: string }[];
+  settings?: OrgIdentity;
+  resources?: ResourceLite[];
 }
 
 /** Données de démo en mémoire : les écritures ne sont PAS persistées (réponses « dryRun »). */
@@ -221,6 +240,15 @@ export class MemoryRepo implements AcademyRepo {
   }
   async lastConnection(enrollmentId: string) {
     return this.d.learnerConnections.filter((c) => c.enrollmentId === enrollmentId).sort((a, b) => b.endedAt.localeCompare(a.endedAt))[0] ?? null;
+  }
+  async connectionsOf(enrollmentId: string) {
+    return this.d.learnerConnections.filter((c) => c.enrollmentId === enrollmentId).sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  }
+  async organization() {
+    return this.d.settings ?? null;
+  }
+  async resources(ids: string[]) {
+    return (this.d.resources ?? []).filter((r) => ids.includes(r.id) && r.visibility !== "interne");
   }
   async saveConnection(c: Omit<LearnerConnection, "createdAt" | "updatedAt">) {
     const i = this.d.learnerConnections.findIndex((x) => x.id === c.id);

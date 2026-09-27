@@ -86,8 +86,11 @@ export async function academy<T>(body: Record<string, unknown>): Promise<{ statu
 | --- | --- | --- |
 | `catalog` | — | `courses[]` publiées, au catalogue et payantes : présentation (titre, sous-titre, description Markdown, objectifs, prérequis, durée, prix TTC en centimes, accès, assistance, accessibilité) et programme (modules → leçons, `isPreview`). |
 | `overview` | `email` | `learner`, `enrollments[]` : `open`, formation, `persona`, `expiresAt`, `progressPercent`, `timeSpentMinutes`, `quizAverage`, `certificateIssuedAt`, `nextLessonId`, `modules[].lessons[]` avec `state` (`terminee` · `en_cours` · `disponible` · `verrouillee`). Une inscription expirée / suspendue est renvoyée avec `open: false`. |
-| `lesson` | `email`, `enrollmentId`, `lessonId` | `lesson` (blocs **filtrés par profil**, réponses des quiz et scripts vidéo retirés, vidéos sans lien masquées), `progress`, `assignments` (retours du formateur), `previousLessonId`, `nextLessonId`. Ouvrir une leçon la passe « en cours ». 423 si verrouillée. |
+| `lesson` | `email`, `enrollmentId`, `lessonId` | `lesson` (blocs **filtrés par profil**, réponses des quiz et scripts vidéo retirés, vidéos sans lien masquées, blocs « ressource » complétés par `resource: { title, description, format, url }` — non servis si la ressource est introuvable ou interne), `progress`, `assignments` (retours du formateur), `previousLessonId`, `nextLessonId`. Ouvrir une leçon la passe « en cours ». 423 si verrouillée. |
 | `track` | `email`, `enrollmentId`, `event` | Voir ci-dessous. |
+| `set_persona` | `email`, `enrollmentId`, `persona` (`tech` · `non_tech` · `reconversion`) | Change la variante de contenu servie à l'apprenant (choix proposé dans Mon espace). |
+| `preview` | `courseSlug`, `lessonId`, `persona?` | Sans compte : leçon marquée « accès libre » d'une formation publiée au catalogue (même format que `lesson`, sans progression). 404 sinon. |
+| `certificate` | `email`, `enrollmentId` | Certificat de réalisation **une fois délivré par l'équipe** (même après la fin de l'accès) : référence, apprenant, formation, dates de début / fin (connexions), durée réalisée (temps estimé des leçons terminées), temps connecté, progression, moyenne des quiz, mentions de l'organisme (raison sociale, SIRET, NDA, adresse). 404 `CERTIFICATE_NOT_ISSUED` sinon. |
 
 Événements `track` :
 
