@@ -16,6 +16,9 @@
 --     une exposition ou une conversion, au plus une fois par visiteur, de façon atomique.
 --   • Nouvelle section de droits « marketing » : admin et commercial en écriture,
 --     pédagogie et lecture seule en consultation (miroir de src/lib/auth/permissions.ts).
+--     crm.section_access() et activities_entity_check reprennent À L'IDENTIQUE ce
+--     qu'a posé la migration Academy (20260926220123) et y ajoutent le marketing :
+--     toute migration ultérieure qui les redéfinit doit conserver les deux.
 
 -- 1. Campagnes
 create table if not exists crm.ad_campaigns (
@@ -200,7 +203,10 @@ alter table crm.activities add constraint activities_entity_check check (entity 
   'users', 'organizations', 'contacts', 'submissions', 'deals', 'tasks', 'sequences', 'emailTemplates', 'emails',
   'events', 'speakers', 'applications', 'projects', 'attendances', 'evaluations', 'complaints', 'indicators',
   'evidences', 'improvementActions', 'watchItems', 'quotes', 'invoices', 'payments', 'bankTransactions',
-  'resources', 'contents', 'automations', 'offers', 'adCampaigns', 'experiments'));
+  'resources', 'contents', 'automations', 'offers',
+  'courses', 'courseModules', 'lessons', 'academyPaths', 'enrollments', 'lessonProgress', 'assignments',
+  'learnerConnections', 'cohorts',
+  'adCampaigns', 'experiments'));
 
 drop trigger if exists audit_ad_campaigns on crm.ad_campaigns;
 create trigger audit_ad_campaigns after insert or update of status on crm.ad_campaigns
@@ -217,7 +223,8 @@ create or replace trigger set_updated_at before update on crm.ad_stats
 create or replace trigger set_updated_at before update on crm.experiments
   for each row execute function crm.tg_set_updated_at();
 
--- 6. Droits : section « marketing » (copie conforme de PERMISSIONS, src/lib/auth/permissions.ts)
+-- 6. Droits : section « marketing » (copie conforme de PERMISSIONS, src/lib/auth/permissions.ts ;
+--    section « academy » de la migration 20260926220123 conservée telle quelle)
 create or replace function crm.section_access(p_role text, p_section text)
 returns text
 language sql
@@ -230,23 +237,24 @@ as $$
     when p_role = 'admin' then
       case when p_section = any (array[
         'dashboard', 'demandes', 'contacts', 'organisations', 'pipeline', 'relances', 'emails', 'candidatures', 'projets',
-        'sessions', 'intervenants', 'qualiopi', 'facturation', 'ressources', 'contenus', 'marketing', 'analytics', 'automatisations', 'parametres'
+        'sessions', 'intervenants', 'qualiopi', 'facturation', 'ressources', 'contenus', 'academy', 'marketing', 'analytics', 'automatisations', 'parametres'
       ]) then 'write' else 'none' end
     when p_role = 'commercial' then
       case
         when p_section = any (array['dashboard', 'demandes', 'contacts', 'organisations', 'pipeline', 'relances', 'emails', 'candidatures', 'facturation', 'marketing']) then 'write'
-        when p_section = any (array['projets', 'sessions', 'intervenants', 'qualiopi', 'ressources', 'contenus', 'analytics', 'automatisations']) then 'read'
+        when p_section = any (array['projets', 'sessions', 'intervenants', 'qualiopi', 'ressources', 'contenus', 'academy', 'analytics', 'automatisations']) then 'read'
         else 'none'
       end
     when p_role = 'pedagogie' then
       case
-        when p_section = any (array['dashboard', 'relances', 'emails', 'candidatures', 'projets', 'sessions', 'intervenants', 'qualiopi', 'ressources', 'contenus']) then 'write'
+        when p_section = any (array['dashboard', 'relances', 'emails', 'candidatures', 'projets', 'sessions', 'intervenants', 'qualiopi', 'ressources', 'contenus', 'academy']) then 'write'
         when p_section = any (array['demandes', 'contacts', 'organisations', 'pipeline', 'facturation', 'marketing', 'analytics', 'automatisations']) then 'read'
         else 'none'
       end
     when p_role = 'formateur' then
       case
-        when p_section = any (array['dashboard', 'relances', 'projets', 'sessions']) then 'write'
+        -- academy en écriture : correction des livrables et suivi des apprenants.
+        when p_section = any (array['dashboard', 'relances', 'projets', 'sessions', 'academy']) then 'write'
         -- contacts en lecture : noms des participants (émargement, évaluations, projets suivis)
         when p_section = any (array['candidatures', 'ressources', 'intervenants', 'contacts']) then 'read'
         else 'none'
@@ -256,7 +264,7 @@ as $$
         when p_section = 'dashboard' then 'write'
         when p_section = any (array[
           'demandes', 'contacts', 'organisations', 'pipeline', 'relances', 'emails', 'candidatures', 'projets',
-          'sessions', 'intervenants', 'qualiopi', 'facturation', 'ressources', 'contenus', 'marketing', 'analytics', 'automatisations'
+          'sessions', 'intervenants', 'qualiopi', 'facturation', 'ressources', 'contenus', 'academy', 'marketing', 'analytics', 'automatisations'
         ]) then 'read'
         else 'none'
       end
@@ -296,6 +304,10 @@ revoke insert, update, delete on crm.ad_stats from authenticated;
 -- Visites des tests : serveur uniquement (aucune policy, aucun droit pour l'équipe).
 revoke all on crm.experiment_hits from public, anon, authenticated;
 grant all on crm.experiment_hits to service_role;
+
+-- section_access() est remplacée (CREATE OR REPLACE conserve ses droits) : on les réaffirme par sécurité.
+revoke execute on function crm.section_access(text, text) from public, anon;
+grant execute on function crm.section_access(text, text) to authenticated, service_role;
 
 -- 8. Fonctions : exécution réservée au serveur
 revoke execute on function crm.track_experiment(text, text, text, text) from public, anon, authenticated;

@@ -42,7 +42,7 @@ Site ◄──────────────── lit ──────�
 | `supabase/migrations/20260926103336_crm_functions.sql` | Numérotation légale, paiements, places restantes, synchro CRM → site, vues |
 | `supabase/migrations/20260926103516_qualiopi_referentiel.sql` | 32 indicateurs Qualiopi |
 | `supabase/migrations/20260926122058_crm_auth_membership.sql` | `crm.claim_team_membership()` (rattachement du compte Auth au membre de même email vérifié) ; audit automatique limité aux écritures hors session d'un membre — appliquée le 26/09/2026 |
-| `supabase/migrations/20260927105800_crm_marketing.sql` | Marketing : `ad_campaigns`, `ad_stats`, `experiments`, `experiment_hits`, `crm.track_experiment()`, section de droits `marketing` — **écrite, non appliquée** (§ 5 sexies) |
+| `supabase/migrations/20260927105800_crm_marketing.sql` | Marketing : `ad_campaigns`, `ad_stats`, `experiments`, `experiment_hits`, `crm.track_experiment()`, section de droits `marketing` — **écrite, non appliquée** (§ 5 septies) |
 | `src/lib/data/supabase.ts`, `src/lib/data/sync.ts` | Client navigateur (PKCE, schéma `crm`) ; chargement paginé et écritures ordonnées avec annulation en cas de refus |
 | `src/lib/auth/supabase-auth.ts`, `src/lib/store/remote-session.ts` | Lien magique, retour `/auth/callback`, membre de l'équipe, ouverture / fermeture de l'espace de travail |
 
@@ -414,7 +414,17 @@ select date, visitors, pageviews, sources, form_starts, form_submits from crm.tr
 select c.title, s.date, s.views, s.visitors, s.clicks, s.leads from crm.content_stats_days s join crm.contents c on c.id = s.content_id order by s.date desc, s.views desc limit 20;
 ```
 
-## 5 sexies. Marketing : campagnes, régies publicitaires, A/B tests
+## 5 sexies. StartupWeek Academy (e-learning)
+
+Migration `20260926220123_crm_academy.sql`, **appliquée en production le 26/09/2026** : 9 tables `crm.academy_*` (formations, modules, leçons, parcours, cohortes, inscriptions, progression, livrables, connexions), RLS par la nouvelle section `academy` (écriture : admin, pédagogie, formateur ; lecture : commercial, lecture — 36 policies), `crm.section_access()` étendue, entités Academy ajoutées à `crm.activities.entity`, audit hors session d'un membre. Vérifié après application : droits par rôle, RLS active sur les 9 tables, `anon` sans droit, `section_access('commercial', 'facturation')` inchangé.
+
+> **Attention pour les prochaines migrations** : toute nouvelle version de `crm.section_access()` doit conserver la section `academy` (sinon l'équipe perd l'accès à Academy), et toute nouvelle version de `activities_entity_check` doit garder les entités `courses`, `courseModules`, `lessons`, `academyPaths`, `enrollments`, `lessonProgress`, `assignments`, `learnerConnections`, `cohorts`.
+
+Testé avant application sur PostgreSQL 16 (émulation Supabase) + PostgREST 12.2.3 : matrice `section_access()` = `PERMISSIONS` (95/95), contraintes (slug unique, catalogue réservé aux formations publiées et payantes, leçon rattachée au module de la même formation, inscription unique par formation × contact, suppression d'une formation ayant des apprenants refusée), RLS (formateur corrige un livrable, commercial en lecture seule, compte non rattaché : 0 ligne, `anon` refusé), cascades à la suppression d'un contact ; parcours complet via les routes API sur la base : webhook Stripe `checkout.session.completed` → contact, facture `F-2026-0001` payée par trigger, paiement, accès de 183 jours ; rejeu → doublon détecté ; API apprenant signée (sommaire, leçon, connexions, checklist, fin de leçon, déblocage de la suivante).
+
+Formation type : `supabase/data/academy_mvp_ia.sql` (généré par `scripts/academy-sql.ts`, idempotent, statut « relecture »), **insérée en production le 26/09/2026** : fichier récupéré par la base au commit `065b349` (pg_net), empreinte MD5 `ae17ff58593827d19c36ff867a0b12e4` vérifiée avant exécution, puis réponse HTTP supprimée. Résultat : `crs_mvp_ia` « Construire son MVP avec l'IA » en relecture, 10 modules, 65 leçons, 3 000 min, 391 blocs (texte, prompts et questions identiques à la source : 418 850 et 36 074 caractères, 165 questions), liée aux 13 sessions SW-0011 → SW-0023, auteurs : les 2 administrateurs. Les 12 blocs « ressource » ont été retirés (les ressources de démo n'existent pas en base) : à rajouter depuis l'éditeur une fois les fichiers déposés dans *Ressources*. *Advisors* après application : aucune alerte de sécurité liée à Academy ; performance : INFO seulement (index encore inutilisés, 5 clés étrangères rarement utilisées sans index). Contrat de l'API apprenant, vente et variables : [ACADEMY.md](ACADEMY.md).
+
+## 5 septies. Marketing : campagnes, régies publicitaires, A/B tests
 
 Migration `20260927105800_crm_marketing.sql` — **écrite et testée en local (PostgreSQL 16), pas encore appliquée en production**. Elle ne touche à aucune table du site et n'ajoute que des objets au schéma `crm` (plus le remplacement de `crm.section_access()` et de la contrainte `activities_entity_check`, étendus à la section « marketing » et aux entités `adCampaigns` / `experiments`).
 
@@ -425,7 +435,7 @@ Migration `20260927105800_crm_marketing.sql` — **écrite et testée en local (
 | `crm.experiments` | A/B tests (créas, pages du site, emails) ; trigger `experiments_keep_counts` : une modification depuis l'interface ne peut pas écraser les compteurs d'un test du site |
 | `crm.experiment_hits` + `crm.track_experiment()` | Une exposition / une conversion au plus par visiteur et par test, incrément atomique ; serveur uniquement |
 
-Droits (miroir de `src/lib/auth/permissions.ts`) : `admin` et `commercial` en écriture, `pedagogie` et `lecture` en consultation, `formateur` sans accès.
+Droits (miroir de `src/lib/auth/permissions.ts`) : `admin` et `commercial` en écriture, `pedagogie` et `lecture` en consultation, `formateur` sans accès. La nouvelle version de `crm.section_access()` et de `activities_entity_check` **reprend à l'identique la section `academy` et les entités Academy** de la migration `20260926220123` (cf. avertissement du § 5 sexies) et y ajoute `marketing`, `adCampaigns`, `experiments`.
 
 **Tests locaux réalisés** (base PostgreSQL 16 neuve, toutes les migrations du dépôt rejouées dans l'ordre — hors planifications `pg_cron`, extension absente en local) : migration rejouée deux fois (idempotente) ; doublon de statistiques (même jour, même publicité, `creative_id` nul compris) refusé ; clé de test invalide refusée ; `track_experiment` : exposition comptée une fois par visiteur, conversion comptée sur la variante réellement vue, variante / test inconnus refusés ; commercial : lecture et écriture des campagnes, écriture des statistiques refusée, renommage d'une variante d'un test en cours sans perte des compteurs ; pédagogie : lecture seule ; formateur : aucune ligne ; `experiment_hits` et `track_experiment` inaccessibles à `authenticated`.
 

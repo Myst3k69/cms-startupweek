@@ -7,6 +7,10 @@
  *   - payment_intent.succeeded : paiement direct portant metadata.invoice_id ;
  *   - charge.refunded : remboursement (ligne négative, statut « rembourse »).
  *
+ * StartupWeek Academy : une session Checkout portant metadata.academy_course_id (créée par
+ * /api/academy/checkout) est un achat de formation en ligne → contact, facture, paiement et
+ * accès (recordAcademyPurchase), même idempotence sur la référence pi_….
+ *
  * Idempotent : la référence Stripe (pi_… / cs_… / refund:ch_…:montant) est unique
  * dans crm.payments ; checkout.session.completed et payment_intent.succeeded d'un
  * même paiement partagent la référence pi_… et ne créent qu'une ligne.
@@ -17,6 +21,9 @@
  */
 import { MAX_WEBHOOK_BODY_BYTES, readBodyWithLimit, verifyStripeSignature } from "@/lib/server/security";
 import { getSupabaseAdmin, type CrmAdminClient } from "@/lib/server/supabase-admin";
+import { SupabaseRepo } from "@/lib/server/academy/repo";
+import { recordAcademyPurchase, type PurchaseOutcome } from "@/lib/server/academy/purchase";
+import type { Persona } from "@/lib/domain/types";
 
 export const runtime = "nodejs";
 
@@ -31,6 +38,7 @@ interface StripeEvent {
 }
 
 type Outcome =
+  | PurchaseOutcome
   | { status: "recorded"; paymentId: string; invoiceId: string; invoiceStatus?: string; paidCents?: number }
   | { status: "duplicate"; reference: string }
   | { status: "ignored"; reason: string };
@@ -139,6 +147,23 @@ async function handleCheckout(db: CrmAdminClient, event: StripeEvent): Promise<O
   const session = event.data.object;
   if (str(session, "payment_status") !== "paid") return { status: "ignored", reason: "not_paid_yet" };
   const paymentIntent = idOf(session, "payment_intent");
+  const meta = obj(session, "metadata");
+  const academyCourseId = str(meta, "academy_course_id");
+  if (academyCourseId) {
+    const persona = str(meta, "persona");
+    return recordAcademyPurchase(new SupabaseRepo(db), {
+      courseId: academyCourseId,
+      email: str(meta, "email") ?? str(obj(session, "customer_details"), "email") ?? str(session, "customer_email") ?? "",
+      firstName: str(meta, "first_name"),
+      lastName: str(meta, "last_name"),
+      persona: persona === "tech" || persona === "non_tech" || persona === "reconversion" ? (persona as Persona) : undefined,
+      amountCents: int(session, "amount_total") ?? 0,
+      reference: paymentIntent ?? str(session, "id") ?? event.id,
+      receivedAt: new Date(event.created * 1000).toISOString(),
+      feeCents: await fetchStripeFee(paymentIntent),
+      stripeEventId: event.id,
+    });
+  }
   const invoiceId = str(obj(session, "metadata"), "invoice_id") ?? str(session, "client_reference_id");
   return recordPayment(db, {
     invoiceId,

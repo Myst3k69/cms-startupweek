@@ -1,8 +1,9 @@
 # StartupWeek OS — CRM & back-office 100 % custom
 
-Le back-office de **StartupWeek** (bootcamp MVP 7 jours) : CRM, demandes entrantes, pipeline, relances, candidatures, sessions & émargement, projets des candidats, intervenants, **Qualiopi**, **facturation (acompte / solde, Stripe, Qonto)**, ressources, contenus du site, **marketing (campagnes Meta / LinkedIn, A/B tests, promotion des sessions)**, analytics et automatisations — pour remplacer Airtable + les workflows n8n.
+Le back-office de **StartupWeek** (bootcamp MVP 7 jours) : CRM, demandes entrantes, pipeline, relances, candidatures, sessions & émargement, projets des candidats, intervenants, **Qualiopi**, **facturation (acompte / solde, Stripe, Qonto)**, ressources, contenus du site, **StartupWeek Academy (e-learning)**, **marketing (campagnes Meta / LinkedIn, A/B tests, promotion des sessions)**, analytics et automatisations — pour remplacer Airtable + les workflows n8n.
 
 ➡️ Pourquoi et comment : **[docs/PROPOSITION.md](docs/PROPOSITION.md)** (analyse de l'existant, bénéfices, limites, plan de mise en production).
+➡️ E-learning : **[docs/ACADEMY.md](docs/ACADEMY.md)** (création des formations, accès des candidats, API pour « Mon espace » du site, vente Stripe, formation type de 50 h).
 
 ## Démarrer
 
@@ -48,7 +49,7 @@ Priorité : paramètre `?home=cockpit|focus|studio` (partageable) → choix mém
 | **Audiences** | Segments (candidats non inscrits, alumni, Digital Starter Kit, newsletter, exclusion des inscrits) exportés pour Meta / LinkedIn — consentement marketing obligatoire, hachage SHA-256, export journalisé |
 | **Liens UTM** | Générateur et convention de nommage ; utm_campaign reçues sans campagne correspondante |
 
-Synchro API Meta Ads / LinkedIn Ads : `/api/ads/sync` — configuration dans [docs/SUPABASE.md § 5 sexies](docs/SUPABASE.md).
+Synchro API Meta Ads / LinkedIn Ads : `/api/ads/sync` — configuration dans [docs/SUPABASE.md § 5 septies](docs/SUPABASE.md).
 
 ## Scripts
 
@@ -69,7 +70,7 @@ src/
   app/print/…            documents imprimables A4 (facture, devis, convention, convocation, attestation, émargement, programme)
   app/api/…              intake des formulaires du site, webhook Stripe, synchro Qonto, health
   components/            ui (primitives), charts, layout (AppShell, ⌘K, alertes), shared
-  features/<domaine>/    home, crm, programmes, qualiopi, documents, billing, site, marketing, analytics, system
+  features/<domaine>/    home, crm, programmes, qualiopi, documents, billing, site, academy, marketing, analytics, system
   lib/domain/            types (contrat de données), constantes, sélecteurs, actions métier, alertes
   lib/store/             store zustand (CRUD générique + journal d'activité)
   lib/data/              seed de démo, référentiel Qualiopi, synchro Supabase
@@ -86,7 +87,7 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 
 | Élément | État |
 |---|---|
-| Interface complète (19 sections, 38 pages back-office, 7 documents imprimables, 6 routes API) | ✅ fonctionnelle en mode démo |
+| Interface complète (20 sections, 42 pages back-office, 7 documents imprimables, 11 routes API) | ✅ fonctionnelle en mode démo |
 | Automatisations (acompte à l'acceptation, inscription au paiement, solde, emails, tâches, convocations, accusés de réclamation, garde de capacité) | ✅ exécutées côté client en démo — chaîne complète vérifiée dans le navigateur |
 | Qualité | ✅ `pnpm typecheck`, `pnpm lint`, `pnpm build` sans erreur ; 53 écrans vérifiés en clair / sombre / mobile 390 px (aucune erreur console, aucun débordement) |
 | Marketing (campagnes, A/B tests, audiences, promotion des sessions) | ✅ interface et données de démo ; migration `20260927105800` **écrite et testée en local, non appliquée** ; synchro Meta / LinkedIn écrite d'après la documentation officielle, **non testée avec de vrais comptes** |
@@ -97,4 +98,5 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 | Analytics du site (trafic + statistiques par article) | ✅ 26/09/2026 : mesure sans cookie écrite par le site dans `crm.traffic_days` / `crm.content_stats_days` (migration `20260926220247` appliquée en production) — [docs/SUPABASE.md § 5 quinquies](docs/SUPABASE.md). Les chiffres arrivent dès le déploiement du site (`/api/event`) ; posts LinkedIn / Instagram / newsletter : saisie manuelle |
 | Endpoints `/api/intake`, Stripe, Qonto | ✍️ écrits et testés en local (*dry-run* sans variables d'environnement) — à tester en préproduction avec les vraies API |
 | Envoi réel des emails (Resend) | ⏳ prévu côté serveur (intake) ; les emails déclenchés depuis l'interface sont journalisés en démo |
+| StartupWeek Academy (e-learning) | ✅ 26/09/2026 : back-office complet (formations, parcours, éditeur de leçons à 7 types de blocs et variantes par profil, aperçu apprenant en 3 directions artistiques, apprenants, livrables, cohortes, certificat FOAD), accès automatique des inscrits, API apprenant et vente Stripe testées de bout en bout en local (PostgreSQL + PostgREST) ; migration `20260926220123_crm_academy` **appliquée en production** ; formation type « Construire son MVP avec l'IA » (50 h). « Mon espace » du site reste à construire — [docs/ACADEMY.md](docs/ACADEMY.md) |
 | Documents légaux (convention, CGV, attestation) | ⚠️ modèles à faire valider juridiquement (voir le point L.6353-6 dans la proposition) |

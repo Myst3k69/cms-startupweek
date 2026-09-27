@@ -31,6 +31,7 @@ import { scoreTone } from "../../lib/labels";
 import { CandidateCard, DossierCard, LinkedProjectCard, PaymentCard, QualiopiChecklist, ScoringCard } from "./application-sections";
 import { useApplicationMover, type MoveTarget } from "./use-mover";
 import { sessionDates } from "../../lib/sessions";
+import { ContactAcademyCard } from "@/features/academy/components/academy-panels";
 
 interface ActionDef {
   key: string;
@@ -213,6 +214,7 @@ export function ApplicationDetail({ id }: { id: ID }) {
           </Card>
         </div>
         <div className="space-y-6">
+          <ContactAcademyCard contactId={app.contactId} />
           <CandidateCard contact={contact} />
           <QualiopiChecklist app={app} event={event} canEdit={editable} />
           <PaymentCard key={app.funderName ?? ""} app={app} event={event} invoices={invoices} canEdit={editable} />
