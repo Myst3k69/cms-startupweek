@@ -386,6 +386,33 @@ select id, status_code, left(content::text, 200), created from net._http_respons
 
 **Limites.** Pas de suivi d'ouverture ni de clic (SMTP) ; un rebond différé (boîte pleine, adresse morte signalée plus tard) arrive dans la boîte `contact@`, pas dans le CRM. Les séquences autres que Digital Starter Kit (J-7, J+1, relances automatiques de devis / factures…) ne sont pas exécutées automatiquement : leurs emails s'envoient depuis les fiches (boutons) ou la fenêtre de rédaction. Les réponses au questionnaire de satisfaction restent dans l'outil de formulaire choisi.
 
+## 5 quinquies. Mesure d'audience du site (sans cookie)
+
+Migration `20260926220247_crm_site_analytics.sql`, **appliquée en production le 26/09/2026** : droits vérifiés (`service_role` seul peut appeler la fonction ; `anon` et `authenticated` refusés ; tables d'empreintes illisibles hors service_role) ; scénario rejoué sur la vraie base dans un bloc annulé (page vue d'un article venant de Google, seconde vue, clic, formulaire commencé puis envoyé → 1 visiteur, 2 pages vues, 1 lecteur, 1 clic, 1 lead ; `crm.contents` et `public.blog_post` intacts ; rien de conservé) ; *advisors* : seulement `rls_enabled_no_policy` (INFO) sur `crm.site_salts` / `crm.site_visitors`, voulu. Validée auparavant en local : PostgreSQL 16 + PostgREST 12.2.3, site construit et piloté dans Chromium (visiteurs, sources, lecteurs uniques, clics, leads du jour et de la veille, opt-out, robots, requêtes d'un autre site, étapes du tunnel de candidature).
+
+**Avant** : `crm.traffic_days` vide et `crm.contents.metrics` à 0 pour les 75 contenus publiés — rien ne les alimentait ; la carte « Tracking » affirmait que Vercel Web Analytics était la source des chiffres (aucun import n'existait).
+
+| Événement | Émis par | Alimente |
+| --- | --- | --- |
+| Page vue | navigateur → `POST /api/event` du site (`components/SiteAnalytics.tsx`) | `crm.traffic_days` (visiteurs, pages vues, sources) ; pour `/blog/<slug>` : `crm.content_stats_days` (vues, lecteurs, sources) |
+| Clic sur un lien d'un article | navigateur → `/api/event` | `content_stats_days.clicks` |
+| Formulaire commencé (1er champ, une fois par page) | navigateur → `/api/event` | `traffic_days.form_starts` |
+| Formulaire envoyé | **serveur du site** (`mirrorToCrm`, toutes les routes `/api/submit-*` sauf réclamation ; tunnel de candidature : étape « capture » seulement) | `traffic_days.form_submits` ; `content_stats_days.leads` du dernier article lu (le jour même ou la veille) |
+
+- **Point d'entrée** : `crm.track_site_event(kind, path, ip, user_agent, referrer_host, utm_source, utm_medium)`, appelée par le site avec sa clé secrète (même client que le blog, aucune nouvelle variable). La route `/api/event` n'accepte pas « formulaire envoyé » : un lead ne peut pas être fabriqué depuis un navigateur.
+- **Vie privée** : aucun cookie ni stockage sur l'appareil. Un visiteur = `sha256(sel du jour | IP | user-agent)` calculé en base ; IP et user-agent ne sont pas enregistrés ; sels et empreintes (`crm.site_salts`, `crm.site_visitors`) effacés après 48 h par la tâche horaire `crm-site-visitors-purge`. Seuls restent des compteurs. Ignorés : robots, IP de `EXCLUDED_ANALYTICS_IPS` (cookie `analytics-excluded` posé par `proxy.ts`), navigateurs passés par `/disable-analytics`, préproduction, previews Vercel, localhost, espace membre.
+- **Définitions** : visiteurs = uniques **par jour**, additionnés sur une période ; source = UTM de la première page vue du jour, sinon domaine référent (Google et moteurs, LinkedIn, Instagram, messageries → newsletter, autres sites → « Partenaires & autres sites »), sinon « Direct » ; Meta Ads = `utm_source` meta… / *_ads, ou facebook / instagram avec `utm_medium` payant (cpc, paid…) — **les campagnes Meta doivent porter ces UTM** pour être reconnues.
+- **Articles** : un article est reconnu par son slug publié (`public.blog_post.slug` → `crm_id`) ; les statistiques restent attachées au contenu si le slug change ensuite. `crm.contents` n'est jamais modifié par la mesure (sinon : recopie vers le site et date « modifié le » à chaque vue). `contents.metrics` devient la **saisie manuelle** (posts LinkedIn / Instagram, newsletter : bouton « Mettre à jour les chiffres » dans l'éditeur) ; le CRM affiche saisie + mesure (`contentPerformance()`).
+- **CRM** : `content_stats_days` lisible par les sections Contenus et Analytics (aucune écriture depuis l'interface), chargée à la connexion avec `traffic_days` (les chiffres s'actualisent au rechargement). Fiche d'un article : vues, lecteurs, clics, leads sur 30 j / 90 j / 12 mois, histogramme, lecteurs par source. Page Analytics : la carte « Tracking » affiche la date de la dernière donnée reçue.
+- **Limites** : une partie des visiteurs échappe à toute mesure côté navigateur (bloqueurs, JavaScript désactivé) ; plusieurs personnes derrière la même IP avec le même navigateur comptent pour un ; la FAQ et les autres pages ne sont pas mesurées contenu par contenu (seulement dans le trafic global). Conversions vers Meta (API Conversions) / GA4 depuis le CRM : non implémentées.
+- **Politique de confidentialité du site** : elle ne mentionne aujourd'hui que Google Analytics — à compléter (mesure d'audience interne, sans cookie, base légale intérêt légitime, conservation des empreintes 48 h).
+
+```sql
+-- Contrôle rapide (SQL Editor)
+select date, visitors, pageviews, sources, form_starts, form_submits from crm.traffic_days order by date desc limit 7;
+select c.title, s.date, s.views, s.visitors, s.clicks, s.leads from crm.content_stats_days s join crm.contents c on c.id = s.content_id order by s.date desc, s.views desc limit 20;
+```
+
 ## 6. Brancher Stripe
 
 1. Dashboard Stripe → Developers → Webhooks → *Add endpoint* : `https://cms-startupweek.vercel.app/api/stripe/webhook`.
