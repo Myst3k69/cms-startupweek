@@ -104,20 +104,23 @@ export function PlainEditable({
   className?: string;
   label: string;
   multiline?: boolean;
-  /** Entrée (sans Maj) sur un champ d'une ligne : ex. ajouter l'étape suivante. */
+  /** Entrée sur un champ d'une ligne : ex. ajouter l'étape suivante. */
   onEnter?: () => void;
 }) {
   const ref = React.useRef<HTMLSpanElement>(null);
+  const normalize = React.useCallback(
+    (raw: string) => {
+      const t = raw.replace(/\u00a0/g, " ");
+      return multiline ? t.replace(/\n+$/, "") : t.replace(/\s*\n\s*/g, " ");
+    },
+    [multiline],
+  );
+  // Le DOM n'est réécrit que si la valeur change vraiment de l'extérieur (sinon le curseur sauterait).
   React.useLayoutEffect(() => {
     const el = ref.current;
-    if (el && el.innerText !== value) el.innerText = value;
-  }, [value]);
-  const read = () => {
-    const el = ref.current;
-    if (!el) return "";
-    const t = el.innerText.replace(/ /g, " ");
-    return multiline ? t.replace(/\n+$/, "") : t.replace(/\s*\n\s*/g, " ");
-  };
+    if (el && normalize(el.innerText) !== value) el.innerText = value;
+  }, [value, normalize]);
+  const read = () => normalize(ref.current?.innerText ?? "");
   return (
     <span
       ref={ref}
@@ -129,7 +132,7 @@ export function PlainEditable({
       suppressContentEditableWarning
       onInput={() => onChange(read())}
       onKeyDown={(e) => {
-        if (e.key === "Enter" && !e.shiftKey && !multiline) {
+        if (e.key === "Enter" && !multiline) {
           e.preventDefault();
           onEnter?.();
         }
