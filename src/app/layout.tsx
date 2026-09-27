@@ -26,11 +26,15 @@ export const viewport: Viewport = {
 /** Applique le thème avant le premier rendu (évite le flash clair → sombre). */
 const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("sw-theme")||"system";var d=t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";}catch(e){}})();`;
 
+/** Applique le menu replié avant le premier rendu (évite le saut de mise en page ; cf. components/layout/sidebar.ts). */
+const SIDEBAR_SCRIPT = `(function(){try{if(localStorage.getItem("sw-sidebar")==="collapsed")document.documentElement.dataset.sidebar="collapsed";}catch(e){}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" suppressHydrationWarning className={`${inter.variable} ${grotesk.variable} ${fraunces.variable} ${mono.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: SIDEBAR_SCRIPT }} />
       </head>
       <body className="min-h-dvh bg-background font-sans text-foreground antialiased">
         <Providers>{children}</Providers>

@@ -17,6 +17,7 @@ export type Section =
   | "facturation"
   | "ressources"
   | "contenus"
+  | "academy"
   | "analytics"
   | "automatisations"
   | "parametres";
@@ -25,7 +26,7 @@ export type Access = "none" | "read" | "write";
 
 const ALL: Section[] = [
   "dashboard", "demandes", "contacts", "organisations", "pipeline", "relances", "emails", "candidatures", "projets",
-  "sessions", "intervenants", "qualiopi", "facturation", "ressources", "contenus", "analytics", "automatisations", "parametres",
+  "sessions", "intervenants", "qualiopi", "facturation", "ressources", "contenus", "academy", "analytics", "automatisations", "parametres",
 ];
 
 function matrix(write: Section[], read: Section[]): Record<Section, Access> {
@@ -40,14 +41,15 @@ export const PERMISSIONS: Record<Role, Record<Section, Access>> = {
   admin: matrix(ALL, []),
   commercial: matrix(
     ["dashboard", "demandes", "contacts", "organisations", "pipeline", "relances", "emails", "candidatures", "facturation"],
-    ["projets", "sessions", "intervenants", "qualiopi", "ressources", "contenus", "analytics", "automatisations"],
+    ["projets", "sessions", "intervenants", "qualiopi", "ressources", "contenus", "academy", "analytics", "automatisations"],
   ),
   pedagogie: matrix(
-    ["dashboard", "relances", "emails", "candidatures", "projets", "sessions", "intervenants", "qualiopi", "ressources", "contenus"],
+    ["dashboard", "relances", "emails", "candidatures", "projets", "sessions", "intervenants", "qualiopi", "ressources", "contenus", "academy"],
     ["demandes", "contacts", "organisations", "pipeline", "facturation", "analytics", "automatisations"],
   ),
   // contacts en lecture : noms des participants pour l'émargement, les évaluations et les projets suivis.
-  formateur: matrix(["dashboard", "relances", "projets", "sessions"], ["candidatures", "ressources", "intervenants", "contacts"]),
+  // academy en écriture : correction des livrables et suivi des apprenants.
+  formateur: matrix(["dashboard", "relances", "projets", "sessions", "academy"], ["candidatures", "ressources", "intervenants", "contacts"]),
   lecture: matrix(["dashboard"], ALL.filter((s) => s !== "parametres")),
 };
 

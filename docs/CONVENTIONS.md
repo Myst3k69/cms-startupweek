@@ -36,3 +36,4 @@ src/
 10. **Accessibilité** : libellés explicites (`aria-label`), statut jamais porté par la seule couleur (Badge = point + libellé), focus visible, cibles ≥ 32px.
 11. **Mobile** : layouts en grille responsive (`sm:`/`lg:`), tables scrollables horizontalement, pas de débordement de page.
 12. Textes en **français**, ton direct et concret (vouvoiement côté client).
+13. **StartupWeek Academy** : règles pures partagées navigateur / serveur dans `lib/domain/academy.ts` (ordre des leçons, blocs par profil, déblocage séquentiel, correction des quiz, certificat) ; les 3 directions artistiques passent par les tokens `--da-*` (`bg-da-card`, `text-da-accent`, `font-da-title`…) sous `<DaScope da=…>`. Contenus de formation livrés en code : format `SeedModule` (`lib/data/academy/authoring.ts`), identifiants dérivés des clés (stables).

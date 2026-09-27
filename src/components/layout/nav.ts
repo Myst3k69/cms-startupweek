@@ -4,6 +4,7 @@ import {
   CalendarDays,
   FileText,
   FolderKanban,
+  GraduationCap,
   Inbox,
   KanbanSquare,
   LayoutDashboard,
@@ -64,6 +65,12 @@ export const NAV: NavGroup[] = [
       { href: "/projets", label: "Projets candidats", icon: Rocket, section: "projets", keywords: "startups mvp" },
       { href: "/intervenants", label: "Intervenants", icon: Mic2, section: "intervenants", keywords: "formateurs mentors jury" },
       { href: "/ressources", label: "Ressources", icon: Library, section: "ressources", keywords: "pdf documents templates" },
+    ],
+  },
+  {
+    label: "StartupWeek Academy",
+    items: [
+      { href: "/academy", label: "Academy", icon: GraduationCap, section: "academy", keywords: "e-learning formations cours parcours leçons apprenants elearning" },
     ],
   },
   {

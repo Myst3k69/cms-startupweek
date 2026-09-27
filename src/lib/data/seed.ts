@@ -23,9 +23,10 @@ import { buildQualiopi } from "./seed/qualiopi";
 import { buildCrm } from "./seed/crm";
 import { buildAutomations, buildContents } from "./seed/content";
 import { buildActivities, buildContentStats, buildTraffic } from "./seed/analytics";
+import { buildAcademy } from "./seed/academy";
 
 /** À incrémenter à chaque évolution du jeu de démo (force la régénération du store local). */
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 
 export interface SeedData extends Collections {
   settings: Settings;
@@ -67,6 +68,15 @@ function emptyData(): SeedData {
     contents: [],
     automations: [],
     offers: [],
+    courses: [],
+    courseModules: [],
+    lessons: [],
+    academyPaths: [],
+    enrollments: [],
+    lessonProgress: [],
+    assignments: [],
+    learnerConnections: [],
+    cohorts: [],
     settings: undefined as unknown as Settings, // renseigné par buildTeam
     activities: [],
     traffic: [],
@@ -93,6 +103,7 @@ export function buildSeed(now: number): SeedData {
   buildQualiopi(ctx); // indicators, evidences, improvementActions, watchItems, complaints, attendances, evaluations
   buildCrm(ctx); // emailTemplates, sequences, submissions, deals, tasks, emails
   buildContents(ctx);
+  buildAcademy(ctx); // formations, parcours, cohorte, inscriptions et progression (StartupWeek Academy)
   buildAutomations(ctx);
   buildTraffic(ctx);
   buildContentStats(ctx); // après buildContents : audience quotidienne des articles du blog
