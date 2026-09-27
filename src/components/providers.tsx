@@ -15,9 +15,13 @@ import { startRemoteSession, watchAuth } from "@/lib/store/remote-session";
 function StoreRuntime() {
   const toast = useToast();
   useEffect(() => {
+    // Pages publiques (document envoyé par email, désinscription) : aucune session à ouvrir.
+    const publicPage = /^\/(documents|desinscription)\//.test(window.location.pathname);
     if (DATA_MODE === "supabase") {
-      watchAuth();
-      if (!window.location.pathname.startsWith("/auth/callback")) void startRemoteSession();
+      if (!publicPage) {
+        watchAuth();
+        if (!window.location.pathname.startsWith("/auth/callback")) void startRemoteSession();
+      }
     } else {
       void useCrm.persist.rehydrate();
     }

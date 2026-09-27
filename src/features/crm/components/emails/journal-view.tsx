@@ -3,17 +3,18 @@
 import * as React from "react";
 import { AlertTriangle, CalendarClock, MailOpen, MousePointerClick, RotateCcw, Send, XCircle } from "lucide-react";
 import { useCrm } from "@/lib/store";
-import { useNow, useSession } from "@/lib/hooks";
+import { useNow, useSession, useSettings } from "@/lib/hooks";
 import { sendEmail } from "@/lib/domain/actions";
 import { EMAIL_STATUSES, labelOf } from "@/lib/domain/constants";
 import { contactName } from "@/lib/domain/selectors";
 import type { EmailMessage } from "@/lib/domain/types";
 import { dateTime, percent, relative } from "@/lib/format";
 import { normalizeEmail } from "@/lib/utils";
-import { Button, DataTable, DescriptionList, Drawer, StatCard, StatusBadge, useToast, type Column, type FilterDef } from "@/components/ui";
+import { Badge, Button, DataTable, DescriptionList, Drawer, StatCard, StatusBadge, useToast, type Column, type FilterDef } from "@/components/ui";
 import { ContactLink } from "@/components/shared/entity-links";
 import { EntityRefLink } from "../shared/entity-ref-link";
 import { DAY, decodeEntities } from "../../lib/format";
+import { isSending, useEmailDelivery, useSendingRefresh } from "../../lib/email-delivery";
 
 const DELIVERED = new Set<EmailMessage["status"]>(["envoye", "ouvert", "clique"]);
 const when = (m: EmailMessage) => m.sentAt ?? m.scheduledAt ?? m.createdAt;
@@ -24,6 +25,8 @@ export function JournalView({ initialId }: { initialId?: string }) {
   const contacts = useCrm((s) => s.contacts);
   const now = useNow();
   const [openId, setOpenId] = React.useState<string | undefined>(initialId);
+  const delivery = useEmailDelivery();
+  useSendingRefresh(emails, now);
 
   const tplById = React.useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates]);
   const contactByEmail = React.useMemo(() => new Map(contacts.map((c) => [normalizeEmail(c.email), c])), [contacts]);
@@ -61,7 +64,12 @@ export function JournalView({ initialId }: { initialId?: string }) {
           </div>
         ),
       },
-      { key: "status", header: "Statut", sort: (m) => labelOf(EMAIL_STATUSES, m.status), render: (m) => <StatusBadge options={EMAIL_STATUSES} value={m.status} /> },
+      {
+        key: "status",
+        header: "Statut",
+        sort: (m) => labelOf(EMAIL_STATUSES, m.status),
+        render: (m) => (isSending(m, now) ? <Badge tone="info" dot>Envoi en cours</Badge> : <StatusBadge options={EMAIL_STATUSES} value={m.status} />),
+      },
       {
         key: "date",
         header: "Date",
@@ -95,6 +103,15 @@ export function JournalView({ initialId }: { initialId?: string }) {
 
   return (
     <div className="space-y-5">
+      {delivery.live && delivery.configured === false ? (
+        <p className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning-text">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          L&apos;envoi n&apos;est pas encore configuré sur le serveur (SMTP ou secret de la route d&apos;envoi) : les emails restent en file, statut « Programmé », et partiront dès la configuration terminée.
+        </p>
+      ) : null}
+      {!delivery.live ? (
+        <p className="rounded-md bg-surface-2 px-3 py-2 text-sm text-muted-foreground">Mode démo : aucun email n&apos;est réellement envoyé.</p>
+      ) : null}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Envoyés (30 j)" value={stats.sent} icon={Send} hint={stats.scheduled ? `+ ${stats.scheduled} programmé${stats.scheduled > 1 ? "s" : ""}` : "Aucun envoi programmé"} />
         <StatCard label="Taux d'ouverture" value={percent(stats.sent ? (stats.opened / stats.sent) * 100 : 0)} icon={MailOpen} hint={`${stats.opened} ouverts sur ${stats.sent}`} />
@@ -133,6 +150,9 @@ function EmailPreviewDrawer({ id, onClose }: { id?: string; onClose: () => void 
   const update = useCrm((s) => s.update);
   const toast = useToast();
   const { canEdit } = useSession();
+  const settings = useSettings();
+  const now = useNow();
+  const delivery = useEmailDelivery();
   if (!id || !msg) return null;
   const editable = canEdit("emails");
   const tpl = msg.templateId ? templates.find((t) => t.id === msg.templateId) : undefined;
@@ -144,14 +164,21 @@ function EmailPreviewDrawer({ id, onClose }: { id?: string; onClose: () => void 
     toast({ title: "Envoi programmé annulé", description: "L'email repasse en brouillon.", tone: "info" });
   };
   const sendNow = () => {
+    if (delivery.live) {
+      // Remis en file pour maintenant : le serveur l'envoie dans les secondes qui suivent.
+      update("emails", msg.id, { status: "programme", scheduledAt: new Date().toISOString(), error: undefined });
+      toast({ title: "Envoi en cours", description: decodeEntities(msg.subject) });
+      return;
+    }
     update("emails", msg.id, { status: "envoye", sentAt: new Date().toISOString(), scheduledAt: undefined });
     toast({ title: "Email envoyé", description: decodeEntities(msg.subject) });
   };
   const resend = () => {
-    sendEmail({ to: msg.to, subject: msg.subject, body: msg.body, templateId: msg.templateId, related: msg.related });
-    toast({ title: "Email renvoyé", description: `${decodeEntities(msg.subject)} → ${msg.to}` });
+    sendEmail({ to: msg.to, subject: decodeEntities(msg.subject), body: decodeEntities(msg.body), templateId: msg.templateId, related: msg.related });
+    toast({ title: delivery.live ? "Nouvel envoi en cours" : "Email renvoyé", description: `${decodeEntities(msg.subject)} → ${msg.to}` });
     onClose();
   };
+  const sending = isSending(msg, now);
 
   return (
     <Drawer
@@ -161,13 +188,13 @@ function EmailPreviewDrawer({ id, onClose }: { id?: string; onClose: () => void 
       title={decodeEntities(msg.subject)}
       description={
         <span className="flex flex-wrap items-center gap-2">
-          <StatusBadge options={EMAIL_STATUSES} value={msg.status} />
+          {sending ? <Badge tone="info" dot>Envoi en cours</Badge> : <StatusBadge options={EMAIL_STATUSES} value={msg.status} />}
           <span>{dateTime(when(msg))}</span>
         </span>
       }
       footer={
         editable ? (
-          msg.status === "programme" ? (
+          msg.status === "programme" && !sending ? (
             <>
               <Button variant="ghost" size="sm" onClick={cancel}>
                 <XCircle /> Annuler l'envoi
@@ -176,7 +203,7 @@ function EmailPreviewDrawer({ id, onClose }: { id?: string; onClose: () => void 
                 <Send /> Envoyer maintenant
               </Button>
             </>
-          ) : msg.status === "brouillon" ? (
+          ) : msg.status === "programme" ? undefined : msg.status === "brouillon" ? (
             <Button size="sm" onClick={sendNow}>
               <Send /> Envoyer
             </Button>
@@ -203,19 +230,29 @@ function EmailPreviewDrawer({ id, onClose }: { id?: string; onClose: () => void 
         {msg.status === "erreur" ? (
           <p className="flex items-start gap-2 rounded-md border border-danger/20 bg-danger-soft px-3 py-2 text-sm text-danger-text">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            L'envoi a échoué (adresse invalide, boîte pleine ou rejet du fournisseur). Vérifiez l'adresse puis renvoyez.
+            <span>
+              L&apos;envoi a échoué{msg.attempts ? ` (${msg.attempts} tentative${msg.attempts > 1 ? "s" : ""})` : ""}. {msg.error ?? "Adresse invalide, boîte pleine ou rejet du serveur d'envoi."} Corrigez puis renvoyez.
+            </span>
+          </p>
+        ) : null}
+        {msg.status === "brouillon" && msg.error ? (
+          <p className="flex items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning-text">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            {msg.error}
           </p>
         ) : null}
         {msg.status === "programme" ? (
           <p className="flex items-start gap-2 rounded-md bg-info-soft px-3 py-2 text-sm text-info-text">
             <CalendarClock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            Envoi automatique le {dateTime(msg.scheduledAt)}.
+            {sending
+              ? `Envoi en cours${msg.error ? ` — nouvel essai après une erreur : ${msg.error}` : ""}.`
+              : `Envoi automatique le ${dateTime(msg.scheduledAt)}${msg.error ? ` (nouvel essai après une erreur : ${msg.error})` : ""}.`}
           </p>
         ) : null}
         <div className="rounded-lg border border-border bg-surface-2/60">
           <div className="border-b border-border px-4 py-3">
             <p className="text-xs text-muted-foreground">
-              De : StartupWeek &lt;hello@startupweek.tech&gt; — À : {contact ? contactName(contact) : msg.to}
+              De : {settings.brand || "StartupWeek"} &lt;{settings.email || "contact@startupweek.tech"}&gt; — À : {contact ? contactName(contact) : msg.to}
             </p>
             <p className="mt-1 text-sm font-semibold text-foreground">{decodeEntities(msg.subject)}</p>
           </div>

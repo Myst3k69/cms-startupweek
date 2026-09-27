@@ -7,6 +7,7 @@
  */
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/server/supabase-admin";
 import { isValidSupabaseUrl } from "@/lib/data/supabase";
+import { isMailConfigured } from "@/lib/server/mailer";
 
 export const runtime = "nodejs";
 
@@ -42,7 +43,10 @@ export async function GET(): Promise<Response> {
         stripeWebhook: Boolean(env.STRIPE_WEBHOOK_SECRET),
         stripeApi: Boolean(env.STRIPE_SECRET_KEY),
         qonto: Boolean(env.QONTO_ORGANIZATION_SLUG && env.QONTO_SECRET_KEY && env.QONTO_BANK_ACCOUNT_ID),
-        email: Boolean(env.RESEND_API_KEY && env.EMAIL_FROM),
+        /** Fournisseur d'email (SMTP ou Resend) et expéditeur configurés. */
+        email: isMailConfigured(),
+        /** Secret de la route d'envoi appelée par la base (file d'emails). */
+        emailDispatch: Boolean(env.EMAIL_DISPATCH_SECRET),
         cron: Boolean(env.CRON_SECRET),
       },
       time: new Date().toISOString(),

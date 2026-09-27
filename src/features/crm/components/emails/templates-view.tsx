@@ -32,7 +32,11 @@ const VARIABLES: { key: string; label: string }[] = [
   { key: "numero_devis", label: "N° de devis" },
   { key: "numero_reclamation", label: "N° de réclamation" },
   { key: "lien_questionnaire", label: "Lien questionnaire" },
-  { key: "lien_kit", label: "Lien Digital Starter Kit" },
+  { key: "dates_session", label: "Dates de la session (« du 5 au 12 octobre 2026 »)" },
+  { key: "date_entretien", label: "Date de l'entretien" },
+  { key: "validite", label: "Validité du devis" },
+  { key: "objet", label: "Objet de la demande" },
+  { key: "lien_document", label: "Lien vers la facture / le devis (complété à l'envoi)" },
 ];
 
 /** Valeurs d'exemple pour l'aperçu (tirées de la prochaine session ouverte quand elle existe). */
@@ -66,13 +70,16 @@ function useSampleVars() {
       echeance: "15 octobre 2026",
       numero_devis: `${settings.quotePrefix ?? "D"}-${year}-0012`,
       numero_reclamation: `REC-${year}-004`,
-      lien_questionnaire: "https://www.startupweek.tech/avis",
-      lien_kit: "https://storage.startupweek.tech/public/digital-starter-kit.zip",
+      lien_questionnaire: settings.satisfactionFormUrl || "https://tally.so/r/exemple",
+      lien_document: "https://exemple.startupweek.tech/documents/exemple",
+      dates_session: ev ? `du ${date(ev.startAt, "d MMMM")} au ${date(ev.endAt, "d MMMM yyyy")}` : "du 12 au 18 octobre 2026",
+      date_entretien: "14 oct. 2026 · 10:00",
+      validite: "31 octobre 2026",
+      objet: "Demande d'information",
       sujet: "Demande d'information",
       delai: "48 h",
       type_demande: "Entreprise",
       date_reception: "24 septembre 2026",
-      lien_crm: "https://os.startupweek.tech/demandes",
     } as Record<string, string>;
   }, [events, settings]);
 }

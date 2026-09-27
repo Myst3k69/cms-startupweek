@@ -212,6 +212,15 @@ export const remoteSync = {
     });
   },
 
+  /** Relit des lignes en base et met le store à jour (ex. statut d'un email envoyé par le serveur). */
+  async refresh(collection: EntityName, ids: ID[]) {
+    const c = getSupabase();
+    if (!c || !ids.length) return;
+    const { data, error } = await c.from(TABLES[collection]).select("*").in("id", ids);
+    if (error) return report(collection, describeDbError(error));
+    for (const row of (data ?? []) as Row[]) rowListener?.(collection, fromDb(row), undefined);
+  },
+
   /** Journal d'activité : ajout seul (immuable côté base, sauf admin). */
   insertActivity(activity: Activity) {
     const c = getSupabase();

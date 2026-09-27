@@ -7,7 +7,7 @@
  * En production, la même logique vit côté serveur (numérotation : crm.next_document_number()).
  */
 import { crm, findById } from "@/lib/store";
-import { createInvoice, createTask, nextNumber, recordPayment, sendEmail } from "@/lib/domain/actions";
+import { createInvoice, createTask, nextNumber, paymentText, recordPayment, sendEmail } from "@/lib/domain/actions";
 import { contactName, invoiceBalance, invoiceTotal } from "@/lib/domain/selectors";
 import { date, money } from "@/lib/format";
 import { uid } from "@/lib/utils";
@@ -222,18 +222,21 @@ function invoiceVars(inv: Invoice, amountCents: number) {
     montant: money(amountCents, true),
     echeance,
     date_echeance: echeance,
-    lien_paiement: inv.stripePaymentLink ?? `virement IBAN ${crm().settings.iban} (référence ${numero})`,
+    lien_paiement: paymentText(inv),
     session: ev?.name ?? "",
   };
 }
 
-/** Envoi de la facture par email (PDF + lien de paiement). Modèle « Facture d'acompte » pour un acompte. */
+/** Envoi de la facture par email (lien vers la facture + règlement). Modèle « Facture d'acompte » pour un acompte. */
 export function sendInvoiceEmail(id: ID) {
   const inv = findById("invoices", id);
   if (!inv || !inv.number) return false;
   const { to } = recipientOf(inv);
   if (!to) return false;
-  const tpl = inv.kind === "acompte" && inv.eventId ? billingTemplate(/acompte/i, /relance|rappel/i) : undefined;
+  const tpl =
+    inv.kind === "acompte" && inv.eventId
+      ? billingTemplate(/acompte/i, /relance|rappel/i)
+      : billingTemplate(inv.kind === "avoir" ? /envoi d'avoir/i : /envoi de facture/i);
   const label = inv.kind === "avoir" ? "l'avoir" : inv.kind === "acompte" ? "la facture d'acompte" : inv.kind === "solde" ? "la facture de solde" : "la facture";
   sendEmail({
     to,
@@ -241,7 +244,7 @@ export function sendInvoiceEmail(id: ID) {
     subject: tpl ? undefined : `${inv.kind === "avoir" ? "Avoir" : "Facture"} {{numero}} — StartupWeek`,
     body: tpl
       ? undefined
-      : `Bonjour {{prenom}},\n\nVeuillez trouver ci-joint ${label} {{numero}} d'un montant de {{montant}}${inv.kind === "avoir" ? "" : ", à régler avant le {{echeance}}"}.\n${inv.kind === "avoir" ? "" : "Règlement : {{lien_paiement}}\n"}\nMerci pour votre confiance,\nL'équipe StartupWeek`,
+      : `Bonjour {{prenom}},\n\nVoici ${label} {{numero}} d'un montant de {{montant}}${inv.kind === "avoir" ? "" : ", à régler avant le {{echeance}}"} : {{lien_document}}\n${inv.kind === "avoir" ? "" : "Règlement : {{lien_paiement}}\n"}\nMerci pour votre confiance,\nL'équipe StartupWeek`,
     vars: invoiceVars(inv, Math.abs(invoiceTotal(inv).ttc)),
     related: { entity: "invoices", id: inv.id },
   });
@@ -254,10 +257,12 @@ export function sendDueSoonNotice(id: ID) {
   if (!inv || !inv.number) return false;
   const { to } = recipientOf(inv);
   if (!to) return false;
+  const tpl = billingTemplate(/avant échéance/i);
   sendEmail({
     to,
-    subject: "Rappel : facture {{numero}} à régler avant le {{echeance}}",
-    body: "Bonjour {{prenom}},\n\nPetit rappel : la facture {{numero}} ({{montant}}) arrive à échéance le {{echeance}}.\nRèglement : {{lien_paiement}}\n\nL'équipe StartupWeek",
+    template: tpl,
+    subject: tpl ? undefined : "Rappel : facture {{numero}} à régler avant le {{echeance}}",
+    body: tpl ? undefined : "Bonjour {{prenom}},\n\nPetit rappel : la facture {{numero}} ({{montant}}) arrive à échéance le {{echeance}}.\nFacture : {{lien_document}}\nRèglement : {{lien_paiement}}\n\nL'équipe StartupWeek",
     vars: invoiceVars(inv, invoiceBalance(inv)),
     related: { entity: "invoices", id: inv.id },
   });
@@ -271,7 +276,7 @@ export function sendDueSoonNotice(id: ID) {
  * par niveau et les variables attendues par les modèles du seed ({{numero_facture}}, {{date_echeance}}).
  */
 function sendReminderEmail(inv: Invoice, level: number, to: string) {
-  const tpl = level === 1 ? billingTemplate(/j\+3\b/i) : level === 2 ? billingTemplate(/j\+10\b/i) : undefined;
+  const tpl = level === 1 ? billingTemplate(/j\+3\b/i) : level === 2 ? billingTemplate(/j\+10\b/i) : billingTemplate(/mise en demeure/i);
   const formal = level >= 3;
   sendEmail({
     to,
@@ -402,10 +407,14 @@ export function sendQuote(id: ID) {
   if (!q) return false;
   const { contact, to } = recipientOf(q);
   if (!to) return false;
+  const tpl = billingTemplate(/envoi de devis/i);
   sendEmail({
     to,
-    subject: "Votre devis StartupWeek {{numero}}",
-    body: "Bonjour {{prenom}},\n\nComme convenu, vous trouverez ci-joint notre proposition {{numero}} d'un montant de {{montant}} HT, valable jusqu'au {{validite}}.\nUn simple « bon pour accord » en réponse suffit pour lancer l'organisation.\n\nBien à vous,\nL'équipe StartupWeek",
+    template: tpl,
+    subject: tpl ? undefined : "Votre devis StartupWeek {{numero}}",
+    body: tpl
+      ? undefined
+      : "Bonjour {{prenom}},\n\nComme convenu, voici notre proposition {{numero}} d'un montant de {{montant}} HT, valable jusqu'au {{validite}} : {{lien_document}}\nUn simple « bon pour accord » en réponse suffit pour lancer l'organisation.\n\nBien à vous,\nL'équipe StartupWeek",
     vars: { prenom: contact?.firstName ?? "", numero: q.number, montant: money(quoteTotal(q).ht, true), validite: date(q.validUntil) },
     related: { entity: "quotes", id: q.id },
   });
