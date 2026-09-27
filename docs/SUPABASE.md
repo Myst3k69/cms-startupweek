@@ -365,7 +365,7 @@ Migration `20260926215925_crm_email_delivery.sql`, **appliquée en production le
    SMTP_PASSWORD=<mot de passe de la boîte>
    EMAIL_FROM=StartupWeek <contact@startupweek.tech>
    EMAIL_DISPATCH_SECRET=<valeur du secret Vault crm_email_dispatch_secret, point 2>
-   EMAIL_BCC=aurelien.chiren@gmail.com   # facultatif : copie de chaque email (n8n mettait cette adresse en copie)
+   EMAIL_BCC=aurelien.chiren@gmail.com   # facultatif : copie de chaque email (n8n mettait cette adresse en copie) — jamais au destinataire lui-même
    PUBLIC_APP_URL=https://…              # facultatif : domaine des liens envoyés (défaut : URL de production Vercel)
    ```
 2. Secret partagé : créé dans Vault le 26/09/2026 (valeur aléatoire tirée par la base, jamais écrite ailleurs). Pour le lire et le copier dans `EMAIL_DISPATCH_SECRET` : Supabase → SQL Editor :
