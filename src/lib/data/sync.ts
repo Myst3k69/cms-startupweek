@@ -46,6 +46,15 @@ export const TABLES: Record<EntityName, string> = {
   contents: "contents",
   automations: "automation_rules",
   offers: "offers",
+  courses: "academy_courses",
+  courseModules: "academy_modules",
+  lessons: "academy_lessons",
+  academyPaths: "academy_paths",
+  enrollments: "academy_enrollments",
+  lessonProgress: "academy_progress",
+  assignments: "academy_assignments",
+  learnerConnections: "academy_connections",
+  cohorts: "academy_cohorts",
 };
 
 type Row = Record<string, unknown>;

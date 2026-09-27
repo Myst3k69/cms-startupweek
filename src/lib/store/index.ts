@@ -48,6 +48,15 @@ export const ID_PREFIX: Record<EntityName, string> = {
   contents: "cnt",
   automations: "aut",
   offers: "off",
+  courses: "crs",
+  courseModules: "mod",
+  lessons: "les",
+  academyPaths: "pth",
+  enrollments: "enr",
+  lessonProgress: "lpr",
+  assignments: "liv",
+  learnerConnections: "cnx",
+  cohorts: "coh",
 };
 
 export type NewEntity<K extends EntityName> = Omit<EntityMap[K], "id" | "createdAt" | "updatedAt"> & { id?: ID };
@@ -102,6 +111,12 @@ const ENTITY_LABEL: Partial<Record<EntityName, string>> = {
   contents: "Contenu",
   resources: "Ressource",
   submissions: "Demande",
+  courses: "Formation",
+  lessons: "Leçon",
+  academyPaths: "Parcours",
+  enrollments: "Inscription Academy",
+  assignments: "Livrable",
+  cohorts: "Cohorte",
 };
 
 /** Paramètres par défaut (remplacés par le seed de démo ou la base). */

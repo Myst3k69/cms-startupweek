@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, Building2, CalendarX2, ClipboardCheck, Columns3, Euro, FileText, Globe2, LayoutDashboard, Library, ListChecks, MapPin, Printer, Smile, Users } from "lucide-react";
+import { ArrowLeft, Building2, CalendarX2, ClipboardCheck, Columns3, Euro, FileText, Globe2, GraduationCap, LayoutDashboard, Library, ListChecks, MapPin, Printer, Smile, Users } from "lucide-react";
 import { Badge, EmptyState, LinkButton, PageHeader, StatusBadge, Tabs, useToast } from "@/components/ui";
 import { StatusSelect } from "@/components/shared/status-select";
 import { EVENT_KINDS, EVENT_MODES, EVENT_STATUSES, labelOf } from "@/lib/domain/constants";
@@ -21,8 +21,9 @@ import { EvaluationsTab } from "./tab-evaluations";
 import { ResourcesTab } from "./tab-resources";
 import { FinancesTab } from "./tab-finances";
 import { DocumentsTab } from "./tab-documents";
+import { SessionAcademyTab } from "@/features/academy/components/academy-panels";
 
-const TABS = ["apercu", "participants", "programme", "emargement", "evaluations", "ressources", "finances", "documents"] as const;
+const TABS = ["apercu", "participants", "programme", "emargement", "evaluations", "ressources", "academy", "finances", "documents"] as const;
 export type SessionTab = (typeof TABS)[number];
 
 export function isSessionTab(v: string | undefined): v is SessionTab {
@@ -51,7 +52,7 @@ export function SessionDetail({ id, initialTab }: { id: ID; initialTab?: string 
 
 function SessionDetailView({ ev, initialTab }: { ev: EventSession; initialTab: SessionTab }) {
   const now = useNow();
-  const { canEdit } = useSession();
+  const { canEdit, can } = useSession();
   const editable = canEdit("sessions");
   const { update } = useActions();
   const toast = useToast();
@@ -68,6 +69,7 @@ function SessionDetailView({ ev, initialTab }: { ev: EventSession; initialTab: S
     { value: "emargement" as const, label: "Émargement", icon: ClipboardCheck },
     { value: "evaluations" as const, label: "Évaluations", icon: Smile, count: data.evals.length || undefined },
     { value: "ressources" as const, label: "Ressources", icon: Library, count: ev.resourceIds.length || undefined },
+    ...(can("academy") ? [{ value: "academy" as const, label: "Academy", icon: GraduationCap }] : []),
     { value: "finances" as const, label: "Finances", icon: Euro },
     { value: "documents" as const, label: "Documents", icon: FileText },
   ];
@@ -148,6 +150,7 @@ function SessionDetailView({ ev, initialTab }: { ev: EventSession; initialTab: S
       {tab === "emargement" ? <AttendanceTab ev={ev} data={data} canEdit={editable} /> : null}
       {tab === "evaluations" ? <EvaluationsTab ev={ev} data={data} canEdit={editable} /> : null}
       {tab === "ressources" ? <ResourcesTab ev={ev} canEdit={editable} /> : null}
+      {tab === "academy" ? <SessionAcademyTab ev={ev} canEdit={editable} /> : null}
       {tab === "finances" ? <FinancesTab key={ev.budgetCents ?? "none"} ev={ev} data={data} canEdit={editable} /> : null}
       {tab === "documents" ? <DocumentsTab ev={ev} data={data} /> : null}
     </div>
