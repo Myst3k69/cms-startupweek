@@ -13,7 +13,7 @@ import { ENTITY_LABEL } from "../../lib/labels";
 
 const COLLECTIONS = Object.keys(ID_PREFIX) as EntityName[];
 
-type ImportPatch = Partial<Pick<CrmState, EntityName | "settings" | "activities" | "traffic">>;
+type ImportPatch = Partial<Pick<CrmState, EntityName | "settings" | "activities" | "traffic" | "contentStats">>;
 
 function snapshot() {
   const s = useCrm.getState();
@@ -27,6 +27,7 @@ function snapshot() {
     settings: s.settings,
     activities: s.activities,
     traffic: s.traffic,
+    contentStats: s.contentStats,
     ...data,
   };
 }
@@ -55,6 +56,7 @@ function parseImport(text: string): { ok: true; patch: ImportPatch; counts: [str
   if (o.settings && typeof o.settings === "object" && !Array.isArray(o.settings)) patch.settings = { ...useCrm.getState().settings, ...(o.settings as object) };
   if (Array.isArray(o.activities)) patch.activities = o.activities;
   if (Array.isArray(o.traffic)) patch.traffic = o.traffic;
+  if (Array.isArray(o.contentStats)) patch.contentStats = o.contentStats;
   if (!counts.length) return { ok: false, error: "Aucune collection reconnue dans ce fichier." };
   return { ok: true, patch: patch as ImportPatch, counts };
 }

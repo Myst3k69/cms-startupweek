@@ -109,6 +109,8 @@ export interface Contact extends BaseEntity {
   score: number; // 0-100, calculé (engagement + fit)
   lastContactAt?: ISODate;
   notes?: string;
+  /** Jeton du lien de désinscription des emails marketing (attribué par la base). */
+  unsubscribeToken?: string;
 }
 
 /** Demande entrante = toute soumission de formulaire du site (remplace Form Submissions + tables métier). */
@@ -241,12 +243,21 @@ export interface EmailMessage extends BaseEntity {
   subject: string;
   body: string;
   templateId?: ID;
+  /** « programme » = en file : envoyé par le serveur à scheduledAt (maintenant ou plus tard). */
   status: EmailStatus;
   scheduledAt?: ISODate;
   sentAt?: ISODate;
   openedAt?: ISODate;
   related?: EntityRef;
   sequenceId?: ID;
+  /** Tentatives d'envoi (3 au plus). */
+  attempts?: number;
+  /** Réservé par un envoi en cours depuis cet instant. */
+  sendingAt?: ISODate;
+  /** Dernière erreur d'envoi, ou raison du non-envoi (variable non remplie, consentement…). */
+  error?: string;
+  /** Identifiant du message chez le fournisseur (Message-ID SMTP). */
+  providerId?: string;
 }
 
 /* ───────────────────────────── Sessions & événements ───────────────────────────── */
@@ -558,6 +569,8 @@ export interface Quote extends BaseEntity {
   sentAt?: ISODate;
   acceptedAt?: ISODate;
   invoiceId?: ID;
+  /** Jeton du lien public vers le devis (/documents/<jeton>), attribué par la base. */
+  publicToken?: string;
 }
 
 /** CGV StartupWeek : acompte de 30 % à l'inscription, solde à J-30. */
@@ -581,6 +594,8 @@ export interface Invoice extends BaseEntity {
   paidCents: Cents;
   preferredMethod: PaymentMethod;
   stripePaymentLink?: string;
+  /** Jeton du lien public vers la facture (/documents/<jeton>), attribué par la base. */
+  publicToken?: string;
   funder?: { name: string; subrogation: boolean; agreementRef?: string };
   remindersSent: number;
   lastReminderAt?: ISODate;
@@ -655,6 +670,11 @@ export interface ContentItem extends BaseEntity {
   eventId?: ID;
   scheduledAt?: ISODate;
   publishedAt?: ISODate;
+  /**
+   * Chiffres saisis à la main (posts LinkedIn / Instagram, newsletter…). Les articles
+   * du blog sont mesurés sur le site (ContentStatDay) : affichage = saisie + mesure,
+   * via contentPerformance().
+   */
   metrics: { views: number; clicks: number; leads: number };
   /** Blog : rubrique affichée (« Méthodologie »…). FAQ : clé de catégorie (FAQ_CATEGORIES). */
   category?: string;
@@ -947,6 +967,26 @@ export interface TrafficDay {
   formSubmits: number;
 }
 
+/**
+ * Audience d'un contenu publié sur le site, par jour (crm.content_stats_days) —
+ * écrite par le site (mesure sans cookie), jamais depuis l'interface.
+ * Aujourd'hui : articles du blog (page /blog/<slug>).
+ */
+export interface ContentStatDay {
+  id: ID;
+  contentId: ID;
+  date: ISODate; // YYYY-MM-DD (Europe/Paris)
+  views: number;
+  /** Lecteurs uniques du jour. */
+  visitors: number;
+  /** Clics sur un lien de l'article (appel à l'action, lien interne ou externe). */
+  clicks: number;
+  /** Formulaires envoyés après lecture de l'article (dernier article lu, même jour ou veille). */
+  leads: number;
+  /** Lecteurs par source de visite. */
+  sources: Partial<TrafficDay["sources"]>;
+}
+
 export type AutomationTrigger =
   | "formulaire_recu"
   | "candidature_statut"
@@ -1022,6 +1062,10 @@ export interface Settings {
   stripeConnected: boolean;
   qontoConnected: boolean;
   emailProvider: "resend" | "smtp" | "brevo";
+  /** Accusés de réception et Digital Starter Kit des formulaires du site envoyés par le CRM (désactivé tant que n8n les envoie). */
+  siteFormEmails: boolean;
+  /** Lien du questionnaire de satisfaction à chaud (Tally, Google Forms…), envoyé en fin de session. */
+  satisfactionFormUrl: string;
   depositPercent: number; // acompte à l'inscription (CGV : 30 %)
   balanceDaysBefore: number; // solde exigible à J-x (CGV : 30)
   dataMode: "demo" | "supabase";

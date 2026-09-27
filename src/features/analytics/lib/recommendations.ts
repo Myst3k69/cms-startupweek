@@ -3,8 +3,8 @@
  * Chaque règle ne se déclenche que si les volumes sont suffisants pour être significatifs.
  */
 import type { Tone } from "@/lib/domain/constants";
-import type { Application, ContentItem, EventSession, Submission } from "@/lib/domain/types";
-import { daysUntil, slaState } from "@/lib/domain/selectors";
+import type { Application, ContentItem, EventSession, ID, Submission } from "@/lib/domain/types";
+import { daysUntil, slaState, type ContentPerformance } from "@/lib/domain/selectors";
 import { percent } from "@/lib/format";
 import type { ConversionRow, TrafficTotals } from "./metrics";
 
@@ -28,6 +28,7 @@ export function buildRecommendations(input: {
   slaHours: number;
   traffic: TrafficTotals;
   contents: ContentItem[];
+  contentPerf: Map<ID, ContentPerformance>;
   npsCur?: number;
   npsPrev?: number;
   applications: Application[];
@@ -105,12 +106,13 @@ export function buildRecommendations(input: {
   }
 
   // 5. Contenu le plus générateur de leads.
-  const topLead = input.contents.filter((c) => c.status === "publie" && c.metrics.leads > 0).sort((a, b) => b.metrics.leads - a.metrics.leads)[0];
+  const leadsOf = (c: ContentItem) => input.contentPerf.get(c.id)?.leads ?? 0;
+  const topLead = input.contents.filter((c) => c.status === "publie" && leadsOf(c) > 0).sort((a, b) => leadsOf(b) - leadsOf(a))[0];
   if (topLead) {
     out.push({
       id: "top-content",
       tone: "info",
-      title: `« ${topLead.title} » : ${topLead.metrics.leads} leads`,
+      title: `« ${topLead.title} » : ${leadsOf(topLead)} leads`,
       detail: "Contenu le plus performant : décliner en post LinkedIn, newsletter et page session liée.",
       href: `/contenus/${topLead.id}`,
       cta: "Ouvrir le contenu",

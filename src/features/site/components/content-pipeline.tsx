@@ -5,6 +5,7 @@ import { CalendarClock, Eye, UserPlus } from "lucide-react";
 import { Kanban } from "@/components/ui";
 import { UserChip } from "@/components/shared/entity-links";
 import { StatusSelect } from "@/components/shared/status-select";
+import { useContentPerformance } from "@/lib/hooks";
 import { CHANNELS, CONTENT_STATUSES, CONTENT_TYPES, labelOf, toneOf } from "@/lib/domain/constants";
 import type { ContentItem, ContentStatus } from "@/lib/domain/types";
 import { compactNumber, date } from "@/lib/format";
@@ -23,6 +24,7 @@ export function ContentPipeline({
   onMove: (item: ContentItem, to: ContentStatus) => void;
 }) {
   const active = items.filter((i) => i.status !== "archive");
+  const perf = useContentPerformance();
   return (
     <Kanban
       columns={CONTENT_PIPELINE.map((s) => ({ id: s, title: labelOf(CONTENT_STATUSES, s), tone: toneOf(CONTENT_STATUSES, s) }))}
@@ -50,11 +52,11 @@ export function ContentPipeline({
                 <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
                   <span className="inline-flex items-center gap-0.5" title="Vues">
                     <Eye className="size-3" aria-hidden="true" />
-                    <span className="tabular">{compactNumber(it.metrics.views)}</span>
+                    <span className="tabular">{compactNumber(perf.get(it.id)?.views ?? 0)}</span>
                   </span>
                   <span className="inline-flex items-center gap-0.5" title="Leads">
                     <UserPlus className="size-3" aria-hidden="true" />
-                    <span className="tabular">{it.metrics.leads}</span>
+                    <span className="tabular">{perf.get(it.id)?.leads ?? 0}</span>
                   </span>
                 </span>
               ) : when ? (

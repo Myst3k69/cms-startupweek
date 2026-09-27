@@ -11,7 +11,7 @@ import type { Tone } from "@/lib/domain/constants";
 import type { Settings } from "@/lib/domain/types";
 import { CopyButton, useOrigin } from "../copy-button";
 
-type HealthServices = Partial<Record<"supabaseAdmin" | "supabasePublic" | "intakeSignature" | "allowedOriginsCustom" | "stripeWebhook" | "stripeApi" | "qonto" | "email" | "cron", boolean>>;
+type HealthServices = Partial<Record<"supabaseAdmin" | "supabasePublic" | "intakeSignature" | "allowedOriginsCustom" | "stripeWebhook" | "stripeApi" | "qonto" | "email" | "emailDispatch" | "cron", boolean>>;
 interface Health {
   ok: boolean;
   mode: string;
@@ -35,9 +35,8 @@ interface Integration {
 }
 
 const EMAIL_PROVIDERS: { value: Settings["emailProvider"]; label: string }[] = [
-  { value: "resend", label: "Resend (recommandé)" },
-  { value: "smtp", label: "SMTP" },
-  { value: "brevo", label: "Brevo" },
+  { value: "smtp", label: "SMTP (contact@)" },
+  { value: "resend", label: "Resend" },
 ];
 
 export function IntegrationsTab() {
@@ -98,9 +97,30 @@ export function IntegrationsTab() {
       name: "Emails transactionnels",
       icon: Mail,
       status: { label: EMAIL_PROVIDERS.find((p) => p.value === settings.emailProvider)?.label ?? settings.emailProvider, tone: "info" },
-      description: "Accusés de réception, convocations, relances : variables échappées (fin de l'injection HTML des emails n8n).",
-      env: settings.emailProvider === "resend" ? ["RESEND_API_KEY", "EMAIL_FROM"] : settings.emailProvider === "smtp" ? ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_FROM"] : ["BREVO_API_KEY", "EMAIL_FROM"],
-      health: ["email"],
+      description:
+        "Tous les emails du CRM (réponses, factures, devis, relances, candidatures, convocations…) passent par une file d'envoi : la base appelle la route d'envoi, qui envoie en SMTP (ou Resend) et note « envoyé » / « erreur ». Variables échappées, liens personnels complétés à l'envoi.",
+      env:
+        settings.emailProvider === "resend"
+          ? ["RESEND_API_KEY", "EMAIL_FROM", "EMAIL_DISPATCH_SECRET", "EMAIL_BCC (facultatif)", "PUBLIC_APP_URL (facultatif)"]
+          : ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_FROM", "EMAIL_DISPATCH_SECRET", "EMAIL_BCC (facultatif)", "PUBLIC_APP_URL (facultatif)"],
+      health: ["email", "emailDispatch"],
+      endpoint: "/api/emails/dispatch",
+      extra: (
+        <div className="flex items-start justify-between gap-4 rounded-md border border-border px-3 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">Emails des formulaires du site</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Accusés de réception et Digital Starter Kit envoyés par le CRM. À activer après avoir désactivé les workflows n8n des formulaires, sinon les demandeurs reçoivent chaque email en double.
+            </p>
+          </div>
+          <Switch
+            checked={settings.siteFormEmails}
+            disabled={!editable}
+            onChange={(v) => toggle({ siteFormEmails: v }, v ? "Emails des formulaires envoyés par le CRM" : "Emails des formulaires laissés à n8n")}
+            label="Emails des formulaires du site"
+          />
+        </div>
+      ),
       control: (
         <Select
           aria-label="Fournisseur d'email"

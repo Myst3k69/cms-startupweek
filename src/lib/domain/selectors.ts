@@ -6,7 +6,10 @@ import type {
   Application,
   Complaint,
   Contact,
+  ContentItem,
+  ContentStatDay,
   EventSession,
+  ID,
   Invoice,
   Payment,
   QualiopiIndicator,
@@ -166,4 +169,52 @@ export function lastWeeks(now: number, count = 12) {
 export function inRange(iso: string | undefined, start: number, end: number) {
   const v = t(iso);
   return v >= start && v < end;
+}
+
+/* ───────────── Contenus ───────────── */
+
+/** Contenus mesurés page par page sur le site : les articles du blog (/blog/<slug>, cf. crm.track_site_event). */
+export function isSiteMeasured(c: Pick<ContentItem, "type" | "channel">): boolean {
+  return c.type === "article" && c.channel === "blog";
+}
+
+export interface ContentPerformance {
+  views: number;
+  /** Lecteurs uniques par jour, additionnés (mesure du site uniquement). */
+  visitors: number;
+  clicks: number;
+  leads: number;
+  /** Dernier jour avec une vue mesurée (YYYY-MM-DD). */
+  lastViewDate?: string;
+}
+
+/** Chiffres affichés de chaque contenu : saisie manuelle (metrics) + audience mesurée sur le site. */
+export function contentPerformance(contents: ContentItem[], stats: ContentStatDay[]): Map<ID, ContentPerformance> {
+  const measured = new Map<ID, ContentPerformance>();
+  for (const d of stats) {
+    const m = measured.get(d.contentId) ?? { views: 0, visitors: 0, clicks: 0, leads: 0 };
+    m.views += d.views;
+    m.visitors += d.visitors;
+    m.clicks += d.clicks;
+    m.leads += d.leads;
+    const day = d.date.slice(0, 10);
+    if (d.views > 0 && (!m.lastViewDate || day > m.lastViewDate)) m.lastViewDate = day;
+    measured.set(d.contentId, m);
+  }
+  return new Map(
+    contents.map((c) => {
+      const m = measured.get(c.id);
+      const manual = c.metrics ?? { views: 0, clicks: 0, leads: 0 };
+      return [
+        c.id,
+        {
+          views: (manual.views ?? 0) + (m?.views ?? 0),
+          visitors: m?.visitors ?? 0,
+          clicks: (manual.clicks ?? 0) + (m?.clicks ?? 0),
+          leads: (manual.leads ?? 0) + (m?.leads ?? 0),
+          lastViewDate: m?.lastViewDate,
+        },
+      ];
+    }),
+  );
 }
