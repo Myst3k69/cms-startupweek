@@ -14,7 +14,8 @@ export default async function SessionRoute({
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   return (
     <Guard section="sessions">
-      <SessionDetail id={id} initialTab={firstParam(sp.onglet)} />
+      {/* key : un lien interne vers un autre onglet / une autre rubrique remonte la vue sur la bonne cible. */}
+      <SessionDetail key={`${firstParam(sp.onglet) ?? ""}:${firstParam(sp.rubrique) ?? ""}`} id={id} initialTab={firstParam(sp.onglet)} initialSection={firstParam(sp.rubrique)} />
     </Guard>
   );
 }

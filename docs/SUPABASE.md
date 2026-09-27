@@ -155,6 +155,7 @@ NEXT_PUBLIC_CRM_DATA_MODE=supabase
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…
 SUPABASE_SECRET_KEY=sb_secret_…          # serveur uniquement (routes /api/*)
+ANTHROPIC_API_KEY=sk-ant-…               # serveur uniquement : assistant IA de sourcing de lieux (§ 5 quater)
 ```
 
 ✅ Renseignées en Production le 26/09/2026 (`SUPABASE_SECRET_KEY` pas encore : routes `/api/*` inactives). Les variables `NEXT_PUBLIC_*` sont intégrées **au build** : redéployer après les avoir modifiées. Saisir la **valeur** (`https://…supabase.co`), pas le nom de la variable : une adresse invalide affiche désormais un message explicite sur `/connexion` et `supabasePublic: false` dans `/api/health` (auparavant : page « This page couldn't load »).
@@ -332,6 +333,37 @@ select at, summary, meta from crm.activities where entity_id = 'crm-scheduler' o
 ```
 
 Si les exécutions s'arrêtent (processus « pg_cron scheduler » absent de `pg_stat_activity`), Supabase recommande un redémarrage rapide du projet (*Settings → General*).
+
+## 5 quater. Logistique des sessions et répertoire des lieux
+
+Migration `20260927100000_crm_session_logistics.sql` — **pas encore appliquée en production** (à appliquer avant de déployer l'interface correspondante : sans elle, le chargement signale 5 tables introuvables et l'enregistrement des infos pratiques d'une session échoue).
+
+| Table | Rôle |
+| --- | --- |
+| `crm.venues` | Répertoire des lieux (capacité, tarif indicatif, accès, PMR, contact, note, origine dont « assistant IA ») |
+| `crm.venue_options` | Sourcing : lieux envisagés pour une session, étape (identifié → devis demandé → devis reçu → option posée → retenu / écarté), montant proposé, fin d'option — unique par (session, lieu) |
+| `crm.session_expenses` | Devis & dépenses fournisseurs d'une session (lieu, restauration, activités, transport, intervenants…) avec échéancier `installments` (jsonb : libellé, montant, échéance, payé le, moyen) |
+| `crm.session_activities` | Activités hors programme (jour, horaires, prestataire, coût, statut de réservation, incluse ou en option) |
+| `crm.session_stays` | Séjours : chambre, arrivée / départ (moyen, n° de vol), navette, régime, présence confirmée — unique par (session, contact) et (session, intervenant) |
+| `crm.sessions` | + `venue_id` (lieu retenu) et `logistics` (jsonb : infos pratiques du livret d'accueil) |
+
+- **Droits** : section « sessions » en lecture et en écriture (admin, pédagogie, formateur écrivent ; commercial et lecture lisent), mêmes policies que la migration 2. Rien n'est recopié vers `public.event` ni vers le site.
+- **Suppression d'une session** : ses pistes, devis, activités et séjours sont supprimés (cascade) ; supprimer un lieu est bloqué dans l'interface tant qu'il est utilisé.
+- **Journal** : la contrainte `activities_entity_check` est redéfinie avec les 5 nouvelles entités (`venues`, `venueOptions`, `expenses`, `outings`, `stays`). **Toute migration ultérieure qui la redéfinit doit reprendre la liste complète.**
+- **Rétroplanning** : pas de table dédiée — ce sont des tâches `crm.tasks` rattachées à la session (`related = {entity: "events"}`, `notes` = « Rétroplanning logistique · <étape> »), visibles dans « Relances & tâches ».
+- **Testé localement** (PostgreSQL 16, émulation des rôles Supabase) : migration rejouable, écriture formateur, lecture seule commercial et lecture, `anon` refusé, unicité des séjours, cascades, triggers `updated_at`.
+
+### Assistant IA de sourcing (`POST /api/lieux/recherche`)
+
+Claude (`claude-opus-5`, réflexion adaptative) avec l'outil de **recherche web** d'Anthropic : il cherche des lieux réels pour une destination, des dates et un nombre de personnes, puis rend au plus 6 suggestions (capacité, prix affiché ou estimé, disponibilité « à vérifier », sources). Les refus du modèle basculent automatiquement sur le modèle de repli recommandé par Anthropic (`fallbacks: "default"`).
+
+```
+ANTHROPIC_API_KEY=sk-ant-…     # serveur uniquement (Vercel : Production)
+```
+
+- **Accès** : membre connecté (jeton Supabase vérifié) ayant le droit d'écriture sur « sessions » ; 10 recherches par heure et par membre. En mode démo, la route ne répond qu'en développement local ; l'interface propose alors des exemples **fictifs** clairement signalés.
+- **Coût** : facturé à l'usage par Anthropic (jetons + recherches web, 8 recherches au plus par demande). Ordre de grandeur à vérifier sur la console Anthropic après les premières recherches.
+- **Limites** : prix et disponibilités trouvés en ligne sont indicatifs ; chaque suggestion ajoutée arrive au statut « Repéré » avec ses sources dans les notes. La route n'a **pas été testée avec une vraie clé** (aucune clé dans cet environnement) : la première recherche en production est à surveiller (`vercel logs`, entrée `[lieux/recherche]`). Durée : 1 à 3 min (`maxDuration = 300`).
 
 ## 6. Brancher Stripe
 

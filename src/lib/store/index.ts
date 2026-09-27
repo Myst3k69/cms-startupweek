@@ -47,6 +47,11 @@ export const ID_PREFIX: Record<EntityName, string> = {
   contents: "cnt",
   automations: "aut",
   offers: "off",
+  venues: "ven",
+  venueOptions: "vop",
+  expenses: "exp",
+  outings: "out",
+  stays: "sty",
 };
 
 export type NewEntity<K extends EntityName> = Omit<EntityMap[K], "id" | "createdAt" | "updatedAt"> & { id?: ID };
@@ -99,6 +104,11 @@ const ENTITY_LABEL: Partial<Record<EntityName, string>> = {
   contents: "Contenu",
   resources: "Ressource",
   submissions: "Demande",
+  venues: "Lieu",
+  venueOptions: "Lieu envisagé",
+  expenses: "Dépense",
+  outings: "Activité",
+  stays: "Séjour",
 };
 
 /** Paramètres par défaut (remplacés par le seed de démo ou la base). */

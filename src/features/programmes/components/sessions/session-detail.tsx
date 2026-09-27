@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, Building2, CalendarX2, ClipboardCheck, Columns3, Euro, FileText, Globe2, LayoutDashboard, Library, ListChecks, MapPin, Printer, Smile, Users } from "lucide-react";
+import { ArrowLeft, Building2, CalendarX2, ClipboardCheck, Columns3, Euro, FileText, Globe2, LayoutDashboard, Library, ListChecks, Luggage, MapPin, Printer, Smile, Users } from "lucide-react";
 import { Badge, EmptyState, LinkButton, PageHeader, StatusBadge, Tabs, useToast } from "@/components/ui";
 import { StatusSelect } from "@/components/shared/status-select";
 import { EVENT_KINDS, EVENT_MODES, EVENT_STATUSES, labelOf } from "@/lib/domain/constants";
@@ -21,15 +21,16 @@ import { EvaluationsTab } from "./tab-evaluations";
 import { ResourcesTab } from "./tab-resources";
 import { FinancesTab } from "./tab-finances";
 import { DocumentsTab } from "./tab-documents";
+import { LogisticsTab } from "./logistics/tab-logistics";
 
-const TABS = ["apercu", "participants", "programme", "emargement", "evaluations", "ressources", "finances", "documents"] as const;
+const TABS = ["apercu", "participants", "programme", "logistique", "emargement", "evaluations", "ressources", "finances", "documents"] as const;
 export type SessionTab = (typeof TABS)[number];
 
 export function isSessionTab(v: string | undefined): v is SessionTab {
   return Boolean(v) && (TABS as readonly string[]).includes(v!);
 }
 
-export function SessionDetail({ id, initialTab }: { id: ID; initialTab?: string }) {
+export function SessionDetail({ id, initialTab, initialSection }: { id: ID; initialTab?: string; initialSection?: string }) {
   const ev = useEntity("events", id);
   if (!ev) {
     return (
@@ -46,10 +47,10 @@ export function SessionDetail({ id, initialTab }: { id: ID; initialTab?: string 
       />
     );
   }
-  return <SessionDetailView ev={ev} initialTab={isSessionTab(initialTab) ? initialTab : "apercu"} />;
+  return <SessionDetailView ev={ev} initialTab={isSessionTab(initialTab) ? initialTab : "apercu"} initialSection={initialSection} />;
 }
 
-function SessionDetailView({ ev, initialTab }: { ev: EventSession; initialTab: SessionTab }) {
+function SessionDetailView({ ev, initialTab, initialSection }: { ev: EventSession; initialTab: SessionTab; initialSection?: string }) {
   const now = useNow();
   const { canEdit } = useSession();
   const editable = canEdit("sessions");
@@ -65,6 +66,7 @@ function SessionDetailView({ ev, initialTab }: { ev: EventSession; initialTab: S
     { value: "apercu" as const, label: "Aperçu", icon: LayoutDashboard },
     { value: "participants" as const, label: "Participants", icon: Users, count: audience === "b2c" ? data.enrolled.length : undefined },
     { value: "programme" as const, label: "Programme", icon: ListChecks },
+    ...(ev.mode === "distanciel" ? [] : [{ value: "logistique" as const, label: "Logistique", icon: Luggage }]),
     { value: "emargement" as const, label: "Émargement", icon: ClipboardCheck },
     { value: "evaluations" as const, label: "Évaluations", icon: Smile, count: data.evals.length || undefined },
     { value: "ressources" as const, label: "Ressources", icon: Library, count: ev.resourceIds.length || undefined },
@@ -136,7 +138,7 @@ function SessionDetailView({ ev, initialTab }: { ev: EventSession; initialTab: S
         value={tab}
         onChange={(v) => {
           setTab(v);
-          replaceQuery({ onglet: v === "apercu" ? null : v });
+          replaceQuery({ onglet: v === "apercu" ? null : v, ...(v === "logistique" ? {} : { rubrique: null }) });
         }}
         tabs={tabs}
         className="mb-6"
@@ -145,6 +147,7 @@ function SessionDetailView({ ev, initialTab }: { ev: EventSession; initialTab: S
       {tab === "apercu" ? <OverviewTab ev={ev} data={data} canEdit={editable} /> : null}
       {tab === "participants" ? <ParticipantsTab ev={ev} data={data} canEdit={editable} /> : null}
       {tab === "programme" ? <ProgramTab ev={ev} canEdit={editable} /> : null}
+      {tab === "logistique" ? <LogisticsTab ev={ev} canEdit={editable} initialSection={initialSection} /> : null}
       {tab === "emargement" ? <AttendanceTab ev={ev} data={data} canEdit={editable} /> : null}
       {tab === "evaluations" ? <EvaluationsTab ev={ev} data={data} canEdit={editable} /> : null}
       {tab === "ressources" ? <ResourcesTab ev={ev} canEdit={editable} /> : null}

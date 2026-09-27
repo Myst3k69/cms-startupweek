@@ -53,8 +53,8 @@ Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind CSS v4 (tok
 ```
 src/
   app/(crm)/…            une route par section (Server Component minimal + <Guard section>)
-  app/print/…            documents imprimables A4 (facture, devis, convention, convocation, attestation, émargement, programme)
-  app/api/…              intake des formulaires du site, webhook Stripe, synchro Qonto, health
+  app/print/…            documents imprimables A4 (facture, devis, convention, convocation, attestation, émargement, programme, livret d'accueil)
+  app/api/…              intake des formulaires du site, webhook Stripe, synchro Qonto, health, recherche de lieux (IA)
   components/            ui (primitives), charts, layout (AppShell, ⌘K, alertes), shared
   features/<domaine>/    home, crm, programmes, qualiopi, documents, billing, site, analytics, system
   lib/domain/            types (contrat de données), constantes, sélecteurs, actions métier, alertes
@@ -83,3 +83,5 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 | Endpoints `/api/intake`, Stripe, Qonto | ✍️ écrits et testés en local (*dry-run* sans variables d'environnement) — à tester en préproduction avec les vraies API |
 | Envoi réel des emails (Resend) | ⏳ prévu côté serveur (intake) ; les emails déclenchés depuis l'interface sont journalisés en démo |
 | Documents légaux (convention, CGV, attestation) | ⚠️ modèles à faire valider juridiquement (voir le point L.6353-6 dans la proposition) |
+| Logistique des sessions (onglet « Logistique » : lieu & sourcing, devis & paiements fournisseurs, activités, intervenants, chambres & arrivées, infos pratiques, rétroplanning) + répertoire « Lieux » + livret d'accueil | ✅ en démo (vérifié dans le navigateur, clair / sombre / mobile 390 px) ; ⏳ migration `20260927100000` à appliquer en production — [docs/SUPABASE.md § 5 quater](docs/SUPABASE.md) |
+| Assistant IA de sourcing de lieux (`/api/lieux/recherche`, Claude + recherche web) | ✍️ écrit, **non testé avec une vraie clé** : nécessite `ANTHROPIC_API_KEY` ; exemples fictifs en démo |

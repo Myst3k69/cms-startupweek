@@ -445,3 +445,95 @@ export function nextComplaintNumber(): string {
   return `REC-${year}-${String(max + 1).padStart(3, "0")}`;
 }
 
+
+/* ───────────────────────────── Logistique des sessions ───────────────────────────── */
+
+/**
+ * Retenir un lieu pour une session : l'option passe « Retenu », la session pointe vers le lieu,
+ * et le devis du lieu devient une dépense engagée (créée depuis le montant de l'option si besoin,
+ * avec un échéancier acompte 30 % / solde à J-30).
+ */
+export function retainVenue(optionId: ID, opts: { showOnSession: boolean }): { expenseCreated: boolean; otherOptions: number } {
+  const s = crm();
+  const o = findById("venueOptions", optionId);
+  if (!o) return { expenseCreated: false, otherOptions: 0 };
+  const ev = findById("events", o.eventId);
+  const venue = findById("venues", o.venueId);
+  if (!ev || !venue) return { expenseCreated: false, otherOptions: 0 };
+
+  // Un seul lieu retenu par session : l'ancien redevient « Option posée ».
+  s.venueOptions
+    .filter((x) => x.eventId === ev.id && x.stage === "retenu" && x.id !== o.id)
+    .forEach((x) => s.update("venueOptions", x.id, { stage: "option" }, { log: false }));
+  s.update("venueOptions", o.id, { stage: "retenu" }, { log: `Lieu retenu pour ${ev.code}`, kind: "statut" });
+  s.update("events", ev.id, { venueId: venue.id, ...(opts.showOnSession ? { venue: venue.name } : {}) }, { log: `Lieu retenu : ${venue.name}`, kind: "statut" });
+  if (venue.status === "repere" || venue.status === "en_contact") s.update("venues", venue.id, { status: "valide" }, { log: `Retenu pour ${ev.code}`, kind: "statut" });
+
+  let expenseCreated = false;
+  const now = nowMs();
+  const schedule = (amount: number) => {
+    const deposit = Math.round(amount * 0.3);
+    return [
+      { id: uid("inst"), label: "Acompte 30 %", amountCents: deposit, dueAt: iso(now + 7 * DAY) },
+      // Solde à J-30, jamais avant le lendemain de l'acompte (session proche).
+      { id: uid("inst"), label: "Solde", amountCents: amount - deposit, dueAt: iso(Math.max(now + 8 * DAY, Date.parse(ev.startAt) - 30 * DAY)) },
+    ];
+  };
+  const existing = s.expenses.find((e) => e.eventId === ev.id && e.venueId === venue.id && e.category === "lieu" && e.status !== "refuse");
+  if (existing) {
+    const patch = {
+      ...(existing.status !== "accepte" ? { status: "accepte" as const } : {}),
+      ...(existing.installments.length === 0 && existing.amountCents > 0 ? { installments: schedule(existing.amountCents) } : {}),
+    };
+    if (Object.keys(patch).length) s.update("expenses", existing.id, patch, { log: "Devis du lieu accepté", kind: "statut" });
+  } else if (o.quotedCents) {
+    s.create(
+      "expenses",
+      {
+        eventId: ev.id,
+        category: "lieu",
+        label: `Location ${venue.name}`,
+        supplier: venue.contactName ? `${venue.name} (${venue.contactName})` : venue.name,
+        status: "accepte",
+        amountCents: o.quotedCents,
+        venueId: venue.id,
+        installments: schedule(o.quotedCents),
+        notes: "Échéancier proposé par défaut : à ajuster selon le contrat du lieu.",
+      },
+      { log: `Devis du lieu engagé (${money(o.quotedCents)})` },
+    );
+    expenseCreated = true;
+  }
+  const otherOptions = s.venueOptions.filter((x) => x.eventId === ev.id && x.id !== o.id && x.stage === "option").length;
+  return { expenseCreated, otherOptions };
+}
+
+/** Rétroplanning logistique : crée les tâches type manquantes, rattachées à la session. Renvoie le nombre de tâches créées. */
+export function generateLogisticsPlan(eventId: ID, playbook: { key: string; days: number; title: string; priority: Priority }[], note: string): number {
+  const s = crm();
+  const ev = findById("events", eventId);
+  if (!ev) return 0;
+  const existing = new Set(
+    s.tasks.filter((t) => t.related?.entity === "events" && t.related.id === ev.id && t.notes?.startsWith(note)).map((t) => t.notes),
+  );
+  const start = Date.parse(ev.startAt);
+  const now = nowMs();
+  let created = 0;
+  for (const p of playbook) {
+    const tag = `${note} · ${p.key}`;
+    if (existing.has(tag)) continue;
+    createTask({
+      title: `${p.title} — ${ev.code}`,
+      kind: "admin",
+      priority: p.priority,
+      // Étape déjà dépassée : à faire dès demain plutôt qu'une tâche « en retard » dès sa création.
+      dueAt: iso(Math.max(start + p.days * DAY, now + DAY)),
+      related: { entity: "events", id: ev.id },
+      automated: true,
+      notes: tag,
+    });
+    created += 1;
+  }
+  if (created) s.log({ kind: "systeme", entity: "events", entityId: ev.id, actorId: s.sessionUserId, summary: `Rétroplanning logistique : ${created} tâche${created > 1 ? "s" : ""} créée${created > 1 ? "s" : ""}` });
+  return created;
+}

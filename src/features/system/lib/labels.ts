@@ -41,6 +41,11 @@ export const ENTITY_LABEL: Record<EntityName, string> = {
   contents: "Contenu",
   automations: "Automatisation",
   offers: "Offre",
+  venues: "Lieu",
+  venueOptions: "Lieu envisagé",
+  expenses: "Dépense fournisseur",
+  outings: "Activité",
+  stays: "Séjour",
 };
 
 export const ACTIVITY_KIND_LABEL: Record<ActivityKind, string> = {

@@ -26,6 +26,7 @@ export const ENTITY_KIND_LABEL: Partial<Record<EntityName, string>> = {
   evaluations: "Évaluation",
   resources: "Ressource",
   contents: "Contenu",
+  venues: "Lieu",
 };
 
 export function entityHref(ref: EntityRef): string | undefined {
@@ -67,6 +68,8 @@ export function entityHref(ref: EntityRef): string | undefined {
       return `/ressources`;
     case "contents":
       return `/contenus`;
+    case "venues":
+      return `/lieux?lieu=${id}`;
     default:
       return undefined;
   }
