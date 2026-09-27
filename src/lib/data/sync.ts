@@ -13,7 +13,7 @@
  *   • refus de la base (droits, contrainte) → la modification locale est annulée
  *     et l'erreur est signalée à l'interface.
  */
-import type { Activity, Collections, ContentStatDay, EntityName, ID, Settings, TrafficDay } from "@/lib/domain/types";
+import type { Activity, AdCampaign, AdStatDay, Collections, ContentStatDay, EntityName, Experiment, ID, Settings, TrafficDay } from "@/lib/domain/types";
 import { DATA_MODE, getSupabase, supabaseConfigured } from "./supabase";
 
 /** Nom des tables SQL (schéma crm) pour chaque collection du store. */
@@ -46,6 +46,8 @@ export const TABLES: Record<EntityName, string> = {
   contents: "contents",
   automations: "automation_rules",
   offers: "offers",
+  adCampaigns: "ad_campaigns",
+  experiments: "experiments",
 };
 
 type Row = Record<string, unknown>;
@@ -148,6 +150,7 @@ export interface RemoteData {
   settings?: Partial<Settings>;
   traffic: TrafficDay[];
   contentStats: ContentStatDay[];
+  adStats: AdStatDay[];
   /** Erreur bloquante (ex. schéma non exposé) : rien n'a pu être chargé. */
   fatal?: string;
 }
@@ -253,7 +256,7 @@ export const remoteSync = {
   /** Charge toutes les collections visibles pour l'utilisateur connecté (RLS : une section non autorisée revient vide). */
   async loadAll(): Promise<RemoteData> {
     const c = getSupabase();
-    if (!c) return { collections: {}, activities: [], traffic: [], contentStats: [] };
+    if (!c) return { collections: {}, activities: [], traffic: [], contentStats: [], adStats: [] };
     const collections: Partial<Record<EntityName, unknown[]>> = {};
     let fatal: string | undefined;
 
@@ -262,19 +265,26 @@ export const remoteSync = {
         const { rows, error } = await fetchAll(TABLES[name]);
         if (error) {
           if (error.code === "PGRST106") fatal = describeDbError(error);
+          // Table d'une migration pas encore appliquée (ex. marketing) : section vide, sans bloquer la connexion.
+          if (error.code === "PGRST205" || error.code === "42P01") {
+            console.warn(`[sync:${name}] table absente — migration à appliquer`, error.message);
+            collections[name] = [];
+            return;
+          }
           return report(name, describeDbError(error));
         }
         collections[name] = rows.map(fromDb);
       }),
     );
-    if (fatal) return { collections: {}, activities: [], traffic: [], contentStats: [], fatal };
+    if (fatal) return { collections: {}, activities: [], traffic: [], contentStats: [], adStats: [], fatal };
 
-    const [acts, settings, traffic, contentStats] = await Promise.all([
+    const [acts, settings, traffic, contentStats, adStats] = await Promise.all([
       fetchAll("activities", { column: "at", ascending: false }, 1500),
       c.from("settings").select("*").eq("id", true).maybeSingle(),
       fetchAll("traffic_days", { column: "date", ascending: true }, 2000),
       // Plus récents d'abord : si le plafond est atteint, ce sont les plus anciens jours qui manquent.
       fetchAll("content_stats_days", { column: "date", ascending: false }, 20_000),
+      fetchAll("ad_stats", { column: "date", ascending: true }, 20_000),
     ]);
     if (acts.error) report("activities", describeDbError(acts.error));
     if (settings.error) report("settings", describeDbError(settings.error));
@@ -291,6 +301,28 @@ export const remoteSync = {
       settings: s,
       traffic: traffic.rows.map(fromDb) as unknown as TrafficDay[],
       contentStats: contentStats.rows.map(fromDb) as unknown as ContentStatDay[],
+      // Section marketing non accessible (RLS) : liste vide, sans erreur bloquante.
+      adStats: adStats.error ? [] : (adStats.rows.map(fromDb) as unknown as AdStatDay[]),
+    };
+  },
+
+  /** Relit campagnes, tests A/B et statistiques (après une synchro des régies, compteurs des tests du site). */
+  async loadMarketing(): Promise<{ adCampaigns: AdCampaign[]; experiments: Experiment[]; adStats: AdStatDay[] } | null> {
+    if (!getSupabase()) return null;
+    const [campaigns, experiments, stats] = await Promise.all([
+      fetchAll(TABLES.adCampaigns),
+      fetchAll(TABLES.experiments),
+      fetchAll("ad_stats", { column: "date", ascending: true }, 20_000),
+    ]);
+    const error = campaigns.error ?? experiments.error ?? stats.error;
+    if (error) {
+      report("adCampaigns", describeDbError(error));
+      return null;
+    }
+    return {
+      adCampaigns: campaigns.rows.map(fromDb) as unknown as AdCampaign[],
+      experiments: experiments.rows.map(fromDb) as unknown as Experiment[],
+      adStats: stats.rows.map(fromDb) as unknown as AdStatDay[],
     };
   },
 };

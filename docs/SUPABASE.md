@@ -42,6 +42,7 @@ Site ◄──────────────── lit ──────�
 | `supabase/migrations/20260926103336_crm_functions.sql` | Numérotation légale, paiements, places restantes, synchro CRM → site, vues |
 | `supabase/migrations/20260926103516_qualiopi_referentiel.sql` | 32 indicateurs Qualiopi |
 | `supabase/migrations/20260926122058_crm_auth_membership.sql` | `crm.claim_team_membership()` (rattachement du compte Auth au membre de même email vérifié) ; audit automatique limité aux écritures hors session d'un membre — appliquée le 26/09/2026 |
+| `supabase/migrations/20260927105800_crm_marketing.sql` | Marketing : `ad_campaigns`, `ad_stats`, `experiments`, `experiment_hits`, `crm.track_experiment()`, section de droits `marketing` — **écrite, non appliquée** (§ 5 sexies) |
 | `src/lib/data/supabase.ts`, `src/lib/data/sync.ts` | Client navigateur (PKCE, schéma `crm`) ; chargement paginé et écritures ordonnées avec annulation en cas de refus |
 | `src/lib/auth/supabase-auth.ts`, `src/lib/store/remote-session.ts` | Lien magique, retour `/auth/callback`, membre de l'équipe, ouverture / fermeture de l'espace de travail |
 
@@ -412,6 +413,43 @@ Migration `20260926220247_crm_site_analytics.sql`, **appliquée en production le
 select date, visitors, pageviews, sources, form_starts, form_submits from crm.traffic_days order by date desc limit 7;
 select c.title, s.date, s.views, s.visitors, s.clicks, s.leads from crm.content_stats_days s join crm.contents c on c.id = s.content_id order by s.date desc, s.views desc limit 20;
 ```
+
+## 5 sexies. Marketing : campagnes, régies publicitaires, A/B tests
+
+Migration `20260927105800_crm_marketing.sql` — **écrite et testée en local (PostgreSQL 16), pas encore appliquée en production**. Elle ne touche à aucune table du site et n'ajoute que des objets au schéma `crm` (plus le remplacement de `crm.section_access()` et de la contrainte `activities_entity_check`, étendus à la section « marketing » et aux entités `adCampaigns` / `experiments`).
+
+| Objet | Rôle |
+| --- | --- |
+| `crm.ad_campaigns` | Campagne Meta / LinkedIn, ses publicités (`creatives` jsonb), la session promue, l'`utm_campaign` d'attribution. Clé de synchro `(platform, external_id)` |
+| `crm.ad_stats` | Dépense, impressions, clics, leads par jour, campagne et publicité. **Écrite uniquement par `/api/ads/sync`** (lecture seule pour l'équipe) |
+| `crm.experiments` | A/B tests (créas, pages du site, emails) ; trigger `experiments_keep_counts` : une modification depuis l'interface ne peut pas écraser les compteurs d'un test du site |
+| `crm.experiment_hits` + `crm.track_experiment()` | Une exposition / une conversion au plus par visiteur et par test, incrément atomique ; serveur uniquement |
+
+Droits (miroir de `src/lib/auth/permissions.ts`) : `admin` et `commercial` en écriture, `pedagogie` et `lecture` en consultation, `formateur` sans accès.
+
+**Tests locaux réalisés** (base PostgreSQL 16 neuve, toutes les migrations du dépôt rejouées dans l'ordre — hors planifications `pg_cron`, extension absente en local) : migration rejouée deux fois (idempotente) ; doublon de statistiques (même jour, même publicité, `creative_id` nul compris) refusé ; clé de test invalide refusée ; `track_experiment` : exposition comptée une fois par visiteur, conversion comptée sur la variante réellement vue, variante / test inconnus refusés ; commercial : lecture et écriture des campagnes, écriture des statistiques refusée, renommage d'une variante d'un test en cours sans perte des compteurs ; pédagogie : lecture seule ; formateur : aucune ligne ; `experiment_hits` et `track_experiment` inaccessibles à `authenticated`.
+
+**Appliquer** : SQL Editor ou `supabase db push` (§ 2), puis relancer le chargement du back-office (les nouvelles tables sont lues à la connexion).
+
+### Synchro des régies (`/api/ads/sync`)
+
+1. **Meta** : Business Manager → Utilisateurs système → générer un jeton avec la permission `ads_read` sur le compte publicitaire → `META_ADS_ACCESS_TOKEN` ; `META_AD_ACCOUNT_ID` (`act_…`). Optionnel : `META_GRAPH_VERSION` (défaut `v25.0`).
+2. **LinkedIn** : application LinkedIn avec le produit *Advertising API* (portées `r_ads`, `r_ads_reporting`) → `LINKEDIN_ADS_ACCESS_TOKEN` (expire au bout de 60 jours : prévoir le renouvellement) ; `LINKEDIN_AD_ACCOUNT_ID` (identifiant numérique du compte). Optionnel : `LINKEDIN_API_VERSION` (`AAAAMM`, défaut `202609` ; une version est maintenue environ un an).
+3. Déclenchement : bouton **Synchroniser les régies** (membre avec droit d'écriture Marketing, jeton de session vérifié côté serveur) ou cron quotidien, par exemple dans `vercel.json` : `{ "crons": [{ "path": "/api/ads/sync?days=7", "schedule": "40 5 * * *" }] }` avec `CRON_SECRET`.
+4. Fenêtre glissante de 7 jours par défaut (`?days=` jusqu'à 90, ou `?since=AAAA-MM-JJ` pour un historique) : les régies révisent leurs conversions quelques jours après coup ; l'upsert est idempotent.
+5. Une campagne créée dans la régie apparaît automatiquement (utm_campaign proposée à partir de son nom, à vérifier). Une campagne préparée dans le CRM est reliée en renseignant son identifiant de régie. La synchro ne modifie jamais les champs propres au CRM (session promue, utm_campaign, ciblage résumé, notes, responsable).
+
+**Non testé** : appels réels aux API Meta et LinkedIn (aucun compte de test) — les formats de requêtes et de réponses suivent la documentation officielle (Graph API Insights `level=ad`, LinkedIn `adAnalytics?q=statistics&pivots=List(CAMPAIGN,CREATIVE)`). Premier essai recommandé : `?days=3`, puis contrôle des totaux avec le gestionnaire de publicités.
+
+### Attribution
+
+Une candidature (ou une demande du site) est attribuée à une campagne quand son `utm_campaign` est celle de la campagne **et** qu'elle arrive entre la veille du lancement et 30 jours après la fin (dernier clic). Le formulaire du site transmet `utm_source`, `utm_medium`, `utm_campaign` et désormais `utm_content` / `utm_term` (`/api/intake`) : pour Meta, `utm_content={{ad.id}}` identifie la publicité. Le ROAS est calculé sur le CA **HT facturé** (acomptes + soldes − avoirs) des candidatures attribuées.
+
+### A/B tests des pages du site (`/api/experiments`)
+
+- `GET` : tests « site » en cours (clé, page, variantes et pondérations) — public, mis en cache 60 s.
+- `POST` `{ experiment, variant, visitorId, event: "exposure" | "conversion" }` : origines `ALLOWED_ORIGINS`, 60 événements / minute par IP. Le code d'intégration (tirage stable de la variante, envoi des événements) est affiché dans la fiche de chaque test.
+- Limite connue : un appel forgé hors navigateur reste possible (pas d'authentification du visiteur) ; le dédoublonnage par visiteur et le test de déséquilibre d'échantillon (SRM) affiché dans la fiche limitent l'impact.
 
 ## 6. Brancher Stripe
 

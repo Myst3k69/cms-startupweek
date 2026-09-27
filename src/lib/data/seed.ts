@@ -9,7 +9,7 @@
  *
  * Construction par modules (src/lib/data/seed/*), dans l'ordre des dépendances.
  */
-import type { Activity, Collections, ContentStatDay, Settings, TrafficDay } from "../domain/types";
+import type { Activity, AdStatDay, Collections, ContentStatDay, Settings, TrafficDay } from "../domain/types";
 import type { SeedContext } from "./seed/context";
 import { Clock, Rng } from "./seed/helpers";
 import { buildTeam } from "./seed/team";
@@ -23,15 +23,17 @@ import { buildQualiopi } from "./seed/qualiopi";
 import { buildCrm } from "./seed/crm";
 import { buildAutomations, buildContents } from "./seed/content";
 import { buildActivities, buildContentStats, buildTraffic } from "./seed/analytics";
+import { buildMarketing } from "./seed/marketing";
 
 /** À incrémenter à chaque évolution du jeu de démo (force la régénération du store local). */
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 
 export interface SeedData extends Collections {
   settings: Settings;
   activities: Activity[];
   traffic: TrafficDay[];
   contentStats: ContentStatDay[];
+  adStats: AdStatDay[];
 }
 
 /** Graine fixe : les données ne dépendent que de `now` (pour les dates). */
@@ -67,10 +69,13 @@ function emptyData(): SeedData {
     contents: [],
     automations: [],
     offers: [],
+    adCampaigns: [],
+    experiments: [],
     settings: undefined as unknown as Settings, // renseigné par buildTeam
     activities: [],
     traffic: [],
     contentStats: [],
+    adStats: [],
   };
 }
 
@@ -94,6 +99,7 @@ export function buildSeed(now: number): SeedData {
   buildCrm(ctx); // emailTemplates, sequences, submissions, deals, tasks, emails
   buildContents(ctx);
   buildAutomations(ctx);
+  buildMarketing(ctx); // adCampaigns, adStats, experiments
   buildTraffic(ctx);
   buildContentStats(ctx); // après buildContents : audience quotidienne des articles du blog
   buildActivities(ctx);

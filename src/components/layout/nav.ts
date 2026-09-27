@@ -15,6 +15,7 @@ import {
   Receipt,
   Rocket,
   Settings,
+  Target,
   ShieldCheck,
   Users,
   Workflow,
@@ -54,6 +55,12 @@ export const NAV: NavGroup[] = [
       { href: "/pipeline", label: "Pipeline", icon: KanbanSquare, section: "pipeline", keywords: "opportunités deals ventes" },
       { href: "/relances", label: "Relances & tâches", icon: BellRing, section: "relances", keywords: "tâches séquences follow-up" },
       { href: "/emails", label: "Emails", icon: Mail, section: "emails", keywords: "templates envois" },
+    ],
+  },
+  {
+    label: "Marketing",
+    items: [
+      { href: "/marketing", label: "Campagnes & A/B tests", icon: Target, section: "marketing", keywords: "publicité ads meta facebook instagram linkedin ab test utm audience promotion roas" },
     ],
   },
   {

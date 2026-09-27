@@ -41,6 +41,8 @@ export const ENTITY_LABEL: Record<EntityName, string> = {
   contents: "Contenu",
   automations: "Automatisation",
   offers: "Offre",
+  adCampaigns: "Campagne publicitaire",
+  experiments: "Test A/B",
 };
 
 export const ACTIVITY_KIND_LABEL: Record<ActivityKind, string> = {
@@ -66,6 +68,10 @@ export function entityHref(entity: EntityName, id: string): string | undefined {
       return `/sessions/${id}`;
     case "contents":
       return `/contenus/${id}`;
+    case "adCampaigns":
+      return `/marketing/campagnes/${id}`;
+    case "experiments":
+      return `/marketing/tests/${id}`;
     case "submissions":
       return "/demandes";
     case "deals":

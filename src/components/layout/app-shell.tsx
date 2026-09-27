@@ -215,14 +215,15 @@ function NotificationBell() {
   const applications = useCrm((s) => s.applications);
   const speakers = useCrm((s) => s.speakers);
   const contacts = useCrm((s) => s.contacts);
+  const adCampaigns = useCrm((s) => s.adCampaigns);
   const settings = useCrm((s) => s.settings);
   const sessionUserId = useCrm((s) => s.sessionUserId);
   const now = useNow();
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
   const alerts = React.useMemo(
-    () => computeAlerts({ submissions, complaints, invoices, tasks, events, applications, speakers, contacts, settings, sessionUserId }, now),
-    [submissions, complaints, invoices, tasks, events, applications, speakers, contacts, settings, sessionUserId, now],
+    () => computeAlerts({ submissions, complaints, invoices, tasks, events, applications, speakers, contacts, adCampaigns, settings, sessionUserId }, now),
+    [submissions, complaints, invoices, tasks, events, applications, speakers, contacts, adCampaigns, settings, sessionUserId, now],
   );
   React.useEffect(() => {
     if (!open) return;
