@@ -156,12 +156,11 @@ Sources : `src/lib/data/academy/mvp-ia/m00.ts` → `m09.ts` (format `SeedModule`
 
 1. Migrations `supabase/migrations/*_crm_academy.sql` (tables `crm.academy_*`, RLS, section `academy`) et `*_crm_academy_studio.sql` (statut « validée », relecteur, commentaires de relecture `crm.academy_comments`).
 2. Formation type : `supabase/data/academy_mvp_ia.sql`.
-3. Variables Vercel : `ACADEMY_API_SECRET` (aussi côté site), `SUPABASE_SECRET_KEY` (routes API), `ANTHROPIC_API_KEY` (aide IA), `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (vente), `ALLOWED_ORIGINS`.
+3. Variables Vercel : `ACADEMY_API_SECRET` (aussi côté site ; à défaut, `INTAKE_SIGNING_SECRET` ici et `CRM_INTAKE_SECRET` côté site), `SUPABASE_SECRET_KEY` (routes API), `ANTHROPIC_API_KEY` (aide IA), `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (vente), `ALLOWED_ORIGINS` (doit contenir l'origine du site, ex. `https://www.startupweek.fr`, sinon les URL de retour Stripe sont refusées).
 4. Dans le Studio : relire la formation (onglet Relecture), renseigner le prix (Fiche catalogue), valider, publier, puis cocher « Proposée à l'achat sur le site » pour la vendre.
-5. Site : pages Mon espace (sommaire, lecteur de leçon, quiz, livrables, heartbeat) et catalogue (§ 3).
+5. Site (`startupweek-v2`) : catalogue `/academy`, page de vente `/academy/[slug]`, aperçu gratuit, inscription (Stripe) ; Mon espace `/mon-espace/formations` (sommaire, lecteur de leçon, quiz, livrables, heartbeat, choix du profil, certificat). Le site déduit l'URL du back-office de `CRM_INTAKE_URL`. Ne jamais définir `ACADEMY_DEV_EMAIL` en production.
 
 ## 7. Limites connues
-- **Mon espace n'est pas encore construit** côté site : l'API est prête et testée, les pages restent à faire dans `startupweek-v2`.
 - **Vidéos** : aucune n'est tournée ; les blocs vidéo contiennent le plan de tournage et restent masqués pour les apprenants tant qu'il n'y a pas de lien YouTube.
 - **Emails** (accès ouvert, livrable corrigé) : journalisés, pas envoyés (comme le reste de l'interface, cf. SUPABASE.md § 3.4).
 - **Prix** de la formation e-learning : à définir (non vendue tant qu'il est vide).
