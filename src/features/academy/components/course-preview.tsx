@@ -11,6 +11,7 @@ import { PERSONAS } from "@/lib/domain/constants";
 import type { Course, ID, Lesson, LessonProgress, Persona } from "@/lib/domain/types";
 import { cn } from "@/lib/utils";
 import { useCourseOutline } from "../lib/use-academy";
+import { FocusModeButton } from "@/components/layout/focus-mode";
 import { DaScope, DaSwitcher, useAcademyDa } from "./da";
 import { BlockView } from "./block-view";
 import type { AcademyDa } from "../lib/da";
@@ -147,6 +148,7 @@ function PreviewInner({ course }: { course: Course }) {
           <Button size="xs" variant="ghost" onClick={() => (setProgress([]), setChecks({}), setCurrent(lessons[0]?.id))}>
             <RotateCcw /> Réinitialiser
           </Button>
+          <FocusModeButton scope={`/academy/formations/${course.id}`} size="xs" />
         </div>
       </div>
 

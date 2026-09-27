@@ -35,6 +35,7 @@ import { syncCourseEnrollments } from "@/lib/domain/actions";
 import type { Course, CourseLevel, CourseStatus, ID } from "@/lib/domain/types";
 import { date, money } from "@/lib/format";
 import { cn, uid } from "@/lib/utils";
+import { FocusModeButton } from "@/components/layout/focus-mode";
 import { useCourseOutline } from "../lib/use-academy";
 import { Outline } from "./outline";
 import { LessonEditor } from "./lesson-editor";
@@ -529,6 +530,7 @@ function CourseEditorInner({ course }: { course: Course }) {
             <LinkButton href={`/academy/formations/${course.id}/apercu${lesson ? `?lecon=${lesson.id}` : ""}`} variant="secondary" size="sm">
               <Eye /> Aperçu apprenant
             </LinkButton>
+            <FocusModeButton scope={`/academy/formations/${course.id}`} />
             {editable ? (
               <>
                 {course.status !== "publiee" ? (

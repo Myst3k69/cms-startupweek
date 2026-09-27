@@ -2,6 +2,8 @@
 @import "../styles/tokens.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* `rail:` = menu de gauche replié (barre d'icônes) ; ne concerne que le menu fixe du bureau, marqué `data-rail`. */
+@custom-variant rail (&:where([data-sidebar="collapsed"] [data-rail], [data-sidebar="collapsed"] [data-rail] *));
 
 @theme inline {
   --color-background: var(--background);

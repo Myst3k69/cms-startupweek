@@ -4,7 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ChevronsUpDown, LogOut, Menu as MenuIcon, Monitor, Moon, Search, Sun, X } from "lucide-react";
+import { Bell, ChevronsUpDown, LogOut, Menu as MenuIcon, Minimize2, Monitor, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV } from "./nav";
 import { useSession, useNow } from "@/lib/hooks";
@@ -16,6 +16,7 @@ import { DATA_MODE } from "@/lib/data/supabase";
 import { signOutAndClear } from "@/lib/store/remote-session";
 import { setTheme, useThemePref, type ThemePref } from "./theme";
 import { CommandPalette } from "./command-palette";
+import { exitFocusMode, inFocusScope, setSidebarCollapsed, useFocusScope, useSidebarCollapsed } from "./sidebar";
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
@@ -23,12 +24,12 @@ function isActive(pathname: string, href: string) {
 
 function Brand({ compact }: { compact?: boolean }) {
   return (
-    <Link href="/" className="flex items-center gap-2.5 px-1" aria-label="StartupWeek OS — accueil">
+    <Link href="/" className="flex items-center gap-2.5 px-1 rail:px-0" aria-label="StartupWeek OS — accueil">
       <span className="relative inline-flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-border">
         <Image src="/logo-sw-v4.webp" alt="" width={28} height={28} priority />
       </span>
       {!compact ? (
-        <span className="leading-tight">
+        <span className="leading-tight rail:hidden">
           <span className="block font-display text-[15px] font-semibold tracking-tight text-foreground">StartupWeek</span>
           <span className="block text-[10px] font-medium uppercase tracking-[0.18em] text-accent-text">OS · back-office</span>
         </span>
@@ -42,13 +43,13 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { can } = useSession();
   const counts = useNavCounts();
   return (
-    <nav className="scrollbar-thin flex-1 space-y-5 overflow-y-auto px-3 pb-4" aria-label="Navigation principale">
+    <nav className="scrollbar-thin flex-1 space-y-5 overflow-y-auto px-3 pb-4 rail:space-y-3 rail:px-2" aria-label="Navigation principale">
       {NAV.map((group) => {
         const items = group.items.filter((i) => can(i.section));
         if (!items.length) return null;
         return (
-          <div key={group.label}>
-            <p className="eyebrow mb-1.5 px-2 text-faint">{group.label}</p>
+          <div key={group.label} className="rail:border-t rail:border-border rail:pt-3 rail:first:border-t-0 rail:first:pt-0">
+            <p className="eyebrow mb-1.5 px-2 text-faint rail:hidden">{group.label}</p>
             <ul className="space-y-0.5">
               {items.map((item) => {
                 const active = isActive(pathname, item.href);
@@ -59,15 +60,16 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                       href={item.href}
                       onClick={onNavigate}
                       aria-current={active ? "page" : undefined}
+                      title={item.label}
                       className={cn(
-                        "group flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors",
+                        "group relative flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors rail:justify-center rail:px-0 rail:py-2",
                         active ? "bg-accent-soft font-medium text-foreground" : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
                       )}
                     >
                       <item.icon className={cn("size-4 shrink-0", active ? "text-accent-text" : "text-faint group-hover:text-muted-foreground")} />
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate rail:sr-only">{item.label}</span>
                       {count ? (
-                        <span className={cn("tabular ml-auto rounded-full px-1.5 text-[11px] font-medium", count.tone === "danger" ? "bg-danger-soft text-danger-text" : "bg-surface-3 text-muted-foreground")}>
+                        <span className={cn("tabular ml-auto rounded-full px-1.5 text-[11px] font-medium rail:absolute rail:right-0.5 rail:top-0 rail:px-1 rail:text-[9px] rail:leading-4", count.tone === "danger" ? "bg-danger-soft text-danger-text" : "bg-surface-3 text-muted-foreground")}>
                           {count.value}
                         </span>
                       ) : null}
@@ -113,7 +115,7 @@ function ThemeSwitch() {
     { v: "system", icon: Monitor, label: "Système" },
   ];
   return (
-    <div className="inline-flex items-center gap-0.5 rounded-md border border-border bg-surface-2 p-0.5" role="radiogroup" aria-label="Thème">
+    <div className="inline-flex items-center gap-0.5 rounded-md border border-border bg-surface-2 p-0.5 rail:flex-col" role="radiogroup" aria-label="Thème">
       {opts.map((o) => (
         <button
           key={o.v}
@@ -147,16 +149,16 @@ function UserSwitcher() {
   if (!user) return null;
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2.5 rounded-md p-1.5 text-left hover:bg-surface-2" aria-expanded={open}>
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2.5 rounded-md p-1.5 text-left hover:bg-surface-2 rail:justify-center rail:px-0" aria-expanded={open} title={user.name}>
         <Avatar name={user.name} color={user.color} />
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 flex-1 rail:sr-only">
           <span className="block truncate text-sm font-medium text-foreground">{user.name}</span>
           <span className="block truncate text-[11px] text-muted-foreground">{labelOf(ROLES, user.role)}</span>
         </span>
-        <ChevronsUpDown className="size-4 text-faint" />
+        <ChevronsUpDown className="size-4 text-faint rail:hidden" />
       </button>
       {open ? (
-        <div className="absolute bottom-full left-0 right-0 z-40 mb-1 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-lg">
+        <div className="absolute bottom-full left-0 right-0 z-40 mb-1 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-lg rail:right-auto rail:w-60">
           {DATA_MODE === "supabase" ? (
             <p className="truncate px-3 pb-1.5 pt-1 text-xs text-muted-foreground" title={user.email}>
               {user.email}
@@ -273,10 +275,32 @@ function NotificationBell() {
   );
 }
 
+/** Replie / déplie le menu du bureau en barre d'icônes (choix mémorisé dans le navigateur). */
+function SidebarToggle() {
+  const collapsed = useSidebarCollapsed();
+  const label = collapsed ? "Déplier le menu" : "Réduire le menu";
+  return (
+    <button
+      type="button"
+      onClick={() => setSidebarCollapsed(!collapsed)}
+      title={label}
+      aria-label={label}
+      aria-pressed={collapsed}
+      className="hidden size-7 items-center justify-center rounded-md text-faint hover:bg-surface-2 hover:text-foreground lg:inline-flex"
+    >
+      {/* Icône choisie en CSS : juste dès le premier rendu, avant la lecture de la préférence. */}
+      <PanelLeftClose className="size-4 rail:hidden" aria-hidden="true" />
+      <PanelLeftOpen className="hidden size-4 rail:block" aria-hidden="true" />
+    </button>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const pathname = usePathname();
+  const focusScope = useFocusScope();
+  const focus = inFocusScope(focusScope, pathname);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -289,27 +313,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Mode lecture : quitté en sortant de sa page (ou de ses sous-pages), ou avec Échap quand aucune fenêtre n'est ouverte.
+  React.useEffect(() => {
+    if (focusScope && !focus) exitFocusMode();
+  }, [focusScope, focus]);
+  React.useEffect(() => {
+    if (!focus) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector('[aria-modal="true"]')) exitFocusMode();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [focus]);
+
   const sidebar = (
     <div className="flex h-full flex-col">
-      <div className="flex h-14 items-center justify-between px-4">
+      <div className="flex h-14 items-center justify-between px-4 rail:justify-center rail:px-2">
         <Brand />
       </div>
-      <div className="px-3 pb-3">
+      <div className="px-3 pb-3 rail:px-2">
         <button
           type="button"
           onClick={() => setPaletteOpen(true)}
-          className="flex h-8 w-full items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-sm text-faint shadow-sm hover:border-border-strong"
+          title="Rechercher (⌘K)"
+          className="flex h-8 w-full items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-sm text-faint shadow-sm hover:border-border-strong rail:justify-center rail:px-0"
         >
-          <Search className="size-4" />
-          <span className="flex-1 text-left">Rechercher…</span>
-          <Kbd>⌘K</Kbd>
+          <Search className="size-4 shrink-0" />
+          <span className="flex-1 text-left rail:sr-only">Rechercher…</span>
+          <Kbd className="rail:hidden">⌘K</Kbd>
         </button>
       </div>
       <SidebarNav onNavigate={() => setMobileOpen(false)} />
-      <div className="space-y-2 border-t border-border p-3">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[11px] text-faint">Thème</span>
-          <ThemeSwitch />
+      <div className="space-y-2 border-t border-border p-3 rail:px-2">
+        <div className="flex items-center justify-between gap-2 px-1 rail:flex-col rail:px-0">
+          <span className="text-[11px] text-faint rail:hidden">Thème</span>
+          <div className="flex items-center gap-1 rail:flex-col-reverse">
+            <ThemeSwitch />
+            <SidebarToggle />
+          </div>
         </div>
         <UserSwitcher />
       </div>
@@ -317,13 +358,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-dvh lg:pl-[var(--sidebar-width)]">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[var(--sidebar-width)] border-r border-border bg-surface lg:block">{sidebar}</aside>
+    <div className={cn("min-h-dvh", !focus && "lg:pl-[var(--sidebar-width)] lg:transition-[padding] lg:duration-200")}>
+      {!focus ? (
+        <aside data-rail className="fixed inset-y-0 left-0 z-30 hidden w-[var(--sidebar-width)] border-r border-border bg-surface transition-[width] duration-200 lg:block">
+          {sidebar}
+        </aside>
+      ) : null}
 
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-overlay" onClick={() => setMobileOpen(false)} aria-hidden="true" />
-          <aside className="relative h-full w-[min(85vw,var(--sidebar-width))] border-r border-border bg-surface shadow-lg">
+          <aside className="relative h-full w-[min(85vw,var(--sidebar-full))] border-r border-border bg-surface shadow-lg">
             <button type="button" onClick={() => setMobileOpen(false)} className="absolute right-3 top-3.5 rounded-md p-1 text-muted-foreground hover:bg-surface-2" aria-label="Fermer le menu">
               <X className="size-5" />
             </button>
@@ -332,31 +377,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-background/85 px-4 backdrop-blur sm:px-6">
-        <button type="button" onClick={() => setMobileOpen(true)} className="-ml-1.5 rounded-md p-1.5 text-muted-foreground hover:bg-surface-2 lg:hidden" aria-label="Ouvrir le menu">
-          <MenuIcon className="size-5" />
-        </button>
-        <div className="lg:hidden">
-          <Brand compact />
-        </div>
+      {focus ? (
         <button
           type="button"
-          onClick={() => setPaletteOpen(true)}
-          className="ml-auto inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground lg:hidden"
-          aria-label="Rechercher"
+          onClick={exitFocusMode}
+          className="no-print fixed right-3 top-3 z-40 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-md backdrop-blur hover:text-foreground"
         >
-          <Search className="size-[18px]" />
+          <Minimize2 className="size-3.5" aria-hidden="true" /> Quitter le plein écran <Kbd className="hidden sm:inline">Échap</Kbd>
         </button>
-        <div className="hidden flex-1 items-center gap-2 text-xs text-muted-foreground lg:flex">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2 py-0.5">
-            <span className="size-1.5 rounded-full bg-success" style={{ animation: "sw-pulse-dot 2s infinite" }} />
-            Mode démo · données locales
-          </span>
-        </div>
-        <NotificationBell />
-      </header>
+      ) : (
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-background/85 px-4 backdrop-blur sm:px-6">
+          <button type="button" onClick={() => setMobileOpen(true)} className="-ml-1.5 rounded-md p-1.5 text-muted-foreground hover:bg-surface-2 lg:hidden" aria-label="Ouvrir le menu">
+            <MenuIcon className="size-5" />
+          </button>
+          <div className="lg:hidden">
+            <Brand compact />
+          </div>
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            className="ml-auto inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground lg:hidden"
+            aria-label="Rechercher"
+          >
+            <Search className="size-[18px]" />
+          </button>
+          <div className="hidden flex-1 items-center gap-2 text-xs text-muted-foreground lg:flex">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2 py-0.5">
+              <span className="size-1.5 rounded-full bg-success" style={{ animation: "sw-pulse-dot 2s infinite" }} />
+              Mode démo · données locales
+            </span>
+          </div>
+          <NotificationBell />
+        </header>
+      )}
 
-      <main key={pathname} className="page-enter mx-auto w-full max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8">
+      <main key={pathname} className={cn("page-enter mx-auto w-full px-4 py-6 sm:px-6 lg:px-8", focus ? "max-w-none pt-14" : "max-w-[1480px]")}>
         {children}
       </main>
 

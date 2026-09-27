@@ -19,7 +19,7 @@ Supabase schéma crm : academy_* (source de vérité, RLS équipe)
 | **Formations** | Catalogue interne (statuts brouillon / relecture / publiée / archivée). |
 | **Éditeur de formation** | *Programme* (modules → leçons → blocs), *Informations* (objectifs, prérequis, public, FOAD/Qualiopi), *Accès & vente* (sessions liées, prix, catalogue, Stripe), *Apprenants*. |
 | **Éditeur de leçon** | 7 types de blocs : texte (Markdown), vidéo YouTube, quiz, exercice / livrable, ressource de la bibliothèque, prompt à copier, checklist. Chaque bloc peut être **réservé à un profil** (tech, non-tech, reconversion) : c'est l'hyper-personnalisation. Bouton **« Rédiger avec l'IA »**. |
-| **Aperçu apprenant** | La leçon telle que la voit l'apprenant, avec la progression séquentielle simulée, le choix du profil et **3 directions artistiques** (sélecteur en bas à droite : Néon, Campus, Atelier). |
+| **Aperçu apprenant** | La leçon telle que la voit l'apprenant, avec la progression séquentielle simulée, le choix du profil et **3 directions artistiques** (sélecteur en bas à droite : Néon, Campus, Atelier). Bouton **Plein écran** (ici et dans l'éditeur) : menu et en-tête masqués, page en pleine largeur ; reste actif entre l'éditeur et l'aperçu d'une même formation, Échap pour quitter. |
 | **Parcours** | Enchaînement recommandé de plusieurs formations. |
 | **Apprenants** | Toutes les inscriptions (origine, profil, progression, temps, quiz, dernière activité, fin d'accès) ; fiche apprenant avec la progression par module, le relevé de connexions et le certificat. |
 | **Livrables** | File de correction des exercices (retour + note sur 20). |
