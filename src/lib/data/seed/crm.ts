@@ -28,6 +28,8 @@ import { evId } from "./events";
 import { ORG } from "./organizations";
 import { mainContactOf } from "./people";
 import { U } from "./team";
+import { EMAIL_TEMPLATES } from "../email-templates";
+import { fillEmailTemplate } from "../../email-template";
 
 /* ───────────────────────────── Modèles d'emails ───────────────────────────── */
 
@@ -66,8 +68,10 @@ function varsOf(text: string): string[] {
   return Array.from(new Set(Array.from(text.matchAll(/\{\{\s*([\w.]+)\s*\}\}/g), (m) => m[1])));
 }
 
+/** Remplissage de démo : variable absente → vide (ligne « Libellé : » retirée), lien de document fictif. */
 function render(text: string, vars: Record<string, string>): string {
-  return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, k: string) => vars[k] ?? `{{${k}}}`);
+  const all = Object.fromEntries(varsOf(text).map((k) => [k, vars[k] ?? (k === "lien_document" ? "https://exemple.startupweek.tech/documents/demo" : "")]));
+  return fillEmailTemplate(text, all);
 }
 
 /* ───────────────────────────── Construction ───────────────────────────── */
@@ -83,7 +87,10 @@ export function buildCrm(ctx: SeedContext): void {
 function buildTemplatesAndSequences(ctx: SeedContext): void {
   const { clock } = ctx;
   const r = ctx.rng.fork("templates");
-  ctx.data.emailTemplates = TEMPLATES.map(([id, name, category, subject, body, replacesN8n]) => ({
+  // Modèles de production (src/lib/data/email-templates.ts) + modèles propres aux séquences de démo.
+  const production: Tpl[] = EMAIL_TEMPLATES.map((t) => [t.id, t.name, t.category, t.subject, t.body, t.replacesN8n]);
+  const demoOnly = TEMPLATES.filter(([id]) => !EMAIL_TEMPLATES.some((t) => t.id === id));
+  ctx.data.emailTemplates = [...production, ...demoOnly].map(([id, name, category, subject, body, replacesN8n]) => ({
     id,
     ...stamps(ctx, clock.real("2026-01-15", 10, 0) + r.between(0, 120) * DAY, clock.now - r.between(3, 60) * DAY),
     name,

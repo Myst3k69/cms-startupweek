@@ -25,7 +25,8 @@ import {
   stripHoneypot,
   verifyIntakeSignature,
 } from "@/lib/server/security";
-import { createResendSender, isIntakeForm, normalizeIntake, persistIntake, IntakePersistError } from "@/lib/server/intake";
+import { isIntakeForm, normalizeIntake, persistIntake, IntakePersistError } from "@/lib/server/intake";
+import { createMailSender } from "@/lib/server/mailer";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 
 export const runtime = "nodejs";
@@ -131,9 +132,8 @@ export async function POST(request: Request, { params }: Ctx): Promise<Response>
     return reply(200, { ok: true, dryRun: true, form, normalized: normalized.value }, cors);
   }
 
-  const resendKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
-  const sendEmail = resendKey && from ? createResendSender(resendKey, from) : undefined;
+  // Accusés de réception : envoyés seulement si le réglage « emails des formulaires » est activé (sinon n8n).
+  const sendEmail = createMailSender() ?? undefined;
 
   try {
     const result = await persistIntake(db, normalized.value, { sendEmail });

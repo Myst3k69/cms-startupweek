@@ -9,9 +9,11 @@ import { sendEmail } from "@/lib/domain/actions";
 import { contactName } from "@/lib/domain/selectors";
 import { labelOf, TEMPLATE_CATEGORIES } from "@/lib/domain/constants";
 import type { EmailMessage, EntityRef, ID } from "@/lib/domain/types";
-import { normalizeEmail, renderTemplate } from "@/lib/utils";
+import { normalizeEmail } from "@/lib/utils";
+import { fillEmailTemplate, missingVariables, SERVER_VARIABLES } from "@/lib/email-template";
 import { Badge, Button, FormField, Input, Modal, Segmented, Select, Textarea, useToast } from "@/components/ui";
-import { DAY, decodeEntities, extractVariables, fromDateTimeInput, normText, startOfDay, toDateTimeInput } from "../../lib/format";
+import { DAY, decodeEntities, fromDateTimeInput, normText, startOfDay, toDateTimeInput } from "../../lib/format";
+import { useEmailDelivery } from "../../lib/email-delivery";
 
 export interface EmailComposerProps {
   open: boolean;
@@ -87,7 +89,12 @@ function ComposerInner({ onClose, title = "Nouvel email", description, to: initi
     return out;
   }, [contact, organizations, extraVars, to]);
 
-  const missing = React.useMemo(() => extractVariables(subject, body).filter((v) => vars[v] === undefined || vars[v] === ""), [subject, body, vars]);
+  const filledSubject = React.useMemo(() => fillEmailTemplate(subject, vars), [subject, vars]);
+  const filledBody = React.useMemo(() => fillEmailTemplate(body, vars), [body, vars]);
+  // Jamais d'email envoyé avec une variable non remplie ; les liens personnels sont complétés à l'envoi.
+  const missing = React.useMemo(() => missingVariables(filledSubject, filledBody), [filledSubject, filledBody]);
+  const serverFilled = React.useMemo(() => SERVER_VARIABLES.filter((v) => `${subject} ${body}`.includes(`{{${v}}}`)), [subject, body]);
+  const delivery = useEmailDelivery();
 
   const suggestions = React.useMemo(() => {
     const q = normText(to);
@@ -117,6 +124,7 @@ function ComposerInner({ onClose, title = "Nouvel email", description, to: initi
     const errs: Record<string, string> = {};
     if (!parsed.success) for (const issue of parsed.error.issues) errs[String(issue.path[0])] ??= issue.message;
     let scheduledIso: string | undefined;
+    if (missing.length) errs.body = `Complétez ou retirez : ${missing.map((v) => `{{${v}}}`).join(", ")}`;
     if (mode === "later") {
       scheduledIso = fromDateTimeInput(scheduledAt);
       if (!scheduledIso || new Date(scheduledIso).getTime() <= Date.now()) errs.scheduledAt = "Choisissez une date future";
@@ -133,11 +141,12 @@ function ComposerInner({ onClose, title = "Nouvel email", description, to: initi
       related: effectiveRelated,
       scheduledAt: scheduledIso,
     });
-    if (contact && effectiveRelated?.entity !== "contacts") {
+    // Base connectée : l'envoi réel est journalisé par le serveur (sur l'élément lié et le contact).
+    if (contact && effectiveRelated?.entity !== "contacts" && (!delivery.live || scheduledIso)) {
       log({ kind: "email", entity: "contacts", entityId: contact.id, actorId: sessionUserId, summary: `${scheduledIso ? "Email programmé" : "Email envoyé"} : « ${decodeEntities(msg.subject)} »` });
     }
     if (contact && !scheduledIso) update("contacts", contact.id, { lastContactAt: new Date().toISOString() });
-    toast({ title: scheduledIso ? "Email programmé" : "Email envoyé", description: `${decodeEntities(msg.subject)} → ${msg.to}` });
+    toast({ title: scheduledIso ? "Email programmé" : delivery.live ? "Email en cours d'envoi" : "Email envoyé", description: `${decodeEntities(msg.subject)} → ${msg.to}` });
     onSent?.(msg, Boolean(scheduledIso));
     onClose();
   };
@@ -235,18 +244,29 @@ function ComposerInner({ onClose, title = "Nouvel email", description, to: initi
             <Textarea id="composer-body" aria-label="Message" value={body} onChange={(e) => setBody(e.target.value)} className="min-h-56 font-mono text-[13px]" />
           ) : (
             <div className="min-h-56 rounded-md border border-border bg-surface-2 px-4 py-3">
-              <p className="mb-2 text-sm font-semibold text-foreground">{decodeEntities(renderTemplate(subject || "(sans objet)", vars))}</p>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{decodeEntities(renderTemplate(body, vars))}</p>
+              <p className="mb-2 text-sm font-semibold text-foreground">{decodeEntities(filledSubject || "(sans objet)")}</p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{decodeEntities(filledBody)}</p>
             </div>
           )}
           {errors.body ? <p className="text-xs text-danger-text">{errors.body}</p> : null}
           {missing.length ? (
             <p className="flex flex-wrap items-center gap-1.5 text-xs text-warning-text">
               <TriangleAlert className="size-3.5" aria-hidden="true" />
-              Variables sans valeur (resteront telles quelles) :
+              Variables sans valeur, à compléter ou retirer avant l&apos;envoi :
               {missing.map((v) => (
                 <Badge key={v} tone="warning">{`{{${v}}}`}</Badge>
               ))}
+            </p>
+          ) : null}
+          {serverFilled.length ? (
+            <p className="text-xs text-muted-foreground">
+              {serverFilled.map((v) => `{{${v}}}`).join(", ")} : lien personnel complété automatiquement à l&apos;envoi.
+            </p>
+          ) : null}
+          {delivery.live && delivery.configured === false ? (
+            <p className="flex items-start gap-1.5 text-xs text-warning-text">
+              <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+              Envoi pas encore configuré sur le serveur : l&apos;email restera en file et partira dès la configuration terminée.
             </p>
           ) : null}
         </div>

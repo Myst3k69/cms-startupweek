@@ -9,12 +9,24 @@ import { EVALUATION_KINDS, labelOf } from "@/lib/domain/constants";
 import { contactName } from "@/lib/domain/selectors";
 import type { EventSession } from "@/lib/domain/types";
 import { date } from "@/lib/format";
-import { useLookup, useNow } from "@/lib/hooks";
+import { useLookup, useNow, useSettings } from "@/lib/hooks";
 import { pct } from "@/lib/utils";
 import { Rating } from "../bits";
 import { templateMatching } from "../../lib/applications";
 import { average, evalScore10, npsOf, sessionAudience } from "../../lib/sessions";
 import type { SessionData } from "./use-session-data";
+
+/** Lien personnel du questionnaire : session et participant en paramètres (champs cachés Tally, ignorés ailleurs). */
+function questionnaireLink(formUrl: string, sessionCode: string, participantId: string): string {
+  try {
+    const url = new URL(formUrl);
+    url.searchParams.set("session", sessionCode);
+    url.searchParams.set("participant", participantId);
+    return url.toString();
+  } catch {
+    return formUrl;
+  }
+}
 
 const fmt1 = (v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
 
@@ -23,6 +35,7 @@ export function EvaluationsTab({ ev, data, canEdit }: { ev: EventSession; data: 
   const speakers = useLookup("speakers");
   const now = useNow();
   const toast = useToast();
+  const settings = useSettings();
   const [showAll, setShowAll] = React.useState(false);
 
   const view = React.useMemo(() => {
@@ -85,6 +98,11 @@ export function EvaluationsTab({ ev, data, canEdit }: { ev: EventSession; data: 
   const hasEnrolled = data.enrolled.length > 0;
 
   const sendHot = () => {
+    const formUrl = settings.satisfactionFormUrl.trim();
+    if (!/^https?:\/\//i.test(formUrl)) {
+      toast({ title: "Lien du questionnaire manquant", description: "Renseignez le lien de votre questionnaire de satisfaction (Tally, Google Forms…) dans Paramètres → Qualiopi.", tone: "danger" });
+      return;
+    }
     const tpl = templateMatching("qualiopi", "chaud", "satisfaction");
     let n = 0;
     data.enrolled.forEach((a) => {
@@ -97,7 +115,7 @@ export function EvaluationsTab({ ev, data, canEdit }: { ev: EventSession; data: 
         body: tpl
           ? undefined
           : "Bonjour {{prenom}},\n\nMerci d'avoir participé à la session {{session}} ({{code_session}}).\nVotre avis nous aide à améliorer chaque édition : répondez au questionnaire de satisfaction à chaud (2 minutes) : {{lien_questionnaire}}\n\nMerci !\nL'équipe StartupWeek",
-        vars: { prenom: c.firstName, session: ev.name, code_session: ev.code, lien_questionnaire: `https://startupweek.tech/avis/${ev.code.toLowerCase()}?p=${a.id}` },
+        vars: { prenom: c.firstName, session: ev.name, code_session: ev.code, lien_questionnaire: questionnaireLink(formUrl, ev.code, a.id) },
         related: { entity: "applications", id: a.id },
       });
       n += 1;

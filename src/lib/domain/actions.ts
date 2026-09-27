@@ -30,7 +30,9 @@ import type {
 import { contactName, invoiceBalance, invoiceTotal } from "./selectors";
 import { date, money } from "@/lib/format";
 import { labelOf, APPLICATION_STATUSES } from "./constants";
-import { normalizeEmail, renderTemplate, uid } from "@/lib/utils";
+import { normalizeEmail, uid } from "@/lib/utils";
+import { fillEmailTemplate } from "@/lib/email-template";
+import { remoteSync } from "@/lib/data/sync";
 
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -49,7 +51,19 @@ export function findTemplate(category: TemplateCategory, keyword?: string): Emai
   return list.find((t) => `${t.name} ${t.subject}`.toLowerCase().includes(k));
 }
 
-/** Envoie (démo : journalise) un email à partir d'un template + variables échappées. */
+/** Règlement à indiquer dans un email : lien de paiement Stripe, sinon virement (IBAN + référence). */
+export function paymentText(inv: { stripePaymentLink?: string; number?: string } | undefined): string {
+  if (inv?.stripePaymentLink) return inv.stripePaymentLink;
+  const iban = crm().settings.iban;
+  return iban ? `par virement sur le compte ${iban}${inv?.number ? ` (référence ${inv.number})` : ""}` : "";
+}
+
+/**
+ * Envoie un email à partir d'un modèle + variables (texte brut, échappé à l'envoi).
+ * Base connectée : l'email part dans la file d'envoi (statut « programme », heure =
+ * maintenant ou plus tard) ; le serveur l'envoie, puis note « envoyé » / « erreur »
+ * et journalise sur l'élément lié. Mode démo : marqué envoyé et journalisé aussitôt.
+ */
 export function sendEmail(opts: {
   to: string;
   templateId?: ID;
@@ -62,24 +76,26 @@ export function sendEmail(opts: {
 }) {
   const tpl = opts.template ?? (opts.templateId ? findById("emailTemplates", opts.templateId) : undefined);
   const vars = opts.vars ?? {};
-  const subject = renderTemplate(opts.subject ?? tpl?.subject ?? "(sans objet)", vars);
-  const body = renderTemplate(opts.body ?? tpl?.body ?? "", vars);
-  const scheduled = opts.scheduledAt && new Date(opts.scheduledAt).getTime() > nowMs();
+  const subject = fillEmailTemplate(opts.subject ?? tpl?.subject ?? "(sans objet)", vars).replace(/\s+/g, " ").trim();
+  const body = fillEmailTemplate(opts.body ?? tpl?.body ?? "", vars);
+  const scheduled = Boolean(opts.scheduledAt && new Date(opts.scheduledAt).getTime() > nowMs());
+  const live = remoteSync.active;
   const msg = crm().create(
     "emails",
     {
-      to: opts.to,
+      to: normalizeEmail(opts.to),
       subject,
       body,
       templateId: tpl?.id,
-      status: scheduled ? "programme" : "envoye",
-      scheduledAt: opts.scheduledAt,
-      sentAt: scheduled ? undefined : iso(nowMs()),
+      status: live || scheduled ? "programme" : "envoye",
+      scheduledAt: scheduled ? opts.scheduledAt : live ? iso(nowMs()) : undefined,
+      sentAt: live || scheduled ? undefined : iso(nowMs()),
       related: opts.related,
     },
     { log: false },
   );
-  if (opts.related) {
+  // Base connectée : le serveur journalise l'envoi réel (ou l'échec) sur l'élément lié.
+  if (opts.related && (!live || scheduled)) {
     crm().log({ kind: "email", entity: opts.related.entity, entityId: opts.related.id, actorId: crm().sessionUserId, summary: `${scheduled ? "Email programmé" : "Email envoyé"} : « ${subject} »` });
   }
   return msg;
@@ -218,7 +234,15 @@ export function sendInvoiceReminder(invoiceId: ID) {
     template: tpl,
     subject: tpl ? undefined : "Rappel — facture {{numero_facture}}",
     body: tpl ? undefined : `Bonjour,\n\nSauf erreur de notre part, la facture {{numero_facture}} d'un montant de {{montant}} arrivée à échéance le {{date_echeance}} reste à régler.\nLien de paiement : {{lien_paiement}}\n\nL'équipe StartupWeek`,
-    vars: { prenom: contact?.firstName ?? "", numero_facture: inv.number, montant: money(invoiceBalance(inv), true), date_echeance: date(inv.dueAt), lien_paiement: inv.stripePaymentLink ?? "" },
+    vars: {
+      prenom: contact?.firstName ?? "",
+      numero: inv.number,
+      numero_facture: inv.number,
+      montant: money(invoiceBalance(inv), true),
+      echeance: date(inv.dueAt, "d MMMM yyyy"),
+      date_echeance: date(inv.dueAt, "d MMMM yyyy"),
+      lien_paiement: paymentText(inv),
+    },
     related: { entity: "invoices", id: inv.id },
   });
   s.update("invoices", inv.id, { remindersSent: inv.remindersSent + 1, lastReminderAt: iso(nowMs()) });
@@ -271,7 +295,7 @@ export function changeApplicationStatus(applicationId: ID, status: ApplicationSt
     const inv = createApplicationInvoice(app.id, "acompte");
     if (contact) {
       const tpl = findTemplate("candidature", ev?.mode === "distanciel" ? "distanciel" : "présentiel") ?? findTemplate("candidature", "accept");
-      sendEmail({ to: contact.email, template: tpl, vars: { ...vars, lien_paiement: inv?.stripePaymentLink }, related });
+      sendEmail({ to: contact.email, template: tpl, vars: { ...vars, lien_paiement: paymentText(inv) }, related });
     }
     createTask({ title: `Vérifier le paiement de l'acompte — ${contactName(contact)}`, kind: "paiement", dueInDays: 5, related, automated: true });
   }

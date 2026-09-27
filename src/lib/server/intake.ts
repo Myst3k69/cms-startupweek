@@ -19,6 +19,8 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
+import { fillEmailTemplate, missingVariables } from "@/lib/email-template";
+import { renderEmail, type EmailSender, type OutgoingEmail } from "./mailer";
 import type { PostgrestError } from "@supabase/supabase-js";
 import type {
   Application,
@@ -1222,16 +1224,7 @@ export function normalizeIntake(
 
 /* ═════════════════════════════ Accusés de réception ═════════════════════════════ */
 
-export interface OutgoingEmail {
-  to: string;
-  subject: string;
-  text: string;
-  html: string;
-  replyTo?: string;
-}
-
-export type EmailSendResult = { ok: true; id?: string } | { ok: false; error: string };
-export type EmailSender = (message: OutgoingEmail) => Promise<EmailSendResult>;
+export type { EmailSendResult, EmailSender, OutgoingEmail } from "./mailer";
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] ?? ch);
@@ -1272,46 +1265,29 @@ const ACK_TEMPLATES: Record<AckKind, { subject: string; body: string }> = {
   },
 };
 
-/** Construit l'accusé de réception (texte + HTML échappé). */
-export function buildAckEmail(kind: AckKind, to: string, vars: Record<string, string | undefined>): OutgoingEmail {
-  const tpl = ACK_TEMPLATES[kind];
-  const text = fillTemplate(tpl.body, vars, false);
-  const htmlBody = fillTemplate(tpl.body, vars, true)
-    .split("\n\n")
-    .map((para) => `<p>${para.replace(/\n/g, "<br>")}</p>`)
-    .join("\n");
-  return {
-    to,
-    subject: fillTemplate(tpl.subject, vars, false).replace(/\s+/g, " ").trim(),
-    text,
-    html: `<!doctype html><html lang="fr"><body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.5;color:#111">${htmlBody}</body></html>`,
-  };
-}
+/** Modèle d'accusé de réception en base (Emails → Modèles) pour chaque formulaire. */
+export const ACK_TEMPLATE_IDS: Record<AckKind, string> = {
+  candidature: "tpl_ack_candidature",
+  contact: "tpl_ack_contact",
+  entreprise: "tpl_ack_entreprise",
+  partenaire: "tpl_ack_partenariat",
+  accompagnement: "tpl_ack_accompagnement",
+  reclamation: "tpl_ack_reclamation",
+};
 
-/** Expéditeur Resend (API HTTP, sans SDK). */
-export function createResendSender(apiKey: string, from: string, replyTo?: string): EmailSender {
-  return async (message) => {
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from,
-          to: [message.to],
-          subject: message.subject,
-          text: message.text,
-          html: message.html,
-          ...(message.replyTo ?? replyTo ? { reply_to: message.replyTo ?? replyTo } : {}),
-        }),
-        signal: AbortSignal.timeout(8_000),
-      });
-      if (!res.ok) return { ok: false, error: `Resend HTTP ${res.status}: ${(await res.text()).slice(0, 300)}` };
-      const data = (await res.json()) as { id?: string };
-      return { ok: true, id: data.id };
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) };
-    }
-  };
+/**
+ * Construit l'accusé de réception : modèle de la base s'il existe (`dbTemplate`),
+ * sinon texte intégré. Variables non remplies retirées (jamais de {{…}} envoyé).
+ */
+export function buildAckEmail(kind: AckKind, to: string, vars: Record<string, string | undefined>, dbTemplate?: { subject: string; body: string }): OutgoingEmail {
+  const tpl = dbTemplate ?? ACK_TEMPLATES[kind];
+  const strip = (t: string) => t.replace(/\{\{\s*[\w.]+\s*\}\}/g, "");
+  const subject = strip(fillEmailTemplate(tpl.subject, vars)).replace(/\s+/g, " ").trim();
+  const body = strip(fillEmailTemplate(tpl.body, vars));
+  const unfilled = missingVariables(tpl.subject, tpl.body).filter((v) => !(v in vars));
+  if (unfilled.length) console.warn(`[intake] accusé ${kind} : variables inconnues retirées (${unfilled.join(", ")})`);
+  const rendered = renderEmail(body);
+  return { to, subject, text: rendered.text, html: rendered.html };
 }
 
 /* ═════════════════════════════ Persistance ═════════════════════════════ */
@@ -1349,7 +1325,8 @@ export interface PersistResult {
   duplicate: boolean;
   /** Candidature sur une session complète / close : demande conservée, pas de candidature créée. */
   sessionClosed: boolean;
-  ack: "envoye" | "erreur" | "non_configure" | "non_applicable" | "deja_traite";
+  /** « n8n » : réglage « emails des formulaires » désactivé, l'accusé part par n8n. */
+  ack: "envoye" | "erreur" | "non_configure" | "n8n" | "non_applicable" | "deja_traite";
   sequenceSteps?: number;
 }
 
@@ -1385,16 +1362,19 @@ interface SettingsSnapshot {
   slaHours: number;
   complaintAckHours: number;
   replyTo?: string;
+  /** Accusés de réception et Digital Starter Kit envoyés par le CRM (sinon : par n8n). */
+  siteFormEmails: boolean;
 }
 
 async function loadSettings(db: CrmAdminClient): Promise<SettingsSnapshot> {
-  const { data } = await db.from("settings").select("brand, sla_hours, complaint_ack_hours, email").limit(1).maybeSingle();
+  const { data } = await db.from("settings").select("*").limit(1).maybeSingle();
   const row = (data ?? {}) as Row;
   return {
     brand: typeof row.brand === "string" && row.brand ? row.brand : "StartupWeek",
     slaHours: typeof row.sla_hours === "number" ? row.sla_hours : 48,
     complaintAckHours: typeof row.complaint_ack_hours === "number" ? row.complaint_ack_hours : 48,
     replyTo: typeof row.email === "string" && row.email ? row.email : undefined,
+    siteFormEmails: row.site_form_emails === true,
   };
 }
 
@@ -1459,13 +1439,17 @@ interface SessionInfo {
   registrationDeadline?: string;
   priceCents: number;
   name: string;
+  startAt?: string;
+  endAt?: string;
+  mode?: string;
+  city?: string;
 }
 
 async function findSession(db: CrmAdminClient, code: string | undefined): Promise<SessionInfo | undefined> {
   if (!code) return undefined;
   const { data, error } = await db
     .from("sessions")
-    .select("id, code, status, registration_deadline, price_cents, name")
+    .select("id, code, status, registration_deadline, price_cents, name, start_at, end_at, mode, city")
     .eq("code", code.trim().toUpperCase())
     .maybeSingle();
   fail("session.select", error);
@@ -1478,7 +1462,20 @@ async function findSession(db: CrmAdminClient, code: string | undefined): Promis
     registrationDeadline: (r.registration_deadline as string | null) ?? undefined,
     priceCents: typeof r.price_cents === "number" ? r.price_cents : 0,
     name: (r.name as string) ?? "",
+    startAt: (r.start_at as string | null) ?? undefined,
+    endAt: (r.end_at as string | null) ?? undefined,
+    mode: (r.mode as string | null) ?? undefined,
+    city: (r.city as string | null) ?? undefined,
   };
+}
+
+/** « du 5 au 12 octobre 2026 » (fuseau de Paris). */
+function sessionDates(startAt?: string, endAt?: string): string {
+  if (!startAt) return "";
+  const fmt = (iso: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", ...opts }).format(new Date(iso));
+  const full = { day: "numeric", month: "long", year: "numeric" } as const;
+  if (!endAt || fmt(startAt, full) === fmt(endAt, full)) return `le ${fmt(startAt, full)}`;
+  return `du ${fmt(startAt, { day: "numeric", month: "long" })} au ${fmt(endAt, full)}`;
 }
 
 /** Session fermée aux nouvelles candidatures : complète, annulée, en cours / terminée, ou date limite passée. */
@@ -1740,8 +1737,8 @@ async function enrollStarterKit(db: CrmAdminClient, contact: Contact, vars: Reco
       if (step.templateId) {
         const { data: tpl } = await db.from("email_templates").select("subject, body").eq("id", step.templateId).maybeSingle();
         if (tpl) {
-          subject = fillTemplate(String((tpl as Row).subject ?? step.label), vars, false);
-          body = fillTemplate(String((tpl as Row).body ?? ""), vars, false); // texte brut : échappé à l'envoi
+          subject = fillEmailTemplate(String((tpl as Row).subject ?? step.label), vars);
+          body = fillEmailTemplate(String((tpl as Row).body ?? ""), vars); // texte brut : échappé à l'envoi
         }
       }
       const { error: e } = await db.from("email_messages").insert({
@@ -1888,7 +1885,7 @@ export async function persistIntake(db: CrmAdminClient, n: NormalizedIntake, opt
     duplicate: false,
     sessionClosed,
     sessionId: session?.id,
-    ack: n.ack ? "non_configure" : "non_applicable",
+    ack: !n.ack ? "non_applicable" : !settings.siteFormEmails ? "n8n" : "non_configure",
   };
 
   // ── 5. Objet métier ──
@@ -1932,7 +1929,8 @@ export async function persistIntake(db: CrmAdminClient, n: NormalizedIntake, opt
       break;
     }
     case "starter_kit": {
-      if (n.action.enroll && isNewSubmission) {
+      // Envoyé par n8n tant que le réglage « emails des formulaires » est désactivé.
+      if (n.action.enroll && isNewSubmission && settings.siteFormEmails) {
         result.sequenceSteps = await enrollStarterKit(db, contact, { prenom: contact.firstName || n.contact.firstName, email: contact.email, stade: n.action.stade }, now);
       }
       break;
@@ -1952,15 +1950,37 @@ export async function persistIntake(db: CrmAdminClient, n: NormalizedIntake, opt
   }
 
   // ── 7. Accusé de réception (une seule fois par soumission) ──
-  if (n.ack && isNewSubmission && opts.sendEmail) {
-    const email = buildAckEmail(n.ack, contact.email, {
-      marque: settings.brand,
-      prenom: contact.firstName || n.contact.firstName || "",
-      numero: result.complaintNumber ?? "",
-      session: session && !sessionClosed ? ` pour la session ${session.name || session.code}` : "",
-      objet: n.submission.subject ? ` (« ${n.submission.subject} »)` : "",
-      entreprise: n.submission.company ? ` pour ${n.submission.company}` : "",
-    });
+  // Envoyé par n8n tant que le réglage « emails des formulaires » est désactivé (pas de doublon).
+  if (n.ack && isNewSubmission && opts.sendEmail && settings.siteFormEmails) {
+    const templateId = ACK_TEMPLATE_IDS[n.ack];
+    const { data: tplRow } = await db.from("email_templates").select("subject, body").eq("id", templateId).maybeSingle();
+    const dbTemplate = tplRow ? { subject: String((tplRow as Row).subject ?? ""), body: String((tplRow as Row).body ?? "") } : undefined;
+    const prenom = contact.firstName || n.contact.firstName || "";
+    const openSession = session && !sessionClosed ? session : undefined;
+    const vars: Record<string, string | undefined> = dbTemplate
+      ? {
+          marque: settings.brand,
+          prenom,
+          session: openSession ? openSession.name || openSession.code : "",
+          code_session: openSession?.code ?? "",
+          dates_session: openSession ? sessionDates(openSession.startAt, openSession.endAt) : "",
+          lieu: openSession ? (openSession.mode === "distanciel" ? "en ligne" : openSession.city ?? "") : "",
+          objet: n.submission.subject ?? "",
+          entreprise: n.submission.company ?? "",
+          offre: n.form === "accompagnement" ? (n.submission.subject ?? "").replace(/^Accompagnement — /, "") : "",
+          numero_reclamation: result.complaintNumber ?? "",
+          numero: result.complaintNumber ?? "",
+        }
+      : {
+          // Texte intégré (modèle absent de la base) : formulations d'origine.
+          marque: settings.brand,
+          prenom,
+          numero: result.complaintNumber ?? "",
+          session: openSession ? ` pour la session ${openSession.name || openSession.code}` : "",
+          objet: n.submission.subject ? ` (« ${n.submission.subject} »)` : "",
+          entreprise: n.submission.company ? ` pour ${n.submission.company}` : "",
+        };
+    const email = buildAckEmail(n.ack, contact.email, vars, dbTemplate);
     email.replyTo = settings.replyTo;
     const sent = await opts.sendEmail(email);
     result.ack = sent.ok ? "envoye" : "erreur";
@@ -1969,8 +1989,12 @@ export async function persistIntake(db: CrmAdminClient, n: NormalizedIntake, opt
       to: email.to,
       subject: email.subject,
       body: email.text,
+      template_id: dbTemplate ? templateId : null,
       status: sent.ok ? "envoye" : "erreur",
       sent_at: sent.ok ? now.toISOString() : null,
+      attempts: 1,
+      error: sent.ok ? null : sent.error,
+      provider_id: sent.ok ? (sent.id ?? null) : null,
       related: { entity: "submissions", id: submissionId } satisfies EntityRef,
     });
     if (sent.ok && result.complaintId) {
