@@ -280,6 +280,9 @@ export function domToBlocks(root: El): Block[] {
         const c = inlineOf(el);
         if (hasText(c)) out.push({ t: "p", c });
       }
+    } else if ([...el.children].some((c) => BLOCK_TAGS.has(c.tagName.toLowerCase()))) {
+      // Ex. Chrome qui place une liste dans un paragraphe (<p><ol>…</ol></p>) : on lit les blocs contenus.
+      walk(el);
     } else {
       const c = inlineOf(el);
       if (hasText(c)) out.push({ t: "p", c });
