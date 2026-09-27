@@ -445,7 +445,7 @@ Droits (miroir de `src/lib/auth/permissions.ts`) : `admin` et `commercial` en é
 
 1. **Meta** : Business Manager → Utilisateurs système → générer un jeton avec la permission `ads_read` sur le compte publicitaire → `META_ADS_ACCESS_TOKEN` ; `META_AD_ACCOUNT_ID` (`act_…`). Optionnel : `META_GRAPH_VERSION` (défaut `v25.0`).
 2. **LinkedIn** : application LinkedIn avec le produit *Advertising API* (portées `r_ads`, `r_ads_reporting`) → `LINKEDIN_ADS_ACCESS_TOKEN` (expire au bout de 60 jours : prévoir le renouvellement) ; `LINKEDIN_AD_ACCOUNT_ID` (identifiant numérique du compte). Optionnel : `LINKEDIN_API_VERSION` (`AAAAMM`, défaut `202609` ; une version est maintenue environ un an).
-3. Déclenchement : bouton **Synchroniser les régies** (membre avec droit d'écriture Marketing, jeton de session vérifié côté serveur) ou cron quotidien, par exemple dans `vercel.json` : `{ "crons": [{ "path": "/api/ads/sync?days=7", "schedule": "40 5 * * *" }] }` avec `CRON_SECRET`.
+3. Déclenchement : bouton **Synchroniser les régies** (membre avec droit d'écriture Marketing, jeton de session vérifié côté serveur) ou cron quotidien déclaré dans `vercel.json` : `/api/ads/sync?days=7` à 5 h 40 UTC. Le cron a besoin de `CRON_SECRET` dans Vercel (envoyé en `Authorization: Bearer …`) : sans jetons des régies il répond en dry-run ; avec des jetons mais sans `CRON_SECRET`, il est refusé (401) et rien n'est synchronisé. Sur l'offre Hobby de Vercel, l'heure d'exécution peut glisser dans l'heure.
 4. Fenêtre glissante de 7 jours par défaut (`?days=` jusqu'à 90, ou `?since=AAAA-MM-JJ` pour un historique) : les régies révisent leurs conversions quelques jours après coup ; l'upsert est idempotent.
 5. Une campagne créée dans la régie apparaît automatiquement (utm_campaign proposée à partir de son nom, à vérifier). Une campagne préparée dans le CRM est reliée en renseignant son identifiant de régie. La synchro ne modifie jamais les champs propres au CRM (session promue, utm_campaign, ciblage résumé, notes, responsable).
 
@@ -453,7 +453,10 @@ Droits (miroir de `src/lib/auth/permissions.ts`) : `admin` et `commercial` en é
 
 ### Attribution
 
-Une candidature (ou une demande du site) est attribuée à une campagne quand son `utm_campaign` est celle de la campagne **et** qu'elle arrive entre la veille du lancement et 30 jours après la fin (dernier clic). Le formulaire du site transmet `utm_source`, `utm_medium`, `utm_campaign` et désormais `utm_content` / `utm_term` (`/api/intake`) : pour Meta, `utm_content={{ad.id}}` identifie la publicité. Le ROAS est calculé sur le CA **HT facturé** (acomptes + soldes − avoirs) des candidatures attribuées.
+Une candidature (ou une demande du site) est attribuée à une campagne quand son `utm_campaign` est celle de la campagne **et** qu'elle arrive entre la veille du lancement et 30 jours après la fin (dernier clic). Le formulaire du site transmet `utm_source`, `utm_medium`, `utm_campaign` et désormais `utm_content` / `utm_term` (`/api/intake`) : pour Meta, `utm_content={{ad.id}}` identifie la publicité. Le ROAS est calculé sur le CA **HT** des candidatures attribuées :
+
+- **facturé** (acomptes + soldes − avoirs) quand la candidature a au moins une facture émise dans le CRM ;
+- **estimé** pour un inscrit sans facture dans le CRM (facturation tenue dans un autre outil, par exemple Indy) : prix de l'offre choisie, sinon prix public de la session, convertis en HT selon les règles des factures (exonération de TVA comprise). Financement « gratuit » = 0. L'estimation ignore remises, prises en charge négociées et remboursements ; à l'écran, un ROAS qui en contient une partie est précédé de « ≈ » et le montant estimé est indiqué.
 
 ### A/B tests des pages du site (`/api/experiments`)
 
@@ -599,6 +602,7 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 | Formulaires | Remettre les URLs `N8N_WEBHOOK_*` dans le site et réactiver les 8 workflows. Effet immédiat. |
 | Synchro site | `alter table crm.sessions disable trigger sessions_site_sync; alter table crm.resources disable trigger resources_site_sync; alter table crm.applications disable trigger applications_capacity;` puis réactiver le polling n8n (il réécrit `public.event` depuis Airtable). |
 | Paiements | Désactiver l'endpoint dans Stripe ; retirer le cron Qonto de `vercel.json`. |
+| Régies publicitaires | Retirer le cron `/api/ads/sync` de `vercel.json` (ou les jetons `META_*` / `LINKEDIN_*` dans Vercel : la route passe en dry-run). Les données déjà synchronisées restent en lecture. |
 | Emails | Retirer `EMAIL_DISPATCH_SECRET` (ou les variables SMTP) dans Vercel : plus rien ne part, les emails restent en file « Programmé ». Revenir à n8n pour les formulaires : désactiver *Emails des formulaires du site*. |
 | Planificateur | `select cron.unschedule('crm-scheduler');` (plus de publication ni de rappel automatiques ; les contenus « Planifié » attendent) ; `select cron.unschedule('crm-cron-purge');` ; `drop extension pg_cron;` supprime toutes les tâches. |
 | Tout le CRM | `drop schema crm cascade;` — supprime tables, fonctions et triggers du CRM ; **aucune table `public.*` n'est modifiée structurellement** (seules leurs lignes ont pu être mises à jour par la synchro). Puis `supabase migration repair --status reverted 20260926103012 20260926103117 20260926103336 20260926103516`. |

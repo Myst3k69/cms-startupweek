@@ -21,7 +21,7 @@ import { analyzeExperiment } from "../lib/stats";
 import { CampaignFormModal } from "./campaign-form-modal";
 import { CreativeFormModal } from "./creative-form-modal";
 import { ExperimentFormModal } from "./experiment-form-modal";
-import { BudgetBar, PlatformBadge, VERDICT_LABEL, VERDICT_TONE, cost, roasFmt } from "./parts";
+import { BudgetBar, LeadRevenue, PlatformBadge, VERDICT_LABEL, VERDICT_TONE, cost, revenueLabel, roasFmt } from "./parts";
 import { useMarketingData } from "./use-marketing-data";
 
 const DAY = 86_400_000;
@@ -121,7 +121,7 @@ function CampaignView({ campaign: c }: { campaign: AdCampaign }) {
         <StatCard label="Leads régie" value={number(p.leads)} hint={`CPL ${cost(p.cplCents)} · CPC ${cost(p.cpcCents)}`} icon={Target} />
         <StatCard label="Leads CRM" value={number(p.crmLeads)} hint={`${cost(p.cplCrmCents)} par lead CRM`} icon={UserPlus} />
         <StatCard label="Inscriptions" value={number(p.enrolled)} hint={`${cost(p.cpaCents)} par inscription`} icon={UserCheck} />
-        <StatCard label="ROAS" value={roasFmt(p.roas)} hint={`${money(p.revenueCents)} HT facturés`} icon={TrendingUp} />
+        <StatCard label="ROAS" value={roasFmt(p.roas, p.estimatedCents > 0)} hint={revenueLabel(p.revenueCents, p.estimatedCents)} icon={TrendingUp} />
       </section>
 
       {rows.length ? (
@@ -268,7 +268,10 @@ function CampaignView({ campaign: c }: { campaign: AdCampaign }) {
                               {date(a.submittedAt)} · <SessionLink id={a.eventId} short />
                             </span>
                           </span>
-                          <StatusBadge options={APPLICATION_STATUSES} value={a.status} />
+                          <span className="flex items-center gap-2">
+                            <LeadRevenue revenue={attribution.revenueByApp.get(a.id)} />
+                            <StatusBadge options={APPLICATION_STATUSES} value={a.status} />
+                          </span>
                         </li>
                       ))
                   : null}

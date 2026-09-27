@@ -7,7 +7,7 @@ import type { AdPlatform } from "@/lib/domain/types";
 import { money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PLATFORM_SHORT } from "../lib/labels";
-import type { PromoRisk } from "../lib/metrics";
+import type { AppRevenue, PromoRisk } from "../lib/metrics";
 import type { Verdict } from "../lib/stats";
 
 export function PlatformBadge({ platform, className }: { platform: AdPlatform; className?: string }) {
@@ -46,8 +46,26 @@ export const RISK: Record<PromoRisk, { label: string; tone: Tone }> = {
 /** Coût (centimes) ou tiret si non calculable. */
 export const cost = (cents?: number) => (cents === undefined || !Number.isFinite(cents) ? "—" : money(cents));
 
-/** ROAS « 4,2× » (CA HT / dépense). */
-export const roasFmt = (v?: number) => (v === undefined || !Number.isFinite(v) ? "—" : `${v.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}×`);
+/** ROAS « 4,2× » (CA HT / dépense), précédé de « ≈ » quand une partie du CA est estimée. */
+export const roasFmt = (v?: number, estimated = false) =>
+  v === undefined || !Number.isFinite(v) ? "—" : `${estimated ? "≈ " : ""}${v.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}×`;
+
+/** « 12 400 € HT facturés », « … HT estimés » ou « … HT, dont 3 200 € estimés ». */
+export function revenueLabel(revenueCents: number, estimatedCents: number, fmt: (cents: number) => string = money) {
+  if (!estimatedCents) return `${fmt(revenueCents)} HT facturés`;
+  if (estimatedCents >= revenueCents) return `${fmt(revenueCents)} HT estimés`;
+  return `${fmt(revenueCents)} HT, dont ${fmt(estimatedCents)} estimés`;
+}
+
+/** Montant HT d'un lead attribué, facturé ou estimé (rien si nul). */
+export function LeadRevenue({ revenue }: { revenue?: AppRevenue }) {
+  if (!revenue?.cents) return null;
+  return (
+    <span className="tabular text-xs text-muted-foreground">
+      {money(revenue.cents)} HT{revenue.estimated ? " estimés" : ""}
+    </span>
+  );
+}
 
 /** Taux 0-1 → « 1,24 % ». */
 export const rateFmt = (v: number, digits = 2) => `${(v * 100).toLocaleString("fr-FR", { minimumFractionDigits: digits, maximumFractionDigits: digits })} %`;

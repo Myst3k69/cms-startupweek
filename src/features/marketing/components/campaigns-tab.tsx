@@ -64,7 +64,7 @@ export function CampaignsTab({ data, onOpen }: { data: MarketingData; onOpen: (c
     { key: "leads", header: "Leads CRM", align: "right", render: ({ p }) => <span className="tabular">{number(p.crmLeads)}</span>, sort: ({ p }) => p.crmLeads, csv: ({ p }) => p.crmLeads },
     { key: "enrolled", header: "Inscr.", align: "right", render: ({ p }) => <span className="tabular">{number(p.enrolled)}</span>, sort: ({ p }) => p.enrolled, csv: ({ p }) => p.enrolled },
     { key: "cpa", header: "Coût / inscr.", align: "right", render: ({ p }) => <span className="tabular">{cost(p.cpaCents)}</span>, sort: ({ p }) => p.cpaCents ?? Infinity, csv: ({ p }) => (p.cpaCents ?? 0) / 100, hideBelow: "md" },
-    { key: "roas", header: "ROAS", align: "right", render: ({ p }) => <span className="tabular font-medium">{roasFmt(p.roas)}</span>, sort: ({ p }) => p.roas ?? -1, csv: ({ p }) => (p.roas ?? 0).toFixed(2) },
+    { key: "roas", header: "ROAS", align: "right", render: ({ p }) => <span className="tabular font-medium">{roasFmt(p.roas, p.estimatedCents > 0)}</span>, sort: ({ p }) => p.roas ?? -1, csv: ({ p }) => (p.roas ?? 0).toFixed(2) },
   ];
 
   return (

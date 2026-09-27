@@ -16,7 +16,7 @@ import { PERIOD_LABEL, pctDelta, periodRange, type Period } from "@/features/ana
 import { PLATFORM_SHORT } from "../lib/labels";
 import { attributeAll, attributionIndex, promotionPlan, statsBetween, sumStats } from "../lib/metrics";
 import { marketingInsights } from "../lib/insights";
-import { PlatformBadge, cost, roasFmt } from "./parts";
+import { PlatformBadge, cost, revenueLabel, roasFmt } from "./parts";
 import type { MarketingData } from "./use-marketing-data";
 
 const DAY = 86_400_000;
@@ -27,16 +27,16 @@ export function OverviewTab({ data, now, onOpenTab }: { data: MarketingData; now
   const range = React.useMemo(() => periodRange(period, now), [period, now]);
   const events = useCollection("events");
   const contents = useCollection("contents");
-  const { campaigns, adStats, byCampaign, applications, submissions, invoices, perf, experiments } = data;
+  const { campaigns, adStats, byCampaign, applications, attributionInput, perf, experiments } = data;
 
   const kpi = React.useMemo(() => {
     const cur = sumStats(statsBetween(adStats, range.startKey, range.endKey));
     const prev = sumStats(statsBetween(adStats, range.prevStartKey, range.prevEndKey));
-    const attrCur = attributionIndex({ applications, submissions, invoices }, { start: range.start, end: range.end });
-    const attrPrev = attributionIndex({ applications, submissions, invoices }, { start: range.prevStart, end: range.prevEnd - 1 });
+    const attrCur = attributionIndex(attributionInput, { start: range.start, end: range.end });
+    const attrPrev = attributionIndex(attributionInput, { start: range.prevStart, end: range.prevEnd - 1 });
     const agg = (f: typeof attrCur) => {
       const a = attributeAll(f, campaigns);
-      return { leads: a.leads, enrolled: a.enrolled, revenue: a.revenueCents };
+      return { leads: a.leads, enrolled: a.enrolled, revenue: a.revenueCents, estimated: a.estimatedCents };
     };
     const a1 = agg(attrCur);
     const a0 = agg(attrPrev);
@@ -48,7 +48,7 @@ export function OverviewTab({ data, now, onOpenTab }: { data: MarketingData; now
       cpaCents: a1.enrolled ? cur.spendCents / a1.enrolled : undefined,
       roas: cur.spendCents ? a1.revenue / cur.spendCents : undefined,
     };
-  }, [adStats, range, applications, submissions, invoices, campaigns]);
+  }, [adStats, range, attributionInput, campaigns]);
 
   const series = React.useMemo(() => {
     const buckets =
@@ -69,13 +69,13 @@ export function OverviewTab({ data, now, onOpenTab }: { data: MarketingData; now
       spend.linkedin.push(rows.filter((r) => platformOf.get(r.campaignId) === "linkedin").reduce((s, r) => s + r.spendCents, 0) / 100);
       leads.push(rows.reduce((s, r) => s + r.leads, 0));
     }
-    const attributed = attributeAll(attributionIndex({ applications, submissions: [], invoices: [] }), campaigns).applications;
+    const attributed = attributeAll(attributionIndex({ ...attributionInput, submissions: [], invoices: [] }), campaigns).applications;
     const apps = buckets.map((b) => attributed.filter((a) => a.submittedAt.slice(0, 10) >= b.from && a.submittedAt.slice(0, 10) <= b.to).length);
     return { labels: buckets.map((b) => b.label), spend, leads, apps, grain: period === "30j" ? "jour" : period === "90j" ? "semaine" : "mois" };
-  }, [period, range, now, campaigns, adStats, applications]);
+  }, [period, range, now, campaigns, adStats, attributionInput]);
 
   const byPlatform = React.useMemo(() => {
-    const attr = attributionIndex({ applications, submissions, invoices }, { start: range.start, end: range.end });
+    const attr = attributionIndex(attributionInput, { start: range.start, end: range.end });
     return (["meta", "linkedin"] as AdPlatform[]).map((platform) => {
       const list = campaigns.filter((c) => c.platform === platform);
       const t = sumStats(list.flatMap((c) => statsBetween(byCampaign.get(c.id) ?? [], range.startKey, range.endKey)));
@@ -83,9 +83,10 @@ export function OverviewTab({ data, now, onOpenTab }: { data: MarketingData; now
       const crmLeads = a.leads;
       const enrolled = a.enrolled;
       const revenue = a.revenueCents;
-      return { platform, campaigns: list.length, active: list.filter((c) => c.status === "active").length, t, crmLeads, enrolled, revenue };
+      const estimated = a.estimatedCents;
+      return { platform, campaigns: list.length, active: list.filter((c) => c.status === "active").length, t, crmLeads, enrolled, revenue, estimated };
     });
-  }, [campaigns, byCampaign, range, applications, submissions, invoices]);
+  }, [campaigns, byCampaign, range, attributionInput]);
 
   const top = React.useMemo(
     () =>
@@ -128,7 +129,7 @@ export function OverviewTab({ data, now, onOpenTab }: { data: MarketingData; now
         <StatCard label="Leads déclarés (régies)" value={number(cur.leads)} hint={`Coût par lead ${cost(cur.cplCents)}`} icon={Target} />
         <StatCard label="Leads CRM attribués" value={number(crm.leads)} delta={pctDelta(crm.leads, crmPrev.leads)} deltaLabel={deltaLabel} hint={crm.leads ? `${money(cur.spendCents / crm.leads)} par lead CRM` : undefined} icon={UserPlus} />
         <StatCard label="Inscriptions attribuées" value={number(crm.enrolled)} delta={pctDelta(crm.enrolled, crmPrev.enrolled)} deltaLabel={deltaLabel} hint={`Coût par inscription ${cost(kpi.cpaCents)}`} icon={UserCheck} />
-        <StatCard label="ROAS" value={roasFmt(kpi.roas)} hint={`${moneyCompact(crm.revenue)} HT facturés / dépense`} icon={TrendingUp} />
+        <StatCard label="ROAS" value={roasFmt(kpi.roas, crm.estimated > 0)} hint={`${revenueLabel(crm.revenue, crm.estimated, moneyCompact)} / dépense`} icon={TrendingUp} />
       </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -211,14 +212,14 @@ export function OverviewTab({ data, now, onOpenTab }: { data: MarketingData; now
                       <td className="tabular py-2.5 pr-3 text-right">{number(r.crmLeads)}</td>
                       <td className="tabular py-2.5 pr-3 text-right">{number(r.enrolled)}</td>
                       <td className="tabular py-2.5 pr-3 text-right">{cost(r.enrolled ? r.t.spendCents / r.enrolled : undefined)}</td>
-                      <td className="tabular py-2.5 text-right font-medium">{roasFmt(r.t.spendCents ? r.revenue / r.t.spendCents : undefined)}</td>
+                      <td className="tabular py-2.5 text-right font-medium">{roasFmt(r.t.spendCents ? r.revenue / r.t.spendCents : undefined, r.estimated > 0)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              Les « leads » des régies (formulaires instantanés, pixel) et ceux du CRM ne se recouvrent pas exactement : bloqueurs, consentement refusé, attribution par vue… Pilotez sur le coût par inscription et le ROAS, calculés sur les factures réelles.
+              Les « leads » des régies (formulaires instantanés, pixel) et ceux du CRM ne se recouvrent pas exactement : bloqueurs, consentement refusé, attribution par vue… Pilotez sur le coût par inscription et le ROAS. Le ROAS repose sur les factures du CRM ; pour un inscrit sans facture (facturation tenue dans un autre outil), le CA est estimé au prix de son offre ou de sa session, HT, et le ROAS est précédé de « ≈ ».
             </p>
           </CardContent>
         </Card>
@@ -227,7 +228,7 @@ export function OverviewTab({ data, now, onOpenTab }: { data: MarketingData; now
           <CardHeader>
             <div>
               <CardTitle>Meilleures campagnes</CardTitle>
-              <CardDescription>ROAS depuis le lancement (CA HT facturé / dépense)</CardDescription>
+              <CardDescription>ROAS depuis le lancement (CA HT attribué / dépense)</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
@@ -242,7 +243,7 @@ export function OverviewTab({ data, now, onOpenTab }: { data: MarketingData; now
                           {PLATFORM_SHORT[c.platform]} · {money(p.spendCents)} · {p.enrolled} inscr. · {cost(p.cpaCents)} / inscr.
                         </span>
                       </span>
-                      <span className="tabular shrink-0 text-sm font-semibold text-foreground">{roasFmt(p.roas)}</span>
+                      <span className="tabular shrink-0 text-sm font-semibold text-foreground">{roasFmt(p.roas, p.estimatedCents > 0)}</span>
                     </Link>
                   </li>
                 ))}

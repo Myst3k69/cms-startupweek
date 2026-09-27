@@ -49,7 +49,7 @@ Priorité : paramètre `?home=cockpit|focus|studio` (partageable) → choix mém
 | **Audiences** | Segments (candidats non inscrits, alumni, Digital Starter Kit, newsletter, exclusion des inscrits) exportés pour Meta / LinkedIn — consentement marketing obligatoire, hachage SHA-256, export journalisé |
 | **Liens UTM** | Générateur et convention de nommage ; utm_campaign reçues sans campagne correspondante |
 
-Synchro API Meta Ads / LinkedIn Ads : `/api/ads/sync` — configuration dans [docs/SUPABASE.md § 5 septies](docs/SUPABASE.md).
+Synchro API Meta Ads / LinkedIn Ads : `/api/ads/sync`, cron quotidien dans `vercel.json` — configuration dans [docs/SUPABASE.md § 5 septies](docs/SUPABASE.md). ROAS : CA HT facturé dans le CRM, ou estimé au prix de l'offre / de la session pour un inscrit facturé dans un autre outil (affiché « ≈ »).
 
 ## Scripts
 

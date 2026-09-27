@@ -2,8 +2,9 @@
  * Dérivations pures du module Marketing : performance des campagnes, attribution CRM,
  * plan de promotion des sessions. `now` toujours passé explicitement (rendu pur).
  */
-import type { AdCampaign, AdStatDay, Application, ContentItem, EventSession, Invoice, Submission } from "@/lib/domain/types";
+import type { AdCampaign, AdStatDay, Application, ContentItem, EventSession, Invoice, Offer, Submission } from "@/lib/domain/types";
 import { daysUntil, invoiceTotal, isUpcoming, sessionStats } from "@/lib/domain/selectors";
+import { lineFromOffer, ttcLine } from "@/features/billing/lib";
 
 const DAY = 86_400_000;
 
@@ -69,9 +70,19 @@ export interface Attribution {
   submissions: Submission[];
   leads: number;
   enrolled: number;
-  /** CA facturé HT (acomptes + soldes − avoirs) des candidatures attribuées. */
+  /**
+   * CA HT des candidatures attribuées : facturé dans le CRM (acomptes + soldes − avoirs) quand
+   * une facture existe, sinon estimé pour les inscrits (voir estimatedRevenueCents).
+   */
   revenueCents: number;
-  revenueByApp: Map<string, number>;
+  /** Part estimée de revenueCents (inscrits sans facture dans le CRM). */
+  estimatedCents: number;
+  revenueByApp: Map<string, AppRevenue>;
+}
+
+export interface AppRevenue {
+  cents: number;
+  estimated: boolean;
 }
 
 /** Fenêtre d'attribution : du lancement (J-1) jusqu'à 30 jours après la fin (clic → candidature). */
@@ -84,10 +95,32 @@ export interface AttributionInput {
   applications: Application[];
   submissions: Submission[];
   invoices: Invoice[];
+  /** Prix des sessions et des offres : estimation du CA des inscrits facturés hors du CRM (ex. Indy). */
+  events: Pick<EventSession, "id" | "priceCents">[];
+  offers: Offer[];
+  vatExempt: boolean;
+}
+
+/**
+ * CA HT estimé d'une inscription sans facture dans le CRM : prix de l'offre choisie, sinon prix
+ * public de la session, convertis en HT selon les règles des factures (lineFromOffer / ttcLine).
+ * Ne tient compte ni des remises, ni des prises en charge négociées, ni des remboursements.
+ */
+export function estimatedRevenueCents(
+  app: Pick<Application, "eventId" | "offerId" | "funding">,
+  eventById: Map<string, Pick<EventSession, "priceCents">>,
+  offerById: Map<string, Offer>,
+  vatExempt: boolean,
+): number {
+  if (app.funding === "gratuit") return 0;
+  const offer = app.offerId ? offerById.get(app.offerId) : undefined;
+  if (offer && offer.priceCents > 0) return lineFromOffer(offer, vatExempt, "").unitPriceCents;
+  const ev = eventById.get(app.eventId);
+  return ev ? ttcLine("", "", ev.priceCents, vatExempt).unitPriceCents : 0;
 }
 
 /** Indexe les leads par utm_campaign (normalisée) — calcul unique pour toutes les campagnes. */
-export function attributionIndex({ applications, submissions, invoices }: AttributionInput, range?: { start: number; end: number }) {
+export function attributionIndex({ applications, submissions, invoices, events, offers, vatExempt }: AttributionInput, range?: { start: number; end: number }) {
   const inRange = (iso: string) => {
     if (!range) return true;
     const t = new Date(iso).getTime();
@@ -118,6 +151,14 @@ export function attributionIndex({ applications, submissions, invoices }: Attrib
     if (list) list.push(s);
     else subs.set(k, [s]);
   }
+  const eventById = new Map(events.map((e) => [e.id, e]));
+  const offerById = new Map(offers.map((o) => [o.id, o]));
+  const revenueOf = (x: Application): AppRevenue => {
+    const list = invByApp.get(x.id);
+    if (list) return { cents: list.reduce((t, inv) => t + invoiceTotal(inv).ht, 0), estimated: false };
+    if (x.status !== "inscrite") return { cents: 0, estimated: false };
+    return { cents: estimatedRevenueCents(x, eventById, offerById, vatExempt), estimated: true };
+  };
   const within = (iso: string, w?: { start: number; end: number }) => {
     if (!w) return true;
     const t = new Date(iso).getTime();
@@ -128,19 +169,32 @@ export function attributionIndex({ applications, submissions, invoices }: Attrib
     const a = ((k && apps.get(k)) || []).filter((x) => within(x.submittedAt, window));
     const s = ((k && subs.get(k)) || []).filter((x) => within(x.receivedAt, window));
     const enrolled = a.filter((x) => x.status === "inscrite").length;
-    const revenueByApp = new Map(a.map((x) => [x.id, (invByApp.get(x.id) ?? []).reduce((t, inv) => t + invoiceTotal(inv).ht, 0)]));
-    const revenueCents = [...revenueByApp.values()].reduce((sum, v) => sum + v, 0);
-    return { applications: a, submissions: s, leads: a.length + s.length, enrolled, revenueCents, revenueByApp };
+    const revenueByApp = new Map(a.map((x) => [x.id, revenueOf(x)]));
+    const { revenueCents, estimatedCents } = sumRevenue(revenueByApp.values());
+    return { applications: a, submissions: s, leads: a.length + s.length, enrolled, revenueCents, estimatedCents, revenueByApp };
   };
 }
 
 export type Attribute = ReturnType<typeof attributionIndex>;
 
+function sumRevenue(values: Iterable<AppRevenue>): { revenueCents: number; estimatedCents: number } {
+  let revenueCents = 0;
+  let estimatedCents = 0;
+  for (const v of values) {
+    revenueCents += v.cents;
+    if (v.estimated) estimatedCents += v.cents;
+  }
+  return { revenueCents, estimatedCents };
+}
+
 /** Leads attribués à un ensemble de campagnes, sans double compte (utm_campaign partagée, fenêtres qui se chevauchent). */
-export function attributeAll(attribute: Attribute, campaigns: AdCampaign[]): { leads: number; enrolled: number; revenueCents: number; applications: Application[] } {
+export function attributeAll(
+  attribute: Attribute,
+  campaigns: AdCampaign[],
+): { leads: number; enrolled: number; revenueCents: number; estimatedCents: number; applications: Application[] } {
   const apps = new Map<string, Application>();
   const subs = new Set<string>();
-  const revenue = new Map<string, number>();
+  const revenue = new Map<string, AppRevenue>();
   for (const c of campaigns) {
     if (!c.utmCampaign) continue;
     const a = attribute(c.utmCampaign, campaignWindow(c));
@@ -152,7 +206,7 @@ export function attributeAll(attribute: Attribute, campaigns: AdCampaign[]): { l
   return {
     leads: list.length + subs.size,
     enrolled: list.filter((x) => x.status === "inscrite").length,
-    revenueCents: [...revenue.values()].reduce((s, v) => s + v, 0),
+    ...sumRevenue(revenue.values()),
     applications: list,
   };
 }
@@ -162,6 +216,8 @@ export interface CampaignPerf extends AdTotals {
   crmLeads: number;
   enrolled: number;
   revenueCents: number;
+  /** Part estimée du CA (inscrits sans facture dans le CRM). */
+  estimatedCents: number;
   /** Coût par lead CRM (candidature ou demande attribuée). */
   cplCrmCents?: number;
   /** Coût par inscription payée. */
@@ -179,6 +235,7 @@ export function campaignPerf(campaign: AdCampaign, rows: AdStatDay[], attributio
     crmLeads: attribution.leads,
     enrolled: attribution.enrolled,
     revenueCents: attribution.revenueCents,
+    estimatedCents: attribution.estimatedCents,
     cplCrmCents: attribution.leads ? Math.round(t.spendCents / attribution.leads) : undefined,
     cpaCents: attribution.enrolled ? Math.round(t.spendCents / attribution.enrolled) : undefined,
     roas: t.spendCents ? attribution.revenueCents / t.spendCents : undefined,
