@@ -11,14 +11,34 @@ Back-office (ce dépôt)                                      Site startupweek-v
 Supabase schéma crm : academy_* (source de vérité, RLS équipe)
 ```
 
-## 1. Ce que fait le back-office (`/academy`)
+## 1. Ce que fait le back-office
+
+Deux espaces dans la section « StartupWeek Academy » du menu :
+- **Studio** (`/studio`) : **créer et publier le contenu** — plan, leçons, fiche catalogue, relecture, publication ;
+- **Academy** (`/academy`) : **gérer les accès et suivre les apprenants** — formations, parcours, inscriptions, livrables, cohortes, sessions liées, réglages Qualiopi / FOAD.
+
+### 1.1 Studio (`/studio`)
+
+| Écran | Rôle |
+| --- | --- |
+| **Accueil** | Les formations par étape : brouillon, en relecture, validée, publiée (archivées à part), avec commentaires ouverts et points bloquants. « Nouvelle formation » ouvre directement le Studio. |
+| **Édition** | Plan (modules → leçons) à gauche ; la leçon au centre, **telle que l'apprenant la verra**, éditable sur place : on clique dans le texte et on écrit, une barre de mise en forme apparaît sur une sélection (gras, italique, code, lien, titre, sous-titre, listes, encadrés info / astuce / attention, citation) ; un texte Markdown collé est converti. « + » entre deux blocs pour insérer l'un des 7 types. Quiz : on écrit questions et réponses dans la leçon et on clique sur le rond de la bonne réponse. Panneau de droite : réglages du bloc sélectionné (profils qui le voient, lien vidéo et plan de tournage, notation, livrable, ressource, outil du prompt) ou de la leçon (durée, accès libre, **assistant IA**), et commentaires de relecture. « Voir comme » : estompe les blocs réservés à d'autres profils. **Enregistrement automatique** 0,8 s après la dernière frappe (indicateur « Enregistrement… / Enregistré »). |
+| **Vue stagiaire** | L'aperçu apprenant (progression simulée, profil, 3 directions artistiques). |
+| **Fiche catalogue** | Champs publics (titre, adresse, accroche, niveau, durée, profils, public, prérequis), présentation et objectifs écrits directement dans l'aperçu de la page du site, prix TTC, TVA, durée d'accès, prix Stripe, « Proposée à l'achat sur le site » (formation publiée et payante). Enregistrement automatique. |
+| **Relecture** | Circuit **brouillon → relecture → validée → publiée** : envoi en relecture avec un relecteur désigné ; le relecteur commente (sur la formation, une leçon ou un bloc), puis **demande des corrections** (retour en brouillon) ou **valide le contenu** (possible une fois tous les commentaires résolus) ; **publication** possible une fois validée et sans point bloquant. Dépublier / archiver. **Vérifications automatiques** : *bloquant* (leçon vide, quiz sans bonne réponse ou avec moins de deux réponses, question sans énoncé, exercice sans consigne, prompt vide, checklist sans étape, lien vidéo non reconnu, prix manquant pour la vente) ; *à vérifier* (vidéos sans lien — masquées pour les apprenants —, ressource manquante, textes vides, critères de réussite, mentions Qualiopi / FOAD, fiche catalogue incomplète). Chaque point mène à l'endroit à corriger. |
+
+Une formation **publiée** reste modifiable : les modifications sont visibles immédiatement (bandeau d'avertissement dans l'édition).
+
+**Stockage** : le contenu reste en Markdown (sous-ensemble du blog) ; l'éditeur convertit Markdown ↔ HTML éditable (`features/studio/lib/rich-text.ts`). Garantie vérifiée par `npx tsx scripts/check-studio-markdown.ts` et par un test Chromium sur les 268 contenus de la formation type : aucune perte ni modification à l'aller-retour. Le Markdown d'un bloc n'est réécrit que si l'auteur le modifie.
+
+### 1.2 Academy (`/academy`)
 
 | Écran | Rôle |
 | --- | --- |
 | **Tableau de bord** | Formations publiées, apprenants actifs, temps d'apprentissage, quiz, livrables à corriger, certificats. |
-| **Formations** | Catalogue interne (statuts brouillon / relecture / publiée / archivée). |
-| **Éditeur de formation** | *Programme* (modules → leçons → blocs), *Informations* (objectifs, prérequis, public, FOAD/Qualiopi), *Accès & vente* (sessions liées, prix, catalogue, Stripe), *Apprenants*. |
-| **Éditeur de leçon** | 7 types de blocs : texte (Markdown), vidéo YouTube, quiz, exercice / livrable, ressource de la bibliothèque, prompt à copier, checklist. Chaque bloc peut être **réservé à un profil** (tech, non-tech, reconversion) : c'est l'hyper-personnalisation. Bouton **« Rédiger avec l'IA »**. |
+| **Formations** | Catalogue interne (statuts brouillon / en relecture / validée / publiée / archivée). |
+| **Fiche formation** | *Accès & vente* (sessions liées, ouverture des accès, résumé du prix et du catalogue), *Qualiopi & équipe* (FOAD : assistance, évaluation, accessibilité, seuils, durée d'accès, progression séquentielle ; auteurs, formateurs référents, mots-clés), *Apprenants* (inscriptions, livrables). Bouton **« Ouvrir dans le Studio »** pour le contenu. |
+| **Blocs de leçon** | 7 types : texte, vidéo YouTube, quiz, exercice / livrable, ressource de la bibliothèque, prompt à copier, checklist. Chaque bloc peut être **réservé à un profil** (tech, non-tech, reconversion) : c'est l'hyper-personnalisation. Édition dans le Studio. |
 | **Aperçu apprenant** | La leçon telle que la voit l'apprenant, avec la progression séquentielle simulée, le choix du profil et **3 directions artistiques** (sélecteur en bas à droite : Néon, Campus, Atelier). Bouton **Plein écran** (ici et dans l'éditeur) : menu et en-tête masqués, page en pleine largeur ; reste actif entre l'éditeur et l'aperçu d'une même formation, Échap pour quitter. |
 | **Parcours** | Enchaînement recommandé de plusieurs formations. |
 | **Apprenants** | Toutes les inscriptions (origine, profil, progression, temps, quiz, dernière activité, fin d'accès) ; fiche apprenant avec la progression par module, le relevé de connexions et le certificat. |
@@ -28,7 +48,7 @@ Supabase schéma crm : academy_* (source de vérité, RLS équipe)
 | **Contact / Candidature** | Carte « StartupWeek Academy » (accès et progression). |
 | **Document imprimable** | `/print/academy/<inscription>` : certificat de réalisation (formation à distance) et relevé de connexions / activités. |
 
-Droits (section `academy`) : écriture pour admin, pédagogie et formateur (correction des livrables) ; lecture pour commercial et lecture.
+Droits (section `academy`, Studio compris) : écriture pour admin, pédagogie et formateur (création, relecture, correction des livrables) ; lecture pour commercial et lecture.
 
 ### Les 3 directions artistiques
 Même contenu, présentation différente. Le choix est mémorisé dans le navigateur et partageable par l'URL (`?da=neon|campus|atelier`). Elles servent à choisir le rendu de « Mon espace » :
@@ -134,10 +154,10 @@ Sources : `src/lib/data/academy/mvp-ia/m00.ts` → `m09.ts` (format `SeedModule`
 
 ## 6. Mise en service
 
-1. Migration `supabase/migrations/*_crm_academy.sql` (tables `crm.academy_*`, RLS, section `academy`).
+1. Migrations `supabase/migrations/*_crm_academy.sql` (tables `crm.academy_*`, RLS, section `academy`) et `*_crm_academy_studio.sql` (statut « validée », relecteur, commentaires de relecture `crm.academy_comments`).
 2. Formation type : `supabase/data/academy_mvp_ia.sql`.
 3. Variables Vercel : `ACADEMY_API_SECRET` (aussi côté site), `SUPABASE_SECRET_KEY` (routes API), `ANTHROPIC_API_KEY` (aide IA), `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (vente), `ALLOWED_ORIGINS`.
-4. Relire la formation, renseigner le prix, publier, puis cocher « Au catalogue » pour la vendre.
+4. Dans le Studio : relire la formation (onglet Relecture), renseigner le prix (Fiche catalogue), valider, publier, puis cocher « Proposée à l'achat sur le site » pour la vendre.
 5. Site : pages Mon espace (sommaire, lecteur de leçon, quiz, livrables, heartbeat) et catalogue (§ 3).
 
 ## 7. Limites connues
