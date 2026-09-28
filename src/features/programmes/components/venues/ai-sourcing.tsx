@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, BedDouble, Check, ExternalLink, Info, Loader2, Plus, Sparkles } from "lucide-react";
+import { AlertTriangle, BedDouble, Check, Expand, ExternalLink, Info, Loader2, Plus, Sparkles } from "lucide-react";
 import { Badge, Button, Card, Checkbox, Drawer, FormField, Input, Select, Textarea, useToast } from "@/components/ui";
 import { VENUE_KINDS, labelOf } from "@/lib/domain/constants";
 import type { EventSession, Region, Venue, VenueKind } from "@/lib/domain/types";
@@ -106,7 +106,7 @@ function AiSourcingInner({ onClose, ev }: { onClose: () => void; ev?: EventSessi
 
   const showDemo = () => {
     setDemo(true);
-    setResult({ ok: true, summary: "Exemples fictifs : ils montrent le format des résultats. Aucune recherche n'a été faite.", suggestions: demoSuggestions({ destination, people: Number(people) || 12 }), searches: 0, model: "démo", demo: true });
+    setResult({ ok: true, summary: "Exemples fictifs : ils montrent le format des résultats. Aucune recherche n'a été faite.", suggestions: demoSuggestions({ destination, people: Number(people) || 12 }), searches: 0, model: "démo", widened: true, demo: true });
     setState("done");
   };
 
@@ -117,7 +117,9 @@ function AiSourcingInner({ onClose, ev }: { onClose: () => void; ev?: EventSessi
       s.description,
       s.workspace ? `Espace de travail : ${s.workspace}` : null,
       s.availability ? `Disponibilité : ${s.availability}` : null,
+      s.criteriaGaps.length ? `Écarts aux critères de recherche : ${s.criteriaGaps.join(" · ")}` : null,
       s.watchOuts.length ? `Vigilance : ${s.watchOuts.join(" · ")}` : null,
+      s.foundOn ? `Trouvé sur : ${s.foundOn}` : null,
       s.sourceUrls.length ? `Sources : ${s.sourceUrls.join(" ")}` : null,
       `Trouvé par l'assistant IA le ${date(new Date().toISOString())} — informations à vérifier.`,
     ];
@@ -236,7 +238,7 @@ function AiSourcingInner({ onClose, ev }: { onClose: () => void; ev?: EventSessi
           {state === "loading" ? (
             <>
               <span className="text-xs text-muted-foreground">
-                {elapsed}s — l'assistant consulte le web (1 à 3 min).
+                {elapsed}s — l'assistant consulte le web (1 à 3 min, jusqu'à 5 s'il doit élargir la recherche).
               </span>
               <Button variant="ghost" size="sm" onClick={() => { abort.current?.abort(); setState("idle"); }}>
                 Annuler
@@ -251,7 +253,7 @@ function AiSourcingInner({ onClose, ev }: { onClose: () => void; ev?: EventSessi
       <div className="mt-6 space-y-4" aria-live="polite">
         {state === "loading" ? (
           <div className="flex items-center gap-3 rounded-lg border border-border bg-surface-2 p-4 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Recherche de lieux réels, lecture des annonces et comparaison des prix…
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Recherche de lieux réels (plateformes de location, lieux de séminaire, recherches générales), lecture des annonces et comparaison des prix…
           </div>
         ) : null}
 
@@ -273,7 +275,13 @@ function AiSourcingInner({ onClose, ev }: { onClose: () => void; ev?: EventSessi
           <>
             <div className={cn("rounded-lg border p-4 text-sm", demo ? "border-warning/50 bg-warning-soft/50" : "border-border bg-surface-2")}>
               {demo ? <p className="mb-1 font-semibold text-warning-text">Exemples fictifs — aucune recherche réelle</p> : null}
-              <p className="text-foreground">{result.summary}</p>
+              <p className="whitespace-pre-line text-foreground">{result.summary}</p>
+              {result.widened ? (
+                <p className="mt-2 flex items-start gap-1.5 text-xs text-foreground">
+                  <Expand className="mt-0.5 size-3.5 shrink-0 text-violet" aria-hidden="true" />
+                  Moins de 3 lieux respectaient tous les critères : l'assistant a élargi la recherche (zone, types de lieux, puis budget). Les lieux concernés portent le badge « Recherche élargie » et indiquent leurs écarts.
+                </p>
+              ) : null}
               {!demo ? (
                 <p className="mt-2 text-xs text-muted-foreground">
                   {result.suggestions.length} lieu{result.suggestions.length > 1 ? "x" : ""} · {result.searches} recherche{result.searches > 1 ? "s" : ""} web. Prix et disponibilités sont des indications trouvées en ligne : à confirmer auprès des propriétaires.
@@ -305,6 +313,8 @@ function SuggestionCard({ s, demo, known, inSourcing, ev, onAdd, onSource }: { s
             </p>
           </div>
           <div className="flex flex-wrap gap-1.5">
+            {s.widened ? <Badge tone="violet">Recherche élargie</Badge> : null}
+            {s.foundOn ? <Badge>{s.foundOn}</Badge> : null}
             <Badge tone={tone} dot>
               Fiabilité {s.confidence}
             </Badge>
@@ -328,8 +338,13 @@ function SuggestionCard({ s, demo, known, inSourcing, ev, onAdd, onSource }: { s
         </div>
         {s.workspace ? <p className="text-xs text-muted-foreground">Espace de travail : {s.workspace}</p> : null}
         {s.accessInfo ? <p className="text-xs text-muted-foreground">Accès : {s.accessInfo}</p> : null}
-        {s.matchReasons.length || s.watchOuts.length ? (
+        {s.matchReasons.length || s.watchOuts.length || s.criteriaGaps.length ? (
           <ul className="space-y-1 text-xs">
+            {s.criteriaGaps.map((r) => (
+              <li key={`gap-${r}`} className="flex gap-1.5 text-foreground">
+                <Expand className="mt-0.5 size-3.5 shrink-0 text-violet" aria-hidden="true" /> Écart : {r}
+              </li>
+            ))}
             {s.matchReasons.map((r) => (
               <li key={r} className="flex gap-1.5 text-foreground">
                 <Check className="mt-0.5 size-3.5 shrink-0 text-success" aria-hidden="true" /> {r}

@@ -451,7 +451,10 @@ Migration `20260928021344_crm_session_logistics.sql`, **appliquée en production
 
 ### Assistant IA de sourcing (`POST /api/lieux/recherche`)
 
-**Vercel AI Gateway + GPT-6 Luna** (`openai/gpt-6-luna`), via l'AI SDK : outil de **recherche web** natif d'OpenAI (`openai.tools.webSearch`, exécuté côté fournisseur) et sortie structurée validée par zod. L'assistant cherche des lieux réels pour une destination, des dates et un nombre de personnes, puis rend au plus 6 suggestions (capacité, prix affiché ou estimé, disponibilité « à vérifier », sources).
+**Vercel AI Gateway + GPT-6 Luna** (`openai/gpt-6-luna`), via l'AI SDK : outil de **recherche web** natif d'OpenAI (`openai.tools.webSearch`, exécuté côté fournisseur, profondeur `high`) et sortie structurée validée par zod. L'assistant cherche des lieux réels pour une destination, des dates et un nombre de personnes, puis rend **de 3 à 6 suggestions** (capacité, prix affiché ou estimé, disponibilité « à vérifier », site où le lieu est proposé, sources).
+
+- **Sources consultées** (au moins 8 recherches demandées au modèle) : plateformes de location de logements entiers (Airbnb, Booking.com, Vrbo / Abritel, plateformes locales du pays), plateformes de lieux de séminaire et de retraite d'équipe (Spacebase, Tagvenue, Kactus, Bird Office…), recherches générales en français, en anglais et dans la langue du pays, puis la page du lieu. Une information introuvable en ligne (fibre, prix, disponibilité) est notée « à vérifier » au lieu d'éliminer le lieu.
+- **Recherche élargie** : si la première recherche trouve moins de 3 lieux, une seconde recherche élargit la zone (jusqu'à environ 1,5 fois la distance demandée), puis les types de lieux, puis le budget (+30 % au plus), sans reproposer les lieux déjà trouvés. Ces lieux portent le badge « Recherche élargie » et listent leurs écarts aux critères. Elle n'est lancée que s'il reste au moins 60 s sur le budget de 280 s ; si elle échoue, les lieux de la première recherche restent affichés.
 
 ```
 # Sur Vercel : rien à configurer si l'OIDC du projet est actif (réglage par défaut,
@@ -461,8 +464,8 @@ VENUE_SEARCH_MODEL=openai/gpt-6-luna   # facultatif : autre modèle AI Gateway s
 ```
 
 - **Accès** : membre connecté (jeton Supabase vérifié) ayant le droit d'écriture sur « sessions » ; 10 recherches par heure et par membre. En mode démo, la route ne répond qu'en développement local ; l'interface propose alors des exemples **fictifs** clairement signalés.
-- **Coût** (tarifs publics AI Gateway au 28/09/2026) : GPT-6 Luna 0,10 $ / million de jetons en entrée et 0,50 $ en sortie ; recherche web 10 $ / 1 000 recherches. Soit quelques centimes par demande ; facturé sur les crédits AI Gateway de l'équipe Vercel.
-- **Limites** : prix et disponibilités trouvés en ligne sont indicatifs ; chaque suggestion ajoutée arrive au statut « Repéré » avec ses sources dans les notes. La route n'a **pas été testée avec un vrai appel** (ni clé ni OIDC dans cet environnement) : la première recherche en production est à surveiller (`vercel logs`, entrée `[lieux/recherche]`). Durée : 1 à 3 min (`maxDuration = 300`).
+- **Coût** (tarifs publics AI Gateway au 28/09/2026) : GPT-6 Luna 0,10 $ / million de jetons en entrée et 0,50 $ en sortie ; recherche web 10 $ / 1 000 recherches. Le coût est surtout celui des recherches web : environ 0,10 à 0,15 $ par demande, jusqu'à environ 0,25 $ quand la recherche est élargie ; facturé sur les crédits AI Gateway de l'équipe Vercel. Le nombre de recherches effectuées s'affiche sous les résultats.
+- **Limites** : prix et disponibilités trouvés en ligne sont indicatifs (Airbnb et Booking.com affichent rarement un prix sans dates saisies) ; chaque suggestion ajoutée arrive au statut « Repéré » avec ses sources, le site où elle a été trouvée et ses écarts éventuels dans les notes. Le nombre de recherches web et le minimum de 3 lieux sont demandés au modèle, sans garantie absolue. Première recherche réelle réussie en production le 28/09/2026 (version à une seule recherche). Durée : 1 à 3 min, jusqu'à 5 min si la recherche est élargie (`maxDuration = 300`).
 
 ## 6. Brancher Stripe
 
