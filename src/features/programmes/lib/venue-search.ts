@@ -11,6 +11,9 @@ export const REGION_VALUES = ["France", "Europe", "Hors Europe"] as const satisf
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date au format AAAA-MM-JJ");
 
+/** Identifiant de modèle AI Gateway : « fournisseur/modèle » (ex. openai/gpt-6-luna). */
+export const MODEL_ID_RE = /^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9._:-]*$/i;
+
 export const criteriaSchema = z
   .object({
     destination: z.string().trim().min(2, "Indiquez une destination (ville, région, côte…)").max(160),
@@ -24,6 +27,8 @@ export const criteriaSchema = z
     mustHaves: z.array(z.string().trim().min(1).max(60)).max(12).default([]),
     notes: z.string().trim().max(800).optional(),
     exclude: z.array(z.string().trim().max(120)).max(80).default([]),
+    /** Modèle choisi dans l'assistant ; vérifié côté serveur contre le catalogue des modèles compatibles. */
+    model: z.string().trim().max(120).regex(MODEL_ID_RE, "Modèle invalide").optional(),
   })
   .refine((c) => !c.startDate || !c.endDate || c.endDate >= c.startDate, { message: "La date de fin précède la date de début", path: ["endDate"] });
 
@@ -69,6 +74,24 @@ export const suggestionSchema = z.object({
 });
 
 export type VenueSuggestion = z.infer<typeof suggestionSchema>;
+
+/** Outil de recherche web : natif OpenAI, ou Perplexity Search exécuté par AI Gateway (tout modèle). */
+export type VenueSearchTool = "openai" | "perplexity";
+
+/** Modèle proposé dans l'assistant (catalogue AI Gateway filtré : outils + sortie structurée). */
+export interface VenueModel {
+  id: string;
+  name: string;
+  provider: string;
+  /** Prix en dollars par million de jetons (entrée / sortie), si publiés. */
+  inputPerM?: number;
+  outputPerM?: number;
+  search: VenueSearchTool;
+}
+
+export type VenueModelsResponse =
+  | { ok: true; models: VenueModel[]; defaultModel: string }
+  | { ok: false; error: "not_configured" | "unauthorized" | "forbidden" | "demo_mode" | "upstream"; message: string };
 
 export type VenueSearchResponse =
   | { ok: true; summary: string; suggestions: VenueSuggestion[]; searches: number; model: string; widened?: boolean; demo?: boolean }

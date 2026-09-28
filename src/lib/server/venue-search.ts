@@ -11,15 +11,17 @@
  *   avec leurs écarts aux critères de départ.
  * - Authentification AI Gateway : sur Vercel, jeton OIDC du projet (aucune clé à gérer) ;
  *   ailleurs (développement local), variable AI_GATEWAY_API_KEY.
- * - Modèle modifiable sans déploiement de code : VENUE_SEARCH_MODEL (ex. openai/gpt-6-sol).
+ * - Modèle : choisi dans l'assistant parmi les modèles compatibles du catalogue AI Gateway
+ *   (src/lib/server/venue-models.ts) ; par défaut VENUE_SEARCH_MODEL (openai/gpt-6-luna).
+ *   Recherche web native d'OpenAI pour les modèles OpenAI, Perplexity Search (AI Gateway) sinon.
  *
  * Les prix et disponibilités trouvés en ligne sont des indications : l'interface le rappelle,
  * et chaque suggestion est ajoutée au répertoire au statut « Repéré ».
  */
-import { generateText, isStepCount, NoObjectGeneratedError, Output, type LanguageModel } from "ai";
+import { gateway, generateText, isStepCount, NoObjectGeneratedError, Output, type LanguageModel, type ToolSet } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
-import { REGION_VALUES, VENUE_KIND_VALUES, suggestionSchema, type criteriaSchema, type VenueSearchResponse, type VenueSuggestion } from "@/features/programmes/lib/venue-search";
+import { REGION_VALUES, VENUE_KIND_VALUES, suggestionSchema, type criteriaSchema, type VenueSearchResponse, type VenueSearchTool, type VenueSuggestion } from "@/features/programmes/lib/venue-search";
 
 type Criteria = z.output<typeof criteriaSchema>;
 
@@ -122,7 +124,7 @@ function describeWidened(c: Criteria, found: VenueSuggestion[]): string {
 }
 
 /** Erreurs AI Gateway / fournisseur → réponse lisible (sans détail technique ni secret). */
-function mapError(err: unknown): Extract<VenueSearchResponse, { ok: false }> | undefined {
+function mapError(err: unknown, modelId: string): Extract<VenueSearchResponse, { ok: false }> | undefined {
   if (NoObjectGeneratedError.isInstance(err)) {
     return err.finishReason === "content-filter"
       ? { ok: false, error: "refused", message: "La recherche a été refusée par le modèle. Reformulez les critères." }
@@ -133,18 +135,24 @@ function mapError(err: unknown): Extract<VenueSearchResponse, { ok: false }> | u
     return { ok: false, error: "not_configured", message: "AI Gateway refuse l'authentification : vérifiez AI_GATEWAY_API_KEY (ou l'OIDC du projet Vercel)." };
   }
   if (e?.name === "GatewayRateLimitError" || e?.statusCode === 429) return { ok: false, error: "rate_limited", message: "Trop de recherches en cours côté AI Gateway : réessayez dans une minute." };
-  if (e?.name === "GatewayModelNotFoundError") return { ok: false, error: "upstream", message: `Modèle « ${VENUE_SEARCH_MODEL} » indisponible sur AI Gateway.` };
+  if (e?.name === "GatewayModelNotFoundError") return { ok: false, error: "upstream", message: `Modèle « ${modelId} » indisponible sur AI Gateway : choisissez-en un autre.` };
   if (e?.name === "TimeoutError" || e?.name === "AbortError") return { ok: false, error: "upstream", message: "La recherche a pris trop de temps. Réessayez avec une destination plus précise." };
   if (e?.name?.startsWith("Gateway") || e?.name?.startsWith("AI_")) return { ok: false, error: "upstream", message: `Le service d'IA a répondu une erreur${e.statusCode ? ` (${e.statusCode})` : ""}. Réessayez.` };
   return undefined;
 }
 
-async function runPass(model: LanguageModel, prompt: string, timeoutMs: number): Promise<{ report: Report; searches: number }> {
+function searchTools(search: VenueSearchTool): ToolSet {
+  return search === "openai"
+    ? { web_search: openai.tools.webSearch({ searchContextSize: "high" }) }
+    : { web_search: gateway.tools.perplexitySearch({ maxResults: 10 }) };
+}
+
+async function runPass(model: LanguageModel, search: VenueSearchTool, prompt: string, timeoutMs: number): Promise<{ report: Report; searches: number }> {
   const result = await generateText({
     model,
     system: SYSTEM,
     prompt,
-    tools: { web_search: openai.tools.webSearch({ searchContextSize: "high" }) },
+    tools: searchTools(search),
     output: Output.object({ schema: reportSchema }),
     // Recherche web exécutée côté fournisseur + étape de sortie structurée.
     stopWhen: isStepCount(4),
@@ -171,7 +179,11 @@ function collect(report: Report, widened: boolean, seen: Set<string>, limit: num
   return out;
 }
 
-export async function searchVenues(criteria: Criteria, model: LanguageModel = VENUE_SEARCH_MODEL): Promise<VenueSearchResponse> {
+/** `model` / `search` : modèle retenu par resolveVenueModel (ou un modèle simulé en test). */
+export async function searchVenues(criteria: Criteria, opts: { model?: LanguageModel; search?: VenueSearchTool } = {}): Promise<VenueSearchResponse> {
+  const model = opts.model ?? VENUE_SEARCH_MODEL;
+  const modelId = typeof model === "string" ? model : model.modelId;
+  const search = opts.search ?? "openai";
   const started = Date.now();
   const seen = new Set<string>();
   const suggestions: VenueSuggestion[] = [];
@@ -179,12 +191,12 @@ export async function searchVenues(criteria: Criteria, model: LanguageModel = VE
   let searches = 0;
 
   try {
-    const first = await runPass(model, describe(criteria), FIRST_PASS_MS);
+    const first = await runPass(model, search, describe(criteria), FIRST_PASS_MS);
     searches += first.searches;
     suggestions.push(...collect(first.report, false, seen, MAX_VENUES));
     if (first.report.summary.trim()) summaries.push(first.report.summary.trim().slice(0, 1200));
   } catch (err) {
-    const mapped = mapError(err);
+    const mapped = mapError(err, modelId);
     // Sélection inexploitable : la recherche élargie peut encore aboutir. Toute autre erreur est rendue telle quelle.
     if (mapped?.error !== "no_result") {
       if (mapped) return mapped;
@@ -196,7 +208,7 @@ export async function searchVenues(criteria: Criteria, model: LanguageModel = VE
   const remaining = DEADLINE_MS - (Date.now() - started);
   if (suggestions.length < MIN_VENUES && remaining >= MIN_SECOND_PASS_MS) {
     try {
-      const second = await runPass(model, describeWidened(criteria, suggestions), remaining);
+      const second = await runPass(model, search, describeWidened(criteria, suggestions), remaining);
       searches += second.searches;
       const extra = collect(second.report, true, seen, MAX_VENUES - suggestions.length);
       if (extra.length) {
@@ -208,7 +220,7 @@ export async function searchVenues(criteria: Criteria, model: LanguageModel = VE
       // Les lieux de la première recherche restent affichés ; sans eux, l'erreur est rendue.
       console.warn("[lieux/recherche] recherche élargie en échec", err);
       if (!suggestions.length) {
-        const mapped = mapError(err);
+        const mapped = mapError(err, modelId);
         if (mapped) return mapped;
         throw err;
       }
@@ -217,5 +229,5 @@ export async function searchVenues(criteria: Criteria, model: LanguageModel = VE
 
   const summary = summaries.join("\n\n");
   if (!suggestions.length) return { ok: false, error: "no_result", message: summary || "Aucun lieu fiable trouvé pour ces critères, même en élargissant la recherche." };
-  return { ok: true, summary, suggestions, searches, model: typeof model === "string" ? model : VENUE_SEARCH_MODEL, widened };
+  return { ok: true, summary, suggestions, searches, model: modelId, widened };
 }
