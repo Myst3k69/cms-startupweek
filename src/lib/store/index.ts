@@ -62,6 +62,7 @@ export const ID_PREFIX: Record<EntityName, string> = {
   cohorts: "coh",
   adCampaigns: "cmp",
   experiments: "abt",
+  courseComments: "rvc",
 };
 
 export type NewEntity<K extends EntityName> = Omit<EntityMap[K], "id" | "createdAt" | "updatedAt"> & { id?: ID };
@@ -128,6 +129,7 @@ const ENTITY_LABEL: Partial<Record<EntityName, string>> = {
   cohorts: "Cohorte",
   adCampaigns: "Campagne",
   experiments: "Test A/B",
+  courseComments: "Commentaire de relecture",
 };
 
 /** Paramètres par défaut (remplacés par le seed de démo ou la base). */

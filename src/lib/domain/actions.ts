@@ -636,3 +636,60 @@ export function issueCertificate(enrollmentId: ID) {
   if (!e) return;
   s.update("enrollments", e.id, { certificateIssuedAt: iso(nowMs()) }, { log: "Certificat de réalisation émis", kind: "document" });
 }
+
+/* ───────────────────────────── Studio : circuit de relecture ───────────────────────────── */
+
+/** Envoi en relecture (brouillon → relecture), avec le relecteur désigné. */
+export function sendCourseToReview(courseId: ID, reviewerId: ID) {
+  const s = crm();
+  const c = findById("courses", courseId);
+  if (!c) return;
+  const reviewer = findById("users", reviewerId);
+  s.update("courses", c.id, { status: "relecture", reviewerId, reviewRequestedAt: iso(nowMs()), validatedAt: undefined, validatedBy: undefined }, { log: `Envoyée en relecture${reviewer ? ` à ${reviewer.name}` : ""}`, kind: "statut" });
+}
+
+/** Le relecteur renvoie la formation à l'auteur (relecture → brouillon) ; les commentaires restent ouverts. */
+export function requestCourseChanges(courseId: ID) {
+  const s = crm();
+  const c = findById("courses", courseId);
+  if (!c) return;
+  const open = s.courseComments.filter((x) => x.courseId === courseId && !x.resolvedAt).length;
+  s.update("courses", c.id, { status: "brouillon" }, { log: `Corrections demandées (${open} commentaire${open > 1 ? "s" : ""} ouvert${open > 1 ? "s" : ""})`, kind: "statut" });
+}
+
+/** Contenu approuvé par le relecteur (relecture → validée). */
+export function validateCourse(courseId: ID) {
+  const s = crm();
+  const c = findById("courses", courseId);
+  if (!c) return;
+  s.update("courses", c.id, { status: "validee", validatedAt: iso(nowMs()), validatedBy: s.sessionUserId ?? undefined }, { log: "Contenu validé en relecture", kind: "statut" });
+}
+
+/** Publication (validée → publiée) : visible des apprenants ; au catalogue si demandé et payante. */
+export function publishCourse(courseId: ID) {
+  const s = crm();
+  const c = findById("courses", courseId);
+  if (!c) return;
+  s.update("courses", c.id, { status: "publiee", publishedAt: c.publishedAt ?? iso(nowMs()) }, { log: "Formation publiée", kind: "statut" });
+}
+
+/** Retour en brouillon (retirée des apprenants et du catalogue) ou archivage. */
+export function unpublishCourse(courseId: ID, to: "brouillon" | "archivee") {
+  const s = crm();
+  const c = findById("courses", courseId);
+  if (!c) return;
+  s.update("courses", c.id, { status: to, inCatalog: false }, { log: to === "archivee" ? "Formation archivée" : "Formation dépubliée (retour en brouillon)", kind: "statut" });
+}
+
+/** Commentaire de relecture (sur la formation, une leçon ou un bloc). */
+export function addCourseComment(input: { courseId: ID; lessonId?: ID; blockId?: ID; body: string }) {
+  const s = crm();
+  const body = input.body.trim();
+  if (!body) return;
+  s.create("courseComments", { courseId: input.courseId, lessonId: input.lessonId, blockId: input.blockId, authorId: s.sessionUserId ?? undefined, body }, { log: false });
+}
+
+export function setCommentResolved(commentId: ID, resolved: boolean) {
+  const s = crm();
+  s.update("courseComments", commentId, resolved ? { resolvedAt: iso(nowMs()), resolvedBy: s.sessionUserId ?? undefined } : { resolvedAt: undefined, resolvedBy: undefined }, { log: false });
+}

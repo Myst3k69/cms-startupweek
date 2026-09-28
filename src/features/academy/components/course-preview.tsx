@@ -39,13 +39,14 @@ function Ring({ value, da }: { value: number; da: AcademyDa }) {
   );
 }
 
-export function CoursePreview({ id }: { id: ID }) {
+/** Aperçu apprenant ; `embedded` : dans l'onglet « Vue stagiaire » du Studio (sans lien de retour ni plein écran). */
+export function CoursePreview({ id, embedded }: { id: ID; embedded?: boolean }) {
   const course = useEntity("courses", id);
   if (!course) return <EmptyState icon={FileSearch} title="Formation introuvable" action={<LinkButton href="/academy">Retour</LinkButton>} className="mt-10" />;
-  return <PreviewInner course={course} />;
+  return <PreviewInner course={course} embedded={embedded} />;
 }
 
-function PreviewInner({ course }: { course: Course }) {
+function PreviewInner({ course, embedded }: { course: Course; embedded?: boolean }) {
   const params = useSearchParams();
   const [da, setDa] = useAcademyDa();
   const { modules, lessons } = useCourseOutline(course.id);
@@ -135,9 +136,11 @@ function PreviewInner({ course }: { course: Course }) {
     <>
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <LinkButton href={`/academy/formations/${course.id}${lesson ? `?lecon=${lesson.id}` : ""}`} variant="ghost" size="sm">
-            <ArrowLeft /> Retour à l&apos;éditeur
-          </LinkButton>
+          {embedded ? null : (
+            <LinkButton href={`/studio/${course.id}${lesson ? `?lecon=${lesson.id}` : ""}`} variant="ghost" size="sm">
+              <ArrowLeft /> Retour au Studio
+            </LinkButton>
+          )}
           <span className="text-xs text-muted-foreground">Aperçu apprenant (Mon espace) — la progression est simulée, rien n&apos;est enregistré.</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -148,7 +151,7 @@ function PreviewInner({ course }: { course: Course }) {
           <Button size="xs" variant="ghost" onClick={() => (setProgress([]), setChecks({}), setCurrent(lessons[0]?.id))}>
             <RotateCcw /> Réinitialiser
           </Button>
-          <FocusModeButton scope={`/academy/formations/${course.id}`} size="xs" />
+          {embedded ? null : <FocusModeButton scope={`/academy/formations/${course.id}`} size="xs" />}
         </div>
       </div>
 

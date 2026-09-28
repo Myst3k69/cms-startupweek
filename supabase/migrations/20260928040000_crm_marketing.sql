@@ -16,9 +16,10 @@
 --     une exposition ou une conversion, au plus une fois par visiteur, de façon atomique.
 --   • Nouvelle section de droits « marketing » : admin et commercial en écriture,
 --     pédagogie et lecture seule en consultation (miroir de src/lib/auth/permissions.ts).
---     crm.section_access() et activities_entity_check reprennent À L'IDENTIQUE ce
---     qu'a posé la migration Academy (20260926220123) et y ajoutent le marketing :
---     toute migration ultérieure qui les redéfinit doit conserver les deux.
+--     crm.section_access() reprend À L'IDENTIQUE la version posée par la migration
+--     Academy (20260926220123, toujours en vigueur au 28/09/2026) et y ajoute le
+--     marketing : toute migration ultérieure qui la redéfinit doit conserver les deux.
+--     activities_entity_check est étendue (valeurs existantes + adCampaigns, experiments).
 
 -- 1. Campagnes
 create table if not exists crm.ad_campaigns (
@@ -176,7 +177,11 @@ begin
   end if;
 
   if v_rows = 0 then
-    return jsonb_build_object('ok', true, 'counted', false, 'reason', 'duplicate');
+    -- Conversion d'un visiteur jamais exposé : ignorée (et signalée comme telle).
+    return jsonb_build_object('ok', true, 'counted', false, 'reason',
+      case when p_event = 'conversion' and not exists (
+             select 1 from crm.experiment_hits h where h.experiment_id = e.id and h.visitor_id = p_visitor)
+           then 'no_exposure' else 'duplicate' end);
   end if;
 
   -- Incrément atomique : l'UPDATE relit la ligne verrouillée (READ COMMITTED).
@@ -197,16 +202,40 @@ begin
 end;
 $$;
 
--- 5. Journal d'activité : nouvelles entités
-alter table crm.activities drop constraint if exists activities_entity_check;
-alter table crm.activities add constraint activities_entity_check check (entity in (
-  'users', 'organizations', 'contacts', 'submissions', 'deals', 'tasks', 'sequences', 'emailTemplates', 'emails',
-  'events', 'speakers', 'applications', 'projects', 'attendances', 'evaluations', 'complaints', 'indicators',
-  'evidences', 'improvementActions', 'watchItems', 'quotes', 'invoices', 'payments', 'bankTransactions',
-  'resources', 'contents', 'automations', 'offers',
-  'courses', 'courseModules', 'lessons', 'academyPaths', 'enrollments', 'lessonProgress', 'assignments',
-  'learnerConnections', 'cohorts',
-  'adCampaigns', 'experiments'));
+-- 5. Journal d'activité : nouvelles entités.
+-- La contrainte est ÉTENDUE, jamais réécrite : on relit les valeurs autorisées aujourd'hui
+-- (posées par n'importe quelle migration : Academy, Studio, logistique des sessions…) et on
+-- y ajoute adCampaigns et experiments. L'ordre d'application des migrations ne retire donc rien.
+do $$
+declare
+  v_def  text;
+  v_list text[];
+begin
+  select pg_get_constraintdef(c.oid) into v_def
+  from pg_constraint c
+  where c.conname = 'activities_entity_check' and c.conrelid = 'crm.activities'::regclass;
+
+  -- Deux rendus possibles : ARRAY['a'::text, 'b'::text] (IN / ARRAY) ou '{a,b}'::text[] (littéral).
+  if v_def ~ '''\{[^}]*\}''' then
+    v_list := string_to_array(substring(v_def from '''\{([^}]*)\}'''), ',');
+  else
+    select coalesce(array_agg(m[1]), '{}') into v_list
+    from regexp_matches(coalesce(v_def, ''), '''([A-Za-z]+)''', 'g') as m;
+  end if;
+
+  if coalesce(cardinality(v_list), 0) < 10 then
+    raise exception 'activities_entity_check introuvable ou illisible (%) : migration interrompue', coalesce(v_def, 'absente');
+  end if;
+
+  v_list := array(select distinct btrim(x, ' "') from unnest(v_list || array['adCampaigns', 'experiments']) as x order by 1);
+
+  alter table crm.activities drop constraint activities_entity_check;
+  -- Même rendu que les autres migrations (ARRAY['a'::text, …]) : relisible par une migration suivante.
+  execute format(
+    'alter table crm.activities add constraint activities_entity_check check (entity = any (array[%s]))',
+    (select string_agg(quote_literal(x) || '::text', ', ') from unnest(v_list) as x));
+end;
+$$;
 
 drop trigger if exists audit_ad_campaigns on crm.ad_campaigns;
 create trigger audit_ad_campaigns after insert or update of status on crm.ad_campaigns

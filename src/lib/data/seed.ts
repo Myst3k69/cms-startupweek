@@ -27,7 +27,7 @@ import { buildAcademy } from "./seed/academy";
 import { buildMarketing } from "./seed/marketing";
 
 /** À incrémenter à chaque évolution du jeu de démo (force la régénération du store local). */
-export const SEED_VERSION = 4;
+export const SEED_VERSION = 5;
 
 export interface SeedData extends Collections {
   settings: Settings;
@@ -81,6 +81,7 @@ function emptyData(): SeedData {
     cohorts: [],
     adCampaigns: [],
     experiments: [],
+    courseComments: [],
     settings: undefined as unknown as Settings, // renseigné par buildTeam
     activities: [],
     traffic: [],

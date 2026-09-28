@@ -78,6 +78,8 @@ export function createMailSender(): EmailSender | null {
   if (!provider || !from) return null;
   const replyTo = process.env.EMAIL_REPLY_TO || addressOf(from);
   const bcc = list(process.env.EMAIL_BCC);
+  // Pas de copie vers le destinataire lui-même (sinon il reçoit l'email deux fois).
+  const copyFor = (to: string) => bcc.filter((b) => b.toLowerCase() !== to.trim().toLowerCase());
 
   if (provider === "smtp") {
     return async (message) => {
@@ -96,10 +98,12 @@ export function createMailSender(): EmailSender | null {
         if (rejected.some((r) => r.toLowerCase() === message.to.toLowerCase())) {
           return { ok: false, error: `Adresse refusée par le serveur SMTP : ${message.to}` };
         }
-        // Copie (EMAIL_BCC) seulement une fois l'envoi accepté : même message, enveloppe vers la copie.
-        if (bcc.length) {
+        // Copie (EMAIL_BCC) seulement une fois l'envoi accepté : même message (même Message-ID,
+        // qu'une boîte recevant les deux dédoublonne), enveloppe vers la copie.
+        const copyTo = copyFor(message.to);
+        if (copyTo.length) {
           await smtpTransport()
-            .sendMail({ ...mail, envelope: { from: addressOf(from), to: bcc } })
+            .sendMail({ ...mail, messageId: info.messageId, envelope: { from: addressOf(from), to: copyTo } })
             .catch((e: unknown) => console.warn(`[mailer] copie non envoyée : ${e instanceof Error ? e.message : String(e)}`));
         }
         return { ok: true, id: info.messageId };
@@ -111,6 +115,7 @@ export function createMailSender(): EmailSender | null {
 
   const apiKey = process.env.RESEND_API_KEY!;
   return async (message) => {
+    const copyTo = copyFor(message.to);
     try {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -118,7 +123,7 @@ export function createMailSender(): EmailSender | null {
         body: JSON.stringify({
           from,
           to: [message.to],
-          ...(bcc.length ? { bcc } : {}),
+          ...(copyTo.length ? { bcc: copyTo } : {}),
           reply_to: message.replyTo ?? replyTo,
           subject: message.subject,
           text: message.text,

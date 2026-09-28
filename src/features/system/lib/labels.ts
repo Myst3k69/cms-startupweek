@@ -52,6 +52,7 @@ export const ENTITY_LABEL: Record<EntityName, string> = {
   cohorts: "Cohorte Academy",
   adCampaigns: "Campagne publicitaire",
   experiments: "Test A/B",
+  courseComments: "Commentaire de relecture",
 };
 
 export const ACTIVITY_KIND_LABEL: Record<ActivityKind, string> = {
@@ -85,6 +86,8 @@ export function entityHref(entity: EntityName, id: string): string | undefined {
       return "/academy?onglet=livrables";
     case "cohorts":
       return "/academy?onglet=cohortes";
+    case "courseComments":
+      return "/studio";
     case "academyPaths":
       return "/academy?onglet=parcours";
     case "courseModules":
