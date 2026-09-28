@@ -49,6 +49,7 @@ Un back-office unique, construit sur **la même stack que le site** (Next.js 16 
 | **Emails** | Templates versionnés et échappés, journal d'envoi | Templates HTML dupliqués dans n8n |
 | **Candidatures** | Pipeline kanban, scoring, checklist Qualiopi, automatisations (acompte, emails, tâches) | Table Candidature |
 | **Sessions** | Fiche session, participants, programme, **émargement**, évaluations, finances, documents | Events + sync polling |
+| **Logistique & lieux** | Par session : sourcing du lieu (kanban, comparatif, assistant IA), devis & échéanciers fournisseurs, activités, intervenants, chambres & arrivées, infos pratiques → livret d'accueil, rétroplanning J-120 → J-1. Répertoire des lieux réutilisable | Rien (fichiers épars) |
 | **Projets candidats** | Portefeuille, jalons, métriques, mentors, suivi J+30/J+90 | Projet saisi en double |
 | **Intervenants** | Annuaire + conformité (CV, formation continue) | Rien (critère 5) |
 | **Qualiopi** | 32 indicateurs, preuves automatiques calculées, réclamations, satisfaction, amélioration, veille, handicap, documents (convention, convocation, attestation, émargement, programme) | Rien |

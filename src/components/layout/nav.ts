@@ -10,6 +10,7 @@ import {
   KanbanSquare,
   LayoutDashboard,
   Library,
+  Hotel,
   Mail,
   Megaphone,
   Mic2,
@@ -63,6 +64,7 @@ export const NAV: NavGroup[] = [
     items: [
       { href: "/candidatures", label: "Candidatures", icon: FileText, section: "candidatures", keywords: "candidats admissions" },
       { href: "/sessions", label: "Sessions & événements", icon: CalendarDays, section: "sessions", keywords: "events bootcamp startup week émargement" },
+      { href: "/lieux", label: "Lieux", icon: Hotel, section: "sessions", keywords: "villas domaines hébergement sourcing devis logistique ia" },
       { href: "/projets", label: "Projets candidats", icon: Rocket, section: "projets", keywords: "startups mvp" },
       { href: "/intervenants", label: "Intervenants", icon: Mic2, section: "intervenants", keywords: "formateurs mentors jury" },
       { href: "/ressources", label: "Ressources", icon: Library, section: "ressources", keywords: "pdf documents templates" },

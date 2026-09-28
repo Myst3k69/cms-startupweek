@@ -12,8 +12,10 @@
   },
   "packageManager": "pnpm@10.33.0",
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.78",
     "@anthropic-ai/sdk": "^0.128.0",
     "@supabase/supabase-js": "^2.117.2",
+    "ai": "^7.0.118",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",

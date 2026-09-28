@@ -23,6 +23,8 @@ import type {
   EventKind,
   EventMode,
   EventStatus,
+  ExpenseCategory,
+  ExpenseStatus,
   FundingSource,
   IndicatorStatus,
   InvoiceKind,
@@ -31,6 +33,8 @@ import type {
   LessonBlockType,
   OrgStatus,
   OrgType,
+  OutingKind,
+  OutingStatus,
   PaymentMethod,
   PaymentStatus,
   Persona,
@@ -42,10 +46,17 @@ import type {
   Role,
   SequenceTrigger,
   SpeakerKind,
+  StayRole,
   SubmissionStatus,
+  SupplierPaymentMethod,
   SubmissionType,
   TaskKind,
   TemplateCategory,
+  TravelMode,
+  VenueKind,
+  VenueOptionStage,
+  VenueSource,
+  VenueStatus,
   Visibility,
   WatchKind,
 } from "./types";
@@ -260,6 +271,127 @@ export const SPEAKER_KINDS = opts<SpeakerKind>({
   coach: "Coach",
   expert: "Expert",
 });
+
+/* ── Logistique des sessions ── */
+
+export const VENUE_KINDS = opts<VenueKind>({
+  villa: "Villa",
+  chateau: "Château",
+  chalet: "Chalet",
+  domaine: "Domaine",
+  riad: "Riad",
+  hotel: "Hôtel",
+  gite: "Gîte / maison d'hôtes",
+  tiers_lieu: "Tiers-lieu / coworking",
+  autre: "Autre",
+});
+
+export const VENUE_STATUSES = opts<VenueStatus>({
+  repere: ["Repéré", "neutral"],
+  en_contact: ["En contact", "info"],
+  valide: ["Validé", "success"],
+  ecarte: ["Écarté", "danger"],
+});
+
+export const VENUE_SOURCES = opts<VenueSource>({
+  manuel: "Saisie manuelle",
+  ia: "Assistant IA",
+  recommandation: "Recommandation",
+  plateforme: "Plateforme de location",
+});
+
+/** Étapes du sourcing d'un lieu pour une session (colonnes du kanban). */
+export const VENUE_OPTION_STAGES = opts<VenueOptionStage>({
+  identifie: ["Identifié", "neutral"],
+  demande: ["Devis demandé", "info"],
+  devis_recu: ["Devis reçu", "violet"],
+  option: ["Option posée", "warning"],
+  retenu: ["Retenu", "success"],
+  ecarte: ["Écarté", "danger"],
+});
+
+export const EXPENSE_CATEGORIES = opts<ExpenseCategory>({
+  lieu: "Lieu & hébergement",
+  restauration: "Restauration",
+  activite: "Activités",
+  transport: "Transport & navettes",
+  intervenant: "Intervenants",
+  materiel: "Matériel & fournitures",
+  autre: "Autre",
+});
+
+export const EXPENSE_STATUSES = opts<ExpenseStatus>({
+  a_demander: ["À demander", "neutral"],
+  demande: ["Devis demandé", "info"],
+  recu: ["Devis reçu", "violet"],
+  accepte: ["Accepté", "success"],
+  refuse: ["Refusé", "danger"],
+});
+
+export const SUPPLIER_PAYMENT_METHODS = opts<SupplierPaymentMethod>({
+  virement: "Virement",
+  carte: "Carte",
+  cheque: "Chèque",
+  especes: "Espèces",
+  plateforme: "Plateforme (en ligne)",
+});
+
+export const OUTING_KINDS = opts<OutingKind>({
+  sport: "Sport & plein air",
+  culture: "Culture & visite",
+  team_building: "Team building",
+  gastronomie: "Gastronomie",
+  detente: "Détente",
+  networking: "Networking",
+  autre: "Autre",
+});
+
+export const OUTING_STATUSES = opts<OutingStatus>({
+  idee: ["Idée", "neutral"],
+  a_reserver: ["À réserver", "warning"],
+  reserve: ["Réservée", "success"],
+  annule: ["Annulée", "danger"],
+});
+
+export const STAY_ROLES = opts<StayRole>({
+  participant: ["Participant", "accent"],
+  intervenant: ["Intervenant", "violet"],
+  equipe: ["Équipe", "info"],
+  invite: ["Invité", "neutral"],
+});
+
+export const TRAVEL_MODES = opts<TravelMode>({
+  avion: "Avion",
+  train: "Train",
+  voiture: "Voiture",
+  navette: "Navette",
+  autre: "Autre",
+});
+
+/** Équipements suggérés pour un lieu (saisie libre possible). */
+export const VENUE_AMENITIES = [
+  "Wifi fibre", "Salle de travail", "Vidéoprojecteur / écran", "Tableau blanc", "Piscine", "Jardin / terrasse",
+  "Cuisine équipée", "Chef / traiteur sur place", "Parking", "Accès PMR", "Proche aéroport", "Proche gare", "Salle de sport",
+];
+
+/**
+ * Rétroplanning logistique type : tâches créées dans « Relances & tâches », rattachées à la session.
+ * `days` = décalage par rapport au premier jour de la session (négatif = avant).
+ */
+export const LOGISTICS_PLAYBOOK: { key: string; days: number; title: string; priority: "normale" | "haute" }[] = [
+  { key: "sourcing", days: -120, title: "Lancer le sourcing du lieu (3 options minimum)", priority: "normale" },
+  { key: "reservation", days: -90, title: "Réserver le lieu et signer le contrat", priority: "haute" },
+  { key: "acompte-lieu", days: -85, title: "Verser l'acompte du lieu", priority: "haute" },
+  { key: "intervenants", days: -60, title: "Confirmer les intervenants (dates, honoraires, déplacements)", priority: "normale" },
+  { key: "activites", days: -45, title: "Réserver les activités et le traiteur", priority: "normale" },
+  { key: "infos", days: -30, title: "Compléter les infos pratiques et le livret d'accueil", priority: "normale" },
+  { key: "arrivees", days: -21, title: "Collecter les arrivées, départs et régimes alimentaires", priority: "normale" },
+  { key: "chambres", days: -14, title: "Finaliser la répartition des chambres", priority: "normale" },
+  { key: "livret", days: -10, title: "Envoyer le livret d'accueil aux participants", priority: "haute" },
+  { key: "solde-lieu", days: -7, title: "Régler le solde du lieu et des prestataires", priority: "haute" },
+  { key: "navettes", days: -3, title: "Confirmer les navettes et les contacts sur place", priority: "normale" },
+  { key: "materiel", days: -1, title: "Vérifier le matériel (écran, câbles, fournitures, badges)", priority: "normale" },
+];
 
 export const APPLICATION_STATUSES = opts<ApplicationStatus>({
   nouvelle: ["Nouvelle", "accent"],

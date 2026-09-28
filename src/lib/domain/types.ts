@@ -311,6 +311,28 @@ export interface EventSession extends BaseEntity {
   orgId?: ID; // client B2B (école / entreprise)
   budgetCents?: Cents; // coûts prévisionnels
   publishedOnSite: boolean;
+  // Logistique (onglet « Logistique ») — jamais publiée sur le site
+  venueId?: ID; // lieu retenu (répertoire des lieux)
+  logistics?: SessionLogistics;
+}
+
+/** Infos pratiques d'une session (livret d'accueil participant). Tous les champs sont facultatifs. */
+export interface SessionLogistics {
+  address?: string;
+  mapsUrl?: string;
+  access?: string; // comment venir
+  nearestHub?: string; // aéroport / gare le plus proche
+  checkIn?: string; // « Dimanche 12 à partir de 16 h »
+  checkOut?: string;
+  meetingPoint?: string;
+  shuttle?: string; // navettes / transferts
+  onsiteContact?: string; // nom + téléphone sur place
+  emergency?: string;
+  wifi?: string;
+  meals?: string;
+  houseRules?: string;
+  whatToBring?: string[];
+  extra?: string;
 }
 
 export type SpeakerKind = "formateur" | "mentor" | "jury" | "coach" | "expert";
@@ -329,6 +351,131 @@ export interface Speaker extends BaseEntity {
   rating?: number; // moyenne évaluations intervenant /5
   contractType: "salarie" | "freelance" | "benevole";
   city?: string;
+}
+
+/* ───────────────────────────── Logistique des sessions ───────────────────────────── */
+
+export type VenueKind = "villa" | "chateau" | "chalet" | "domaine" | "riad" | "hotel" | "gite" | "tiers_lieu" | "autre";
+export type VenueStatus = "repere" | "en_contact" | "valide" | "ecarte";
+export type VenueSource = "manuel" | "ia" | "recommandation" | "plateforme";
+
+/** Répertoire des lieux : réutilisable d'une session à l'autre. */
+export interface Venue extends BaseEntity {
+  name: string;
+  kind: VenueKind;
+  status: VenueStatus;
+  source: VenueSource;
+  region: Region;
+  country: string;
+  city: string;
+  address?: string;
+  bedrooms?: number;
+  beds?: number; // couchages
+  workspaceSeats?: number; // places assises pour travailler en groupe
+  amenities: string[];
+  pricePerNightCents?: Cents; // tarif indicatif, lieu entier
+  priceNotes?: string; // saisonnalité, minimum de nuits, ménage…
+  accessInfo?: string; // aéroport / gare, temps de trajet
+  accessibility?: string; // accès PMR (Qualiopi ind. 26)
+  website?: string;
+  listingUrl?: string; // annonce (plateforme de location)
+  imageUrl?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  rating?: number; // 1-5, après séjour
+  notes: string;
+}
+
+export type VenueOptionStage = "identifie" | "demande" | "devis_recu" | "option" | "retenu" | "ecarte";
+
+/** Sourcing : un lieu envisagé pour une session. */
+export interface VenueOption extends BaseEntity {
+  eventId: ID;
+  venueId: ID;
+  stage: VenueOptionStage;
+  quotedCents?: Cents; // total proposé par le lieu pour la session
+  availability?: string;
+  optionUntil?: ISODate; // fin de l'option posée
+  rejectReason?: string;
+  notes: string;
+}
+
+export type ExpenseCategory = "lieu" | "restauration" | "activite" | "transport" | "intervenant" | "materiel" | "autre";
+export type ExpenseStatus = "a_demander" | "demande" | "recu" | "accepte" | "refuse";
+export type SupplierPaymentMethod = "virement" | "carte" | "cheque" | "especes" | "plateforme";
+
+export interface ExpenseInstallment {
+  id: ID;
+  label: string; // « Acompte 30 % », « Solde »
+  amountCents: Cents;
+  dueAt: ISODate;
+  paidAt?: ISODate;
+  method?: SupplierPaymentMethod;
+  reference?: string;
+}
+
+/** Devis et dépenses fournisseurs d'une session (ce que StartupWeek doit payer). */
+export interface SessionExpense extends BaseEntity {
+  eventId: ID;
+  category: ExpenseCategory;
+  label: string;
+  supplier: string;
+  status: ExpenseStatus;
+  amountCents: Cents; // montant TTC du devis
+  venueId?: ID;
+  speakerId?: ID;
+  activityId?: ID;
+  quoteRef?: string;
+  quoteUrl?: string; // lien vers le devis (PDF, email…)
+  receivedAt?: ISODate;
+  validUntil?: ISODate;
+  installments: ExpenseInstallment[];
+  notes: string;
+}
+
+export type OutingKind = "sport" | "culture" | "team_building" | "gastronomie" | "detente" | "networking" | "autre";
+export type OutingStatus = "idee" | "a_reserver" | "reserve" | "annule";
+
+/** Activité proposée pendant une session (hors programme pédagogique). */
+export interface SessionActivity extends BaseEntity {
+  eventId: ID;
+  title: string;
+  kind: OutingKind;
+  status: OutingStatus;
+  day?: number; // J1…
+  start?: string; // « 17:30 »
+  end?: string;
+  location?: string;
+  provider?: string;
+  contact?: string;
+  costCents?: Cents; // estimation totale
+  included: boolean; // inclus dans le prix participant
+  notes: string;
+}
+
+export type StayRole = "participant" | "intervenant" | "equipe" | "invite";
+export type TravelMode = "avion" | "train" | "voiture" | "navette" | "autre";
+
+/** Séjour d'une personne sur une session : chambre, arrivée, départ, régime. */
+export interface SessionStay extends BaseEntity {
+  eventId: ID;
+  role: StayRole;
+  contactId?: ID;
+  speakerId?: ID;
+  userId?: ID;
+  name: string; // nom affiché (dénormalisé)
+  confirmed: boolean; // présence confirmée
+  room?: string;
+  arrivalAt?: ISODate;
+  arrivalMode?: TravelMode;
+  arrivalRef?: string; // n° de vol / train
+  departureAt?: ISODate;
+  departureMode?: TravelMode;
+  departureRef?: string;
+  shuttle: boolean; // navette à prévoir
+  diet?: string; // régime / allergies : le minimum nécessaire (donnée sensible)
+  notes?: string;
 }
 
 /* ───────────────────────────── Candidatures & projets ───────────────────────────── */
@@ -1120,6 +1267,11 @@ export interface EntityMap {
   contents: ContentItem;
   automations: AutomationRule;
   offers: Offer;
+  venues: Venue;
+  venueOptions: VenueOption;
+  expenses: SessionExpense;
+  outings: SessionActivity;
+  stays: SessionStay;
   courses: Course;
   courseModules: CourseModule;
   lessons: Lesson;
