@@ -17,7 +17,8 @@ import { clientIp, createRateLimiter, readBodyWithLimit } from "@/lib/server/sec
 import { isVenueSearchConfigured, searchVenues } from "@/lib/server/venue-search";
 
 export const runtime = "nodejs";
-// Plusieurs recherches web + réflexion : compter une à trois minutes.
+// Recherche web approfondie (au moins 8 requêtes), puis au besoin une seconde recherche élargie :
+// compter une à trois minutes, jusqu'à cinq quand la recherche est élargie.
 export const maxDuration = 300;
 
 const limiter = createRateLimiter({ capacity: 10, windowMs: 60 * 60_000 });
