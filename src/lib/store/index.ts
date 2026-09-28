@@ -57,6 +57,7 @@ export const ID_PREFIX: Record<EntityName, string> = {
   assignments: "liv",
   learnerConnections: "cnx",
   cohorts: "coh",
+  courseComments: "rvc",
 };
 
 export type NewEntity<K extends EntityName> = Omit<EntityMap[K], "id" | "createdAt" | "updatedAt"> & { id?: ID };
@@ -117,6 +118,7 @@ const ENTITY_LABEL: Partial<Record<EntityName, string>> = {
   enrollments: "Inscription Academy",
   assignments: "Livrable",
   cohorts: "Cohorte",
+  courseComments: "Commentaire de relecture",
 };
 
 /** Paramètres par défaut (remplacés par le seed de démo ou la base). */

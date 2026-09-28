@@ -26,7 +26,7 @@ import { buildActivities, buildContentStats, buildTraffic } from "./seed/analyti
 import { buildAcademy } from "./seed/academy";
 
 /** À incrémenter à chaque évolution du jeu de démo (force la régénération du store local). */
-export const SEED_VERSION = 3;
+export const SEED_VERSION = 4;
 
 export interface SeedData extends Collections {
   settings: Settings;
@@ -77,6 +77,7 @@ function emptyData(): SeedData {
     assignments: [],
     learnerConnections: [],
     cohorts: [],
+    courseComments: [],
     settings: undefined as unknown as Settings, // renseigné par buildTeam
     activities: [],
     traffic: [],
