@@ -42,7 +42,6 @@ export async function GET(): Promise<Response> {
         allowedOriginsCustom: Boolean(env.ALLOWED_ORIGINS),
         stripeWebhook: Boolean(env.STRIPE_WEBHOOK_SECRET),
         stripeApi: Boolean(env.STRIPE_SECRET_KEY),
-        qonto: Boolean(env.QONTO_ORGANIZATION_SLUG && env.QONTO_SECRET_KEY && env.QONTO_BANK_ACCOUNT_ID),
         /** Fournisseur d'email (SMTP ou Resend) et expéditeur configurés. */
         email: isMailConfigured(),
         /** Secret de la route d'envoi appelée par la base (file d'emails). */

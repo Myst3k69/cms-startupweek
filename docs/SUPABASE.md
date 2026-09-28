@@ -1,6 +1,6 @@
 # StartupWeek OS — mise en service Supabase
 
-Ce document décrit comment passer le back-office du mode démo (données dans le navigateur) à Supabase, brancher le site, Stripe et Qonto, migrer les données Airtable et arrêter les workflows n8n. Il est volontairement opérationnel : chaque étape est vérifiable et réversible.
+Ce document décrit comment passer le back-office du mode démo (données dans le navigateur) à Supabase, brancher le site et Stripe, migrer les données Airtable et arrêter les workflows n8n. Il est volontairement opérationnel : chaque étape est vérifiable et réversible.
 
 > **État au 26/09/2026 (lire avant toute mise en production)**
 >
@@ -28,7 +28,7 @@ Ce document décrit comment passer le back-office du mode démo (données dans l
 Site (startupweek-v2)                     StartupWeek OS (ce repo, Vercel)                  Supabase
 /api/submit-*  ── POST signé HMAC ──►  /api/intake/<form>  ── service_role ──►  schéma crm (RLS)
                                          /api/stripe/webhook ◄── Stripe                 │
-                                         /api/qonto/sync     ◄── Vercel Cron            │ triggers SQL
+                                                                                         │ triggers SQL
                                          back-office (session Supabase Auth + RLS) ──►  │
                                                                                          ▼
 Site ◄──────────────── lit ─────────────────────────────────────────────  public.event, public.template,
@@ -441,19 +441,14 @@ Comportement : un paiement = une ligne `crm.payments` (référence `pi_…` uniq
 
 ---
 
-## 7. Brancher Qonto (Vercel Cron)
+## 7. Banque et comptabilité : Indy
 
-1. Qonto → Paramètres → Intégrations & partenaires → Clé API : `QONTO_ORGANIZATION_SLUG` et `QONTO_SECRET_KEY`.
-2. Identifiant du compte : `curl -H "Authorization: $SLUG:$SECRET" https://thirdparty.qonto.com/v2/organization` → `bank_accounts[].id` → `QONTO_BANK_ACCOUNT_ID`.
-3. `CRON_SECRET=<openssl rand -hex 32>` dans Vercel (Vercel l'envoie automatiquement en `Authorization: Bearer …` aux crons). Sans ce secret, la route refuse de synchroniser (503).
-4. Ajouter dans `vercel.json` du CRM :
-   ```json
-   { "crons": [{ "path": "/api/qonto/sync", "schedule": "17 * * * *" }] }
-   ```
-   (Plan Vercel Hobby : un cron au maximum par jour — utiliser alors `"17 6 * * *"` et `?days=3` couvre les week-ends.)
-5. Test manuel : `curl -X POST -H "Authorization: Bearer $CRON_SECRET" "https://cms-startupweek.vercel.app/api/qonto/sync?days=30"`.
+La facturation, la comptabilité et le compte pro sont tenus dans **Indy** : Indy reçoit les opérations bancaires et fait le rapprochement. Le CRM ne relève donc aucun compte bancaire (la synchro Qonto et l'onglet « Rapprochement » ont été retirés).
 
-Rapprochement automatique volontairement prudent : transaction créditrice dont le libellé/la référence contient **un seul** numéro `F-AAAA-NNNN` (préfixe = `settings.invoice_prefix`), facture émise non soldée, montant **exactement** égal au solde (ou au total TTC si rien n'est encore payé). Tout le reste reste « à rapprocher » dans l'interface. Les transactions déjà importées ne sont jamais réécrites (un rapprochement manuel n'est pas écrasé).
+- Indy ne propose pas d'API publique documentée : aucun appel automatique n'est possible depuis le CRM.
+- Les paiements reçus par virement ou par lien de paiement Indy sont saisis dans le CRM depuis la fiche de la facture (« Enregistrer un paiement ») ; Stripe reste branché par webhook (§ 6).
+- Migration **`20260928030000_crm_drop_bank_reconciliation.sql`** — **écrite, non appliquée** : supprime `crm.bank_transactions` (vide au 28/09/2026), la colonne `crm.payments.bank_transaction_id` et `crm.settings.qonto_connected`. Garde-fou : elle s'arrête sans rien modifier si la table contient des lignes. **Ordre** : déployer le code d'abord (il ne lit plus ces objets), puis appliquer la migration.
+- À venir : import de l'export CSV « Factures » d'Indy (Paramètres → Exports) pour retrouver dans le CRM les factures émises et leur statut de paiement.
 
 ---
 
@@ -560,7 +555,7 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 | --- | --- |
 | Formulaires | Remettre les URLs `N8N_WEBHOOK_*` dans le site et réactiver les 8 workflows. Effet immédiat. |
 | Synchro site | `alter table crm.sessions disable trigger sessions_site_sync; alter table crm.resources disable trigger resources_site_sync; alter table crm.applications disable trigger applications_capacity;` puis réactiver le polling n8n (il réécrit `public.event` depuis Airtable). |
-| Paiements | Désactiver l'endpoint dans Stripe ; retirer le cron Qonto de `vercel.json`. |
+| Paiements | Désactiver l'endpoint dans Stripe. |
 | Emails | Retirer `EMAIL_DISPATCH_SECRET` (ou les variables SMTP) dans Vercel : plus rien ne part, les emails restent en file « Programmé ». Revenir à n8n pour les formulaires : désactiver *Emails des formulaires du site*. |
 | Planificateur | `select cron.unschedule('crm-scheduler');` (plus de publication ni de rappel automatiques ; les contenus « Planifié » attendent) ; `select cron.unschedule('crm-cron-purge');` ; `drop extension pg_cron;` supprime toutes les tâches. |
 | Tout le CRM | `drop schema crm cascade;` — supprime tables, fonctions et triggers du CRM ; **aucune table `public.*` n'est modifiée structurellement** (seules leurs lignes ont pu être mises à jour par la synchro). Puis `supabase migration repair --status reverted 20260926103012 20260926103117 20260926103336 20260926103516`. |
@@ -575,11 +570,10 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 3. ✅ **Contrainte `event_code ~ '^SW-[0-9]{4}$'`** (NOT VALID, présente) : les sessions dont le code ne respecte pas ce format ne sont pas publiées (trace `systeme`).
 4. **Correspondances de valeurs vers le site** (limitations des enums du site) : `format` `journee` / `mois` → `semaine` ; `mode` `hybride` → `presentiel` ; statut `brouillon` / `prevu` ou `published_on_site = false` → `brouillon` ; `inscriptions_ouvertes` / `complet` / `en_cours` → `publie`. Ressources : catégories business_plan / pitch_deck / maquette / financier / digital → `public.template` ; les autres → `public.administrative_resource` (n8n n'envoyait que `digital` vers `template`) ; `juridique` → catégorie `contrat`.
 5. **Clés `sb_secret_…`** avec supabase-js (testé uniquement avec un JWT service_role local).
-6. **Qonto v2** : champs `id`, `amount_cents`, `side`, `settled_at`, `reference`, pagination `meta.next_page` et filtre `status[]=completed` (d'après la documentation ; non appelés réellement).
-7. **Rate-limit** en mémoire : par instance serverless (suffisant contre le spam ; pas une limite globale).
-8. Jours fériés non gérés dans le calcul « 48 h ouvrées » des réclamations (samedi/dimanche seulement).
-9. **Migration `20260926122058`** (appliquée le 26/09/2026) : testée localement puis sur la vraie base (bloc annulé) — compte à email vérifié rattaché au membre de même email (casse ignorée), email non vérifié / membre désactivé / compte sans membre → rien, `anon` refusé ; écriture d'un membre connecté → pas d'audit automatique (l'interface journalise), écriture service_role → audit conservé. `auth.users.email_confirmed_at` est supposée présente (colonne standard de Supabase Auth).
-10. **Advisors après exposition du schéma `crm`** (26/09/2026) : `authenticated_security_definer_function_executable` (WARN) liste 8 fonctions `crm` appelables en RPC par tout compte connecté. Voulu pour `claim_team_membership`, `current_member_id`, `current_role`, `has_access`, `has_any_access`, `is_team_member` (elles ne renvoient que des informations sur l'appelant ; un compte du site obtient `null` / `false`). `session_places_remaining` et `session_registered_count` n'ont pas besoin de ce droit (seules des fonctions `SECURITY DEFINER` les appellent) : elles exposent un nombre de places, sans donnée personnelle — droit à retirer par une migration si l'on veut un advisor propre.
+6. **Rate-limit** en mémoire : par instance serverless (suffisant contre le spam ; pas une limite globale).
+7. Jours fériés non gérés dans le calcul « 48 h ouvrées » des réclamations (samedi/dimanche seulement).
+8. **Migration `20260926122058`** (appliquée le 26/09/2026) : testée localement puis sur la vraie base (bloc annulé) — compte à email vérifié rattaché au membre de même email (casse ignorée), email non vérifié / membre désactivé / compte sans membre → rien, `anon` refusé ; écriture d'un membre connecté → pas d'audit automatique (l'interface journalise), écriture service_role → audit conservé. `auth.users.email_confirmed_at` est supposée présente (colonne standard de Supabase Auth).
+9. **Advisors après exposition du schéma `crm`** (26/09/2026) : `authenticated_security_definer_function_executable` (WARN) liste 8 fonctions `crm` appelables en RPC par tout compte connecté. Voulu pour `claim_team_membership`, `current_member_id`, `current_role`, `has_access`, `has_any_access`, `is_team_member` (elles ne renvoient que des informations sur l'appelant ; un compte du site obtient `null` / `false`). `session_places_remaining` et `session_registered_count` n'ont pas besoin de ce droit (seules des fonctions `SECURITY DEFINER` les appellent) : elles exposent un nombre de places, sans donnée personnelle — droit à retirer par une migration si l'on veut un advisor propre.
 
 ## 12. Reste à faire (hors de ce lot)
 

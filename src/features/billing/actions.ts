@@ -1,18 +1,18 @@
 /**
- * Actions métier du module Facturation (brouillons, émission, avoirs, devis, relances, rapprochement Qonto, catalogue).
+ * Actions métier du module Facturation (brouillons, émission, avoirs, devis, relances, catalogue).
  *
- * Elles s'appuient sur les actions transverses de `@/lib/domain/actions` (createInvoice, recordPayment,
+ * Elles s'appuient sur les actions transverses de `@/lib/domain/actions` (createInvoice,
  * nextNumber, sendEmail, createTask) et journalisent chaque étape dans la timeline.
  * Les relances reprennent l'effet de sendInvoiceReminder avec un modèle par niveau (voir sendReminderEmail).
  * En production, la même logique vit côté serveur (numérotation : crm.next_document_number()).
  */
 import { crm, findById } from "@/lib/store";
-import { createInvoice, createTask, nextNumber, paymentText, recordPayment, sendEmail } from "@/lib/domain/actions";
+import { createInvoice, createTask, nextNumber, paymentText, sendEmail } from "@/lib/domain/actions";
 import { contactName, invoiceBalance, invoiceTotal } from "@/lib/domain/selectors";
 import { date, money } from "@/lib/format";
 import { uid } from "@/lib/utils";
 import type { ID, Invoice, InvoiceKind, LineItem, Offer, PaymentMethod, Quote } from "@/lib/domain/types";
-import { displayNumber, guessCounterparty, isCollectible, quoteTotal, type ParsedBankRow } from "./lib";
+import { displayNumber, isCollectible, quoteTotal } from "./lib";
 
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -321,53 +321,6 @@ export function runReminderStep(id: ID): { ok: boolean; level: number; reason?: 
     crm().log({ kind: "systeme", entity: "invoices", entityId: inv.id, summary: `Mise en demeure à envoyer (relance n° ${level})` });
   }
   return { ok: true, level };
-}
-
-/* ───────────────────────────── Rapprochement bancaire ───────────────────────────── */
-
-/** Rapproche un crédit Qonto d'une facture : paiement « virement » + transaction marquée rapprochée. */
-export function reconcileTransaction(txId: ID, invoiceId: ID) {
-  const s = crm();
-  const tx = findById("bankTransactions", txId);
-  const inv = findById("invoices", invoiceId);
-  if (!tx || !inv || tx.status === "rapproche" || tx.amountCents <= 0) return undefined;
-  const pay = recordPayment(invoiceId, tx.amountCents, "virement", tx.reference ? `${tx.id} · ${tx.reference}` : tx.id, { bankTransactionId: tx.id, receivedAt: tx.bookedAt });
-  if (!pay) return undefined;
-  s.update("bankTransactions", tx.id, { status: "rapproche", matchedInvoiceId: inv.id, paymentId: pay.id }, { log: `Rapprochée avec ${inv.number}`, kind: "statut" });
-  return pay;
-}
-
-/** Virement de versement Stripe (payout) : les paiements sont déjà enregistrés côté Stripe. */
-export function markPayoutReconciled(txId: ID) {
-  crm().update("bankTransactions", txId, { status: "rapproche" }, { log: "Versement Stripe rapproché (paiements déjà enregistrés)", kind: "statut" });
-}
-
-export function setTransactionIgnored(txId: ID, ignored: boolean) {
-  crm().update("bankTransactions", txId, { status: ignored ? "ignore" : "a_rapprocher" }, { log: ignored ? "Transaction ignorée" : "Transaction remise à rapprocher", kind: "statut" });
-}
-
-/** Import CSV (démo) : crée les transactions, ignore les doublons (même date, montant et libellé). */
-export function importBankTransactions(rows: ParsedBankRow[]) {
-  const s = crm();
-  const key = (d: string, amount: number, label: string) => `${d.slice(0, 10)}|${amount}|${label.trim().toLowerCase()}`;
-  const existing = new Set(s.bankTransactions.map((t) => key(t.bookedAt, t.amountCents, t.label)));
-  let created = 0;
-  let duplicates = 0;
-  for (const r of rows) {
-    const k = key(r.bookedAt, r.amountCents, r.label);
-    if (existing.has(k)) {
-      duplicates++;
-      continue;
-    }
-    existing.add(k);
-    s.create(
-      "bankTransactions",
-      { bookedAt: r.bookedAt, label: r.label, counterparty: r.counterparty || guessCounterparty(r.label), amountCents: r.amountCents, reference: r.reference, source: "import_csv", status: "a_rapprocher" },
-      { log: "Transaction importée (CSV Qonto)" },
-    );
-    created++;
-  }
-  return { created, duplicates };
 }
 
 /* ───────────────────────────── Devis ───────────────────────────── */

@@ -17,7 +17,7 @@
  *
  * Le recalcul de invoices.paid_cents / status (payee | partielle) et de
  * applications.amount_paid_cents est fait par le trigger SQL crm.payments_refresh_invoice
- * (source de vérité unique, aussi pour les paiements Qonto et manuels).
+ * (source de vérité unique, aussi pour les virements et paiements saisis à la main).
  */
 import { MAX_WEBHOOK_BODY_BYTES, readBodyWithLimit, verifyStripeSignature } from "@/lib/server/security";
 import { getSupabaseAdmin, type CrmAdminClient } from "@/lib/server/supabase-admin";

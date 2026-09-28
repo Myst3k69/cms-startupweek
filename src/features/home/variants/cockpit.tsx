@@ -67,7 +67,7 @@ export function CockpitHome({ data }: { data: DashboardData }) {
           <CardHeader>
             <div>
               <CardTitle>Encaissements — 12 mois</CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">Par moyen de paiement (Stripe, virement Qonto, OPCO)</p>
+              <p className="mt-1 text-xs text-muted-foreground">Par moyen de paiement (Stripe, virement, OPCO)</p>
             </div>
             <Link href="/facturation" className="text-xs text-accent-text hover:underline">
               Facturation →

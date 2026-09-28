@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { BellRing, Boxes, CreditCard, FilePlus2, FileSignature, Landmark, Receipt, ShieldCheck } from "lucide-react";
+import { BellRing, Boxes, CreditCard, FilePlus2, FileSignature, Receipt, ShieldCheck } from "lucide-react";
 import { useCollection, useNow, useSession, useSettings } from "@/lib/hooks";
 import { LinkButton, PageHeader, Tabs } from "@/components/ui";
 import { DAY, isCollectible } from "../lib";
@@ -10,12 +10,11 @@ import { BillingOverview } from "./overview";
 import { InvoicesTab, isInvoiceStatusFilter, type InvoiceStatusFilter } from "./invoices-tab";
 import { QuotesTab } from "./quotes-tab";
 import { PaymentsTab } from "./payments-tab";
-import { ReconciliationTab } from "./reconciliation-tab";
 import { RemindersTab } from "./reminders-tab";
 import { CatalogTab } from "./catalog-tab";
 import { useBillingLookups } from "./shared";
 
-const TABS = ["factures", "devis", "paiements", "rapprochement", "relances", "catalogue"] as const;
+const TABS = ["factures", "devis", "paiements", "relances", "catalogue"] as const;
 type Tab = (typeof TABS)[number];
 const isTab = (v: string | null): v is Tab => !!v && (TABS as readonly string[]).includes(v);
 
@@ -42,7 +41,6 @@ export function BillingPage() {
   const invoices = useCollection("invoices");
   const quotes = useCollection("quotes");
   const payments = useCollection("payments");
-  const txs = useCollection("bankTransactions");
   const offers = useCollection("offers");
   const settings = useSettings();
   const lookups = useBillingLookups();
@@ -54,11 +52,10 @@ export function BillingPage() {
       factures: invoices.filter((i) => !(i.status === "annulee" && !i.number)).length,
       devis: quotes.length,
       paiements: payments.length,
-      rapprochement: txs.filter((t) => t.status === "a_rapprocher").length,
       relances: invoices.filter((i) => isCollectible(i) && new Date(i.dueAt).getTime() - now < 7 * DAY).length,
       catalogue: offers.filter((o) => o.active).length,
     }),
-    [invoices, quotes, payments, txs, offers, now],
+    [invoices, quotes, payments, offers, now],
   );
 
   const onTab = (t: Tab) => setQuery(searchParams, { onglet: t === "factures" ? null : t, statut: t === "factures" ? searchParams.get("statut") : null }, true);
@@ -71,7 +68,7 @@ export function BillingPage() {
         title="Facturation & paiements"
         description={
           <>
-            {settings.legalName} · CGV : acompte {settings.depositPercent} % à l'inscription, solde à J-{settings.balanceDaysBefore} · Stripe {settings.stripeConnected ? "connecté" : "non connecté"} · Qonto {settings.qontoConnected ? "connecté" : "non connecté"}
+            {settings.legalName} · CGV : acompte {settings.depositPercent} % à l'inscription, solde à J-{settings.balanceDaysBefore} · Stripe {settings.stripeConnected ? "connecté" : "non connecté"}
             {settings.vatExempt ? " · Exonération TVA formation active" : " · TVA 20 %"}
           </>
         }
@@ -107,7 +104,6 @@ export function BillingPage() {
             { value: "factures", label: "Factures", count: counts.factures, icon: Receipt },
             { value: "devis", label: "Devis", count: counts.devis, icon: FileSignature },
             { value: "paiements", label: "Paiements", count: counts.paiements, icon: CreditCard },
-            { value: "rapprochement", label: "Rapprochement", count: counts.rapprochement, icon: Landmark },
             { value: "relances", label: "Relances", count: counts.relances, icon: BellRing },
             { value: "catalogue", label: "Catalogue", count: counts.catalogue, icon: Boxes },
           ]}
@@ -115,7 +111,6 @@ export function BillingPage() {
         {tab === "factures" ? <InvoicesTab status={status} onStatusChange={onStatus} /> : null}
         {tab === "devis" ? <QuotesTab /> : null}
         {tab === "paiements" ? <PaymentsTab /> : null}
-        {tab === "rapprochement" ? <ReconciliationTab /> : null}
         {tab === "relances" ? <RemindersTab /> : null}
         {tab === "catalogue" ? <CatalogTab /> : null}
       </section>

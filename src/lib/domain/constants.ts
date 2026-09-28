@@ -3,7 +3,6 @@ import type {
   ApplicationStatus,
   AssignmentStatus,
   AttendanceStatus,
-  BankTxStatus,
   Channel,
   ComplaintStatus,
   ComplaintType,
@@ -385,7 +384,7 @@ export const INVOICE_STATUSES = opts<InvoiceStatus>({
 
 export const PAYMENT_METHODS = opts<PaymentMethod>({
   stripe: "Stripe (CB)",
-  virement: "Virement (Qonto)",
+  virement: "Virement",
   opco: "OPCO (subrogation)",
   cb_terminal: "CB terminal",
   cheque: "Chèque",
@@ -396,12 +395,6 @@ export const PAYMENT_STATUSES = opts<PaymentStatus>({
   en_attente: ["En attente", "warning"],
   echoue: ["Échoué", "danger"],
   rembourse: ["Remboursé", "neutral"],
-});
-
-export const BANK_TX_STATUSES = opts<BankTxStatus>({
-  a_rapprocher: ["À rapprocher", "warning"],
-  rapproche: ["Rapproché", "success"],
-  ignore: ["Ignoré", "neutral"],
 });
 
 export const RESOURCE_CATEGORIES = opts<ResourceCategory>({

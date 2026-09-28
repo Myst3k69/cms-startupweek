@@ -188,7 +188,7 @@ export function createApplicationInvoice(applicationId: ID, kind: Extract<Invoic
 }
 
 /** Enregistre un paiement et met à jour la facture + la candidature liée. */
-export function recordPayment(invoiceId: ID, amountCents: number, method: PaymentMethod, reference: string, opts?: { bankTransactionId?: ID; receivedAt?: string }) {
+export function recordPayment(invoiceId: ID, amountCents: number, method: PaymentMethod, reference: string, opts?: { receivedAt?: string }) {
   const s = crm();
   const inv = findById("invoices", invoiceId);
   if (!inv) return undefined;
@@ -202,7 +202,6 @@ export function recordPayment(invoiceId: ID, amountCents: number, method: Paymen
       status: "reussi",
       reference,
       feeCents: method === "stripe" ? Math.round(amountCents * 0.015 + 25) : 0,
-      bankTransactionId: opts?.bankTransactionId,
     },
     { log: false },
   );
@@ -269,7 +268,7 @@ export function changeApplicationStatus(applicationId: ID, status: ApplicationSt
   const ev = findById("events", app.eventId);
   const now = nowMs();
   // « Alerte capacité » (reprise d'Airtable) : jamais plus d'inscrits que de places, quel que soit le déclencheur
-  // (glisser-déposer, paiement Stripe/Qonto reçu…). En base : trigger équivalent sur crm.applications.
+  // (glisser-déposer, paiement Stripe ou virement reçu…). En base : trigger équivalent sur crm.applications.
   if (status === "inscrite" && ev) {
     const enrolled = s.applications.filter((a) => a.eventId === ev.id && a.status === "inscrite" && a.id !== app.id).length;
     if (enrolled >= ev.capacity) {

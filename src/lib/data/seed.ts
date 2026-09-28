@@ -26,7 +26,7 @@ import { buildActivities, buildContentStats, buildTraffic } from "./seed/analyti
 import { buildAcademy } from "./seed/academy";
 
 /** À incrémenter à chaque évolution du jeu de démo (force la régénération du store local). */
-export const SEED_VERSION = 3;
+export const SEED_VERSION = 4;
 
 export interface SeedData extends Collections {
   settings: Settings;
@@ -63,7 +63,6 @@ function emptyData(): SeedData {
     quotes: [],
     invoices: [],
     payments: [],
-    bankTransactions: [],
     resources: [],
     contents: [],
     automations: [],
@@ -98,7 +97,7 @@ export function buildSeed(now: number): SeedData {
   buildEvents(ctx);
   buildPeople(ctx); // contacts + applications (+ échéanciers de paiement)
   buildProjects(ctx);
-  buildBilling(ctx); // quotes, invoices, payments, bankTransactions
+  buildBilling(ctx); // quotes, invoices, payments
   buildResources(ctx); // + event.resourceIds
   buildQualiopi(ctx); // indicators, evidences, improvementActions, watchItems, complaints, attendances, evaluations
   buildCrm(ctx); // emailTemplates, sequences, submissions, deals, tasks, emails

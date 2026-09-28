@@ -77,7 +77,7 @@ export const NAV: NavGroup[] = [
     label: "Qualité & finance",
     items: [
       { href: "/qualiopi", label: "Qualiopi", icon: ShieldCheck, section: "qualiopi", keywords: "qualité indicateurs audit réclamations satisfaction" },
-      { href: "/facturation", label: "Facturation", icon: Receipt, section: "facturation", keywords: "factures devis paiements stripe qonto" },
+      { href: "/facturation", label: "Facturation", icon: Receipt, section: "facturation", keywords: "factures devis paiements stripe indy" },
     ],
   },
   {

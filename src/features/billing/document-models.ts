@@ -67,7 +67,7 @@ function legalMentions(settings: Settings, lines: { vatRate: number }[], opts: {
 
 const METHOD_TEXT = {
   stripe: "Carte bancaire via le lien de paiement sécurisé (Stripe)",
-  virement: "Virement bancaire (Qonto)",
+  virement: "Virement bancaire",
   opco: "Règlement direct par l'OPCO (subrogation)",
   cb_terminal: "Carte bancaire sur place",
   cheque: `Chèque à l'ordre de la société émettrice`,
@@ -168,7 +168,7 @@ export function buildQuoteModel(q: Quote, { settings, contact, org, ev, deal }: 
       `Règlement selon nos conditions générales de vente (acompte de ${settings.depositPercent} % à la commande), sauf conditions particulières précisées en notes.`,
       `Montant total : ${money(quoteTotal(q).ht, true)} HT soit ${money(quoteTotal(q).ttc, true)} TTC.`,
     ],
-    payment: { iban: settings.iban, reference: q.number || displayNumber(q), methods: ["Virement bancaire (Qonto) ou carte bancaire (Stripe)", "Prise en charge OPCO possible (subrogation)"] },
+    payment: { iban: settings.iban, reference: q.number || displayNumber(q), methods: ["Virement bancaire ou carte bancaire (Stripe)", "Prise en charge OPCO possible (subrogation)"] },
     mentions: legalMentions(settings, q.lines, { quote: true }),
     notes: q.notes,
     signatureBox: true,

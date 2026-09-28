@@ -9,7 +9,7 @@ import { INVOICE_STATUSES, QUOTE_STATUSES } from "@/lib/domain/constants";
 import { effectiveInvoiceStatus } from "@/lib/domain/selectors";
 import type { ID, Invoice, InvoiceKind, PaymentMethod, Quote } from "@/lib/domain/types";
 import { cn } from "@/lib/utils";
-import { CONFIDENCE_LABEL, DAY, effectiveQuoteStatus, type BillingLookups, type Confidence } from "../lib";
+import { DAY, effectiveQuoteStatus, type BillingLookups } from "../lib";
 
 export function useBillingLookups(): BillingLookups {
   const contacts = useLookup("contacts");
@@ -68,15 +68,6 @@ export function DueHint({ dueAt, now, done }: { dueAt: string; now: number; done
   if (days < 0) return <span className="block text-xs font-medium text-danger-text">retard {Math.abs(days)} j</span>;
   if (days === 0) return <span className="block text-xs font-medium text-warning-text">aujourd'hui</span>;
   return <span className={cn("block text-xs", days <= 7 ? "text-warning-text" : "text-muted-foreground")}>dans {days} j</span>;
-}
-
-export function ConfidenceBadge({ confidence, score }: { confidence: Confidence; score: number }) {
-  const c = CONFIDENCE_LABEL[confidence];
-  return (
-    <Badge tone={c.tone} dot title={`Score ${score}/100`}>
-      {c.label} · {score}
-    </Badge>
-  );
 }
 
 export function CopyButton({ value, label = "Copier", size = "sm" }: { value: string; label?: string; size?: "xs" | "sm" }) {

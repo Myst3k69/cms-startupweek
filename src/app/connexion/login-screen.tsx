@@ -24,7 +24,7 @@ const MODULES = [
   { icon: FileText, title: "Candidatures", text: "Pipeline, scoring, acompte automatique" },
   { icon: CalendarDays, title: "Sessions & émargement", text: "Programme, présences, évaluations" },
   { icon: ShieldCheck, title: "Qualiopi", text: "32 indicateurs, preuves calculées" },
-  { icon: Receipt, title: "Facturation", text: "Acompte / solde, Stripe, Qonto" },
+  { icon: Receipt, title: "Facturation", text: "Acompte / solde, paiements, relances" },
   { icon: Megaphone, title: "Contenus du site", text: "Calendrier éditorial, SEO, ressources" },
   { icon: BarChart3, title: "Analytics", text: "Funnel, revenus, satisfaction, sources" },
   { icon: Workflow, title: "Automatisations", text: "Relances et séquences, sans n8n" },
@@ -57,7 +57,7 @@ export function LoginScreen({ next }: { next: string }) {
             De la demande entrante à l'attestation Qualiopi, <span className="text-sw-cyan">un seul outil.</span>
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/70">
-            CRM, candidatures, sessions, émargement, satisfaction, réclamations, factures d'acompte et de solde, Stripe & Qonto, contenus du site et analytics — à la place d'Airtable + 13 workflows n8n.
+            CRM, candidatures, sessions, émargement, satisfaction, réclamations, factures d'acompte et de solde, paiements Stripe, contenus du site et analytics — à la place d'Airtable + 13 workflows n8n.
           </p>
 
           <ul className="mt-6 grid grid-cols-2 gap-2">

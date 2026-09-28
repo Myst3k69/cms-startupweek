@@ -21,8 +21,7 @@ function CodeBlock({ code, label }: { code: string; label: string }) {
 
 const OTHER_ENDPOINTS = [
   { method: "POST", path: "/api/stripe/webhook", auth: "En-tête Stripe-Signature (STRIPE_WEBHOOK_SECRET, tolérance 5 min)", role: "Paiements Stripe → factures payées, acompte réglé ⇒ candidature « Inscrite »" },
-  { method: "POST", path: "/api/qonto/sync", auth: "Authorization: Bearer CRON_SECRET (Vercel Cron)", role: "Import des transactions Qonto et rapprochement des virements" },
-  { method: "GET", path: "/api/health", auth: "Public (aucune donnée sensible)", role: "Supervision : base, email, Stripe, Qonto — remplace l'« Error workflow » n8n" },
+  { method: "GET", path: "/api/health", auth: "Public (aucune donnée sensible)", role: "Supervision : base, email, Stripe — remplace l'« Error workflow » n8n" },
 ];
 
 export function EndpointsTab() {

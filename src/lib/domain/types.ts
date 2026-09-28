@@ -610,23 +610,8 @@ export interface Payment extends BaseEntity {
   receivedAt: ISODate;
   method: PaymentMethod;
   status: PaymentStatus;
-  reference: string; // pi_… (Stripe) / id transaction Qonto / n° accord OPCO
+  reference: string; // pi_… (Stripe) / référence du virement / n° accord OPCO
   feeCents?: Cents;
-  bankTransactionId?: ID;
-}
-
-export type BankTxStatus = "a_rapprocher" | "rapproche" | "ignore";
-
-export interface BankTransaction extends BaseEntity {
-  bookedAt: ISODate;
-  label: string;
-  counterparty: string;
-  amountCents: Cents; // positif = crédit
-  reference?: string;
-  source: "qonto" | "stripe_payout" | "import_csv";
-  status: BankTxStatus;
-  matchedInvoiceId?: ID;
-  paymentId?: ID;
 }
 
 /* ───────────────────────────── Ressources & contenus ───────────────────────────── */
@@ -1060,7 +1045,6 @@ export interface Settings {
   complaintAckHours: number; // engagement accusé de réception
   slaHours: number; // délai de réponse aux demandes
   stripeConnected: boolean;
-  qontoConnected: boolean;
   emailProvider: "resend" | "smtp" | "brevo";
   /** Accusés de réception et Digital Starter Kit des formulaires du site envoyés par le CRM (désactivé tant que n8n les envoie). */
   siteFormEmails: boolean;
@@ -1097,7 +1081,6 @@ export interface EntityMap {
   quotes: Quote;
   invoices: Invoice;
   payments: Payment;
-  bankTransactions: BankTransaction;
   resources: Resource;
   contents: ContentItem;
   automations: AutomationRule;
