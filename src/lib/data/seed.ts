@@ -21,12 +21,13 @@ import { buildBilling } from "./seed/billing";
 import { buildResources } from "./seed/resources";
 import { buildQualiopi } from "./seed/qualiopi";
 import { buildCrm } from "./seed/crm";
+import { buildLogistics } from "./seed/logistics";
 import { buildAutomations, buildContents } from "./seed/content";
 import { buildActivities, buildContentStats, buildTraffic } from "./seed/analytics";
 import { buildAcademy } from "./seed/academy";
 
 /** À incrémenter à chaque évolution du jeu de démo (force la régénération du store local). */
-export const SEED_VERSION = 6;
+export const SEED_VERSION = 7;
 
 export interface SeedData extends Collections {
   settings: Settings;
@@ -67,6 +68,11 @@ function emptyData(): SeedData {
     contents: [],
     automations: [],
     offers: [],
+    venues: [],
+    venueOptions: [],
+    expenses: [],
+    outings: [],
+    stays: [],
     courses: [],
     courseModules: [],
     lessons: [],
@@ -102,6 +108,7 @@ export function buildSeed(now: number): SeedData {
   buildResources(ctx); // + event.resourceIds
   buildQualiopi(ctx); // indicators, evidences, improvementActions, watchItems, complaints, attendances, evaluations
   buildCrm(ctx); // emailTemplates, sequences, submissions, deals, tasks, emails
+  buildLogistics(ctx); // venues, venueOptions, expenses, outings, stays (+ event.venueId / logistics, tâches de rétroplanning)
   buildContents(ctx);
   buildAcademy(ctx); // formations, parcours, cohorte, inscriptions et progression (StartupWeek Academy)
   buildAutomations(ctx);

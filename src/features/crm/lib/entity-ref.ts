@@ -26,6 +26,7 @@ export const ENTITY_KIND_LABEL: Partial<Record<EntityName, string>> = {
   evaluations: "Évaluation",
   resources: "Ressource",
   contents: "Contenu",
+  venues: "Lieu",
   courses: "Formation",
   enrollments: "Inscription Academy",
   assignments: "Livrable",
@@ -71,6 +72,8 @@ export function entityHref(ref: EntityRef): string | undefined {
       return `/ressources`;
     case "contents":
       return `/contenus`;
+    case "venues":
+      return `/lieux?lieu=${id}`;
     case "courses":
       return `/academy/formations/${id}`;
     case "enrollments":
