@@ -156,6 +156,7 @@ NEXT_PUBLIC_CRM_DATA_MODE=supabase
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…
 SUPABASE_SECRET_KEY=sb_secret_…          # serveur uniquement (routes /api/*)
+AI_GATEWAY_API_KEY=…                     # assistant IA de sourcing de lieux (§ 5 octies) — inutile sur Vercel si l'OIDC du projet est actif
 ```
 
 ✅ Renseignées en Production le 26/09/2026 (`SUPABASE_SECRET_KEY` pas encore : routes `/api/*` inactives). Les variables `NEXT_PUBLIC_*` sont intégrées **au build** : redéployer après les avoir modifiées. Saisir la **valeur** (`https://…supabase.co`), pas le nom de la variable : une adresse invalide affiche désormais un message explicite sur `/connexion` et `supabasePublic: false` dans `/api/health` (auparavant : page « This page couldn't load »).
@@ -430,7 +431,44 @@ Migration `20260927214847_crm_academy_studio.sql`, **appliquée en production le
 
 > **Attention pour les prochaines migrations** : toute nouvelle version de `activities_entity_check` doit garder `courseComments` (en plus des entités Academy listées au § 5 sexies).
 
-## 5 octies. Marketing : campagnes, régies publicitaires, A/B tests
+## 5 octies. Logistique des sessions et répertoire des lieux
+
+Migration `20260928021344_crm_session_logistics.sql`, **appliquée en production le 28/09/2026** (avant le déploiement de l'interface) : 5 tables avec RLS et 4 policies chacune, colonnes `sessions.venue_id` / `logistics`, triggers `updated_at`, contrainte du journal étendue à 43 entités (dont `courseComments`, posée par la migration Academy Studio § 5 septies) ; scénario lieu → piste → devis → journal rejoué dans un bloc annulé, rien de conservé, `public.event` inchangé ; aucun nouvel avertissement des *advisors*.
+
+| Table | Rôle |
+| --- | --- |
+| `crm.venues` | Répertoire des lieux (capacité, tarif indicatif, accès, PMR, contact, note, origine dont « assistant IA ») |
+| `crm.venue_options` | Sourcing : lieux envisagés pour une session, étape (identifié → devis demandé → devis reçu → option posée → retenu / écarté), montant proposé, fin d'option — unique par (session, lieu) |
+| `crm.session_expenses` | Devis & dépenses fournisseurs d'une session (lieu, restauration, activités, transport, intervenants…) avec échéancier `installments` (jsonb : libellé, montant, échéance, payé le, moyen) |
+| `crm.session_activities` | Activités hors programme (jour, horaires, prestataire, coût, statut de réservation, incluse ou en option) |
+| `crm.session_stays` | Séjours : chambre, arrivée / départ (moyen, n° de vol), navette, régime, présence confirmée — unique par (session, contact) et (session, intervenant) |
+| `crm.sessions` | + `venue_id` (lieu retenu) et `logistics` (jsonb : infos pratiques du livret d'accueil) |
+
+- **Droits** : section « sessions » en lecture et en écriture (admin, pédagogie, formateur écrivent ; commercial et lecture lisent), mêmes policies que la migration 2. Rien n'est recopié vers `public.event` ni vers le site.
+- **Suppression d'une session** : ses pistes, devis, activités et séjours sont supprimés (cascade) ; supprimer un lieu est bloqué dans l'interface tant qu'il est utilisé.
+- **Journal** : la contrainte `activities_entity_check` est **étendue**, jamais réécrite : la migration relit les valeurs autorisées en base (quelle que soit la migration qui les a posées : Academy, Academy Studio…) et y ajoute `venues`, `venueOptions`, `expenses`, `outings`, `stays`. L'ordre d'application ne retire donc aucune entité ; les migrations futures qui ajoutent des entités devraient procéder de la même façon.
+- **Rétroplanning** : pas de table dédiée — ce sont des tâches `crm.tasks` rattachées à la session (`related = {entity: "events"}`, `notes` = « Rétroplanning logistique · <étape> »), visibles dans « Relances & tâches ».
+- **Testé localement** (PostgreSQL 16, émulation des rôles Supabase) : migration rejouable, écriture formateur, lecture seule commercial et lecture, `anon` refusé, unicité des séjours, cascades, triggers `updated_at`.
+
+### Assistant IA de sourcing (`POST /api/lieux/recherche`)
+
+**Vercel AI Gateway + GPT-6 Luna** (`openai/gpt-6-luna`), via l'AI SDK : outil de **recherche web** natif d'OpenAI (`openai.tools.webSearch`, exécuté côté fournisseur, profondeur `high`) et sortie structurée validée par zod. L'assistant cherche des lieux réels pour une destination, des dates et un nombre de personnes, puis rend **de 3 à 6 suggestions** (capacité, prix affiché ou estimé, disponibilité « à vérifier », site où le lieu est proposé, sources).
+
+- **Sources consultées** (au moins 8 recherches demandées au modèle) : plateformes de location de logements entiers (Airbnb, Booking.com, Vrbo / Abritel, plateformes locales du pays), plateformes de lieux de séminaire et de retraite d'équipe (Spacebase, Tagvenue, Kactus, Bird Office…), recherches générales en français, en anglais et dans la langue du pays, puis la page du lieu. Une information introuvable en ligne (fibre, prix, disponibilité) est notée « à vérifier » au lieu d'éliminer le lieu.
+- **Recherche élargie** : si la première recherche trouve moins de 3 lieux, une seconde recherche élargit la zone (jusqu'à environ 1,5 fois la distance demandée), puis les types de lieux, puis le budget (+30 % au plus), sans reproposer les lieux déjà trouvés. Ces lieux portent le badge « Recherche élargie » et listent leurs écarts aux critères. Elle n'est lancée que s'il reste au moins 60 s sur le budget de 280 s ; si elle échoue, les lieux de la première recherche restent affichés.
+
+```
+# Sur Vercel : rien à configurer si l'OIDC du projet est actif (réglage par défaut,
+# Settings → Security → « Secure backend access with OIDC federation ») ; sinon, ou en local :
+AI_GATEWAY_API_KEY=…            # serveur uniquement (Vercel → AI Gateway → API Keys)
+VENUE_SEARCH_MODEL=openai/gpt-6-luna   # facultatif : autre modèle AI Gateway sans redéployer le code
+```
+
+- **Accès** : membre connecté (jeton Supabase vérifié) ayant le droit d'écriture sur « sessions » ; 10 recherches par heure et par membre. En mode démo, la route ne répond qu'en développement local ; l'interface propose alors des exemples **fictifs** clairement signalés.
+- **Coût** (tarifs publics AI Gateway au 28/09/2026) : GPT-6 Luna 0,10 $ / million de jetons en entrée et 0,50 $ en sortie ; recherche web 10 $ / 1 000 recherches. Le coût est surtout celui des recherches web : environ 0,10 à 0,15 $ par demande, jusqu'à environ 0,25 $ quand la recherche est élargie ; facturé sur les crédits AI Gateway de l'équipe Vercel. Le nombre de recherches effectuées s'affiche sous les résultats.
+- **Limites** : prix et disponibilités trouvés en ligne sont indicatifs (Airbnb et Booking.com affichent rarement un prix sans dates saisies) ; chaque suggestion ajoutée arrive au statut « Repéré » avec ses sources, le site où elle a été trouvée et ses écarts éventuels dans les notes. Le nombre de recherches web et le minimum de 3 lieux sont demandés au modèle, sans garantie absolue. Première recherche réelle réussie en production le 28/09/2026 (version à une seule recherche). Durée : 1 à 3 min, jusqu'à 5 min si la recherche est élargie (`maxDuration = 300`).
+
+## 5 nonies. Marketing : campagnes, régies publicitaires, A/B tests
 
 Migration `20260928040000_crm_marketing.sql` — **écrite et testée en local (PostgreSQL 16), pas encore appliquée en production**. Horodatée après la dernière migration appliquée (`20260928021344_crm_session_logistics`), la CLI l'applique sans `--include-all`. Elle ne touche à aucune table du site et n'ajoute que des objets au schéma `crm`, plus le remplacement de `crm.section_access()` (section « marketing ») et l'**extension** de la contrainte `activities_entity_check` : les valeurs déjà autorisées sont relues puis complétées par `adCampaigns` / `experiments` (même procédé que la migration de logistique des sessions), rien n'est retiré quel que soit l'ordre d'application.
 

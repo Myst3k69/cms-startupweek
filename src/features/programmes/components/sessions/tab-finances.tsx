@@ -10,9 +10,10 @@ import { INVOICE_KINDS, INVOICE_STATUSES, labelOf } from "@/lib/domain/constants
 import { effectiveInvoiceStatus, invoiceBalance, invoiceTotal } from "@/lib/domain/selectors";
 import type { EventSession, Invoice } from "@/lib/domain/types";
 import { date, money } from "@/lib/format";
-import { useActions, useNow } from "@/lib/hooks";
+import { useActions, useCollection, useNow } from "@/lib/hooks";
 import { pct } from "@/lib/utils";
 import type { SessionData } from "./use-session-data";
+import { summarizeExpenses } from "../../lib/logistics";
 
 export function FinancesTab({ ev, data, canEdit }: { ev: EventSession; data: SessionData; canEdit: boolean }) {
   const now = useNow();
@@ -20,7 +21,10 @@ export function FinancesTab({ ev, data, canEdit }: { ev: EventSession; data: Ses
   const toast = useToast();
   const [budget, setBudget] = React.useState(ev.budgetCents !== undefined ? String(ev.budgetCents / 100) : "");
   const { expected, collected, remaining } = data.finance;
-  const costs = ev.budgetCents ?? 0;
+  const allExpenses = useCollection("expenses");
+  const suppliers = React.useMemo(() => summarizeExpenses(allExpenses.filter((e) => e.eventId === ev.id), now), [allExpenses, ev.id, now]);
+  // Coûts retenus pour la marge : le plus prudent entre le budget prévu et les devis déjà acceptés.
+  const costs = Math.max(ev.budgetCents ?? 0, suppliers.committed);
   const margin = expected - costs;
   const breakEven = ev.priceCents > 0 && costs > 0 ? Math.ceil(costs / ev.priceCents) : undefined;
   const potential = data.pipeline.filter((a) => a.status === "acceptee").length * ev.priceCents;
@@ -74,7 +78,7 @@ export function FinancesTab({ ev, data, canEdit }: { ev: EventSession; data: Ses
           label="Marge estimée"
           value={costs ? money(margin) : "—"}
           icon={Calculator}
-          hint={costs ? `${expected ? Math.round((margin / expected) * 100) : 0} % du CA · coûts ${money(costs)}` : "Renseignez les coûts prévus"}
+          hint={costs ? `${expected ? Math.round((margin / expected) * 100) : 0} % du CA · coûts ${money(costs)}${suppliers.committed > (ev.budgetCents ?? 0) ? " (devis acceptés)" : ""}` : "Renseignez les coûts prévus"}
         />
       </div>
 
@@ -110,7 +114,8 @@ export function FinancesTab({ ev, data, canEdit }: { ev: EventSession; data: Ses
               items={[
                 { key: "ca", label: "CA attendu", value: expected, color: seriesColor(0) },
                 { key: "enc", label: "Encaissé", value: collected, color: seriesColor(2) },
-                { key: "cout", label: "Coûts prévus", value: costs, color: seriesColor(1) },
+                { key: "cout", label: "Coûts prévus", value: ev.budgetCents ?? 0, color: seriesColor(1) },
+                { key: "engage", label: "Devis acceptés", value: suppliers.committed, color: seriesColor(3) },
               ]}
               format={(v) => money(v)}
             />
@@ -118,6 +123,14 @@ export function FinancesTab({ ev, data, canEdit }: { ev: EventSession; data: Ses
               <div className="flex justify-between gap-2">
                 <dt className="text-muted-foreground">Prix unitaire TTC</dt>
                 <dd className="tabular text-foreground">{money(ev.priceCents)}</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Fournisseurs : payé / reste</dt>
+                <dd className="tabular text-foreground">
+                  <Link href={`/sessions/${ev.id}?onglet=logistique&rubrique=devis`} className="hover:text-accent-text hover:underline">
+                    {money(suppliers.paid)} / {money(suppliers.remaining)}
+                  </Link>
+                </dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-muted-foreground">Point mort</dt>

@@ -49,7 +49,7 @@ Priorité : paramètre `?home=cockpit|focus|studio` (partageable) → choix mém
 | **Audiences** | Segments (candidats non inscrits, alumni, Digital Starter Kit, newsletter, exclusion des inscrits) exportés pour Meta / LinkedIn — consentement marketing obligatoire, hachage SHA-256, export journalisé |
 | **Liens UTM** | Générateur et convention de nommage ; utm_campaign reçues sans campagne correspondante |
 
-Synchro API Meta Ads / LinkedIn Ads : `/api/ads/sync`, cron quotidien dans `vercel.json` — configuration dans [docs/SUPABASE.md § 5 octies](docs/SUPABASE.md). ROAS : CA HT facturé dans le CRM, ou estimé au prix de l'offre / de la session pour un inscrit facturé dans un autre outil (affiché « ≈ »).
+Synchro API Meta Ads / LinkedIn Ads : `/api/ads/sync`, cron quotidien dans `vercel.json` — configuration dans [docs/SUPABASE.md § 5 nonies](docs/SUPABASE.md). ROAS : CA HT facturé dans le CRM, ou estimé au prix de l'offre / de la session pour un inscrit facturé dans un autre outil (affiché « ≈ »).
 
 ## Scripts
 
@@ -67,8 +67,8 @@ Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind CSS v4 (tok
 ```
 src/
   app/(crm)/…            une route par section (Server Component minimal + <Guard section>)
-  app/print/…            documents imprimables A4 (facture, devis, convention, convocation, attestation, émargement, programme)
-  app/api/…              intake des formulaires du site, webhook Stripe, synchro Qonto, health
+  app/print/…            documents imprimables A4 (facture, devis, convention, convocation, attestation, émargement, programme, livret d'accueil)
+  app/api/…              intake des formulaires du site, webhook Stripe, synchro Qonto, health, recherche de lieux (IA)
   components/            ui (primitives), charts, layout (AppShell, ⌘K, alertes), shared
   features/<domaine>/    home, crm, programmes, qualiopi, documents, billing, site, academy, marketing, analytics, system
   lib/domain/            types (contrat de données), constantes, sélecteurs, actions métier, alertes
@@ -100,3 +100,5 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 | Envoi réel des emails (Resend) | ⏳ prévu côté serveur (intake) ; les emails déclenchés depuis l'interface sont journalisés en démo |
 | StartupWeek Academy (e-learning) | ✅ 26-27/09/2026 : **Academy** (gestion : formations, parcours, apprenants, livrables, cohortes, sessions liées, certificat FOAD) et **Studio** (création : édition sur place sans Markdown visible, vue stagiaire en 3 directions artistiques, fiche catalogue, circuit de relecture brouillon → relecture → validée → publiée avec commentaires et vérifications bloquantes) ; accès automatique des inscrits, API apprenant (Mon espace du site) et vente Stripe testées de bout en bout en local ; migrations `crm_academy` et `crm_academy_studio` **appliquées en production** ; formation type « Construire son MVP avec l'IA » (50 h) — [docs/ACADEMY.md](docs/ACADEMY.md) |
 | Documents légaux (convention, CGV, attestation) | ⚠️ modèles à faire valider juridiquement (voir le point L.6353-6 dans la proposition) |
+| Logistique des sessions (onglet « Logistique » : lieu & sourcing, devis & paiements fournisseurs, activités, intervenants, chambres & arrivées, infos pratiques, rétroplanning) + répertoire « Lieux » + livret d'accueil | ✅ en démo (vérifié dans le navigateur, clair / sombre / mobile 390 px) ; migration `20260928021344` **appliquée en production le 28/09/2026** — [docs/SUPABASE.md § 5 octies](docs/SUPABASE.md) |
+| Assistant IA de sourcing de lieux (`/api/lieux/recherche`, Vercel AI Gateway + GPT-6 Luna, recherche web) | ✅ en production (OIDC Vercel), première recherche réelle réussie le 28/09/2026 ; recherche approfondie (plateformes de location, lieux de séminaire, recherches générales) et seconde recherche élargie si moins de 3 lieux : ✍️ écrite, testée avec un modèle simulé ; `AI_GATEWAY_API_KEY` en local ; exemples fictifs en démo |

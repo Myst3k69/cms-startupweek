@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Award, ClipboardList, FileSignature, FileText, Mail, Printer } from "lucide-react";
+import { Award, BookOpen, ClipboardList, FileSignature, FileText, Mail, Printer } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, EmptyState, StatusBadge } from "@/components/ui";
 import { ContactLink } from "@/components/shared/entity-links";
 import { APPLICATION_STATUSES } from "@/lib/domain/constants";
@@ -54,6 +54,7 @@ export function DocumentsTab({ ev, data }: { ev: EventSession; data: SessionData
         <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <DocButton href={`/print/programme/${ev.id}`} icon={FileText} label="Programme de formation" state="Fiche programme Qualiopi (objectifs, J1…J7, évaluation, accessibilité)" stateTone="muted" />
           <DocButton href={`/print/emargement/${ev.id}`} icon={ClipboardList} label="Feuille d'émargement" state="Par demi-journée, signatures participants et formateurs" stateTone="muted" />
+          {ev.mode !== "distanciel" ? <DocButton href={`/print/livret/${ev.id}`} icon={BookOpen} label="Livret d'accueil participant" state="Lieu, accès, arrivée, semaine, repas, quoi apporter, contacts" stateTone="muted" /> : null}
         </CardContent>
       </Card>
 
