@@ -1,5 +1,5 @@
 /**
- * POST /api/lieux/recherche — assistant IA de sourcing de lieux (Claude + recherche web).
+ * POST /api/lieux/recherche — assistant IA de sourcing de lieux (Vercel AI Gateway + GPT-6 Luna, recherche web).
  *
  * Accès :
  *  - mode supabase : jeton Supabase Auth du membre connecté (Authorization: Bearer …),
@@ -50,7 +50,7 @@ async function authorize(req: Request): Promise<{ ok: true; key: string } | { ok
 
 export async function POST(req: Request): Promise<Response> {
   if (!isVenueSearchConfigured()) {
-    return json({ ok: false, error: "not_configured", message: "Assistant IA non configuré : ajoutez ANTHROPIC_API_KEY dans les variables d'environnement (Vercel)." }, 503);
+    return json({ ok: false, error: "not_configured", message: "Assistant IA non configuré : en local, ajoutez AI_GATEWAY_API_KEY (sur Vercel, l'authentification AI Gateway passe par l'OIDC du projet)." }, 503);
   }
   const auth = await authorize(req);
   if (!auth.ok) return auth.res;

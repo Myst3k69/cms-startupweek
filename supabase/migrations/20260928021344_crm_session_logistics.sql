@@ -192,14 +192,37 @@ end;
 $$;
 
 -- ───────────────────────────── 9. Journal d'activité : nouvelles entités ─────────────────────────────
--- ATTENTION : toute autre migration qui redéfinit cette contrainte doit reprendre la liste complète.
+-- La contrainte est ÉTENDUE, jamais réécrite : on relit les valeurs autorisées aujourd'hui
+-- (posées par n'importe quelle migration : Academy, Academy Studio…) et on y ajoute les 5
+-- entités de la logistique. L'ordre d'application des migrations ne retire donc rien.
 
-alter table crm.activities drop constraint if exists activities_entity_check;
-alter table crm.activities add constraint activities_entity_check check (entity in (
-  'users', 'organizations', 'contacts', 'submissions', 'deals', 'tasks', 'sequences', 'emailTemplates', 'emails',
-  'events', 'speakers', 'applications', 'projects', 'attendances', 'evaluations', 'complaints', 'indicators',
-  'evidences', 'improvementActions', 'watchItems', 'quotes', 'invoices', 'payments', 'bankTransactions',
-  'resources', 'contents', 'automations', 'offers',
-  'courses', 'courseModules', 'lessons', 'academyPaths', 'enrollments', 'lessonProgress', 'assignments',   -- migration crm_academy
-  'learnerConnections', 'cohorts',
-  'venues', 'venueOptions', 'expenses', 'outings', 'stays'));
+do $$
+declare
+  v_def  text;
+  v_list text[];
+begin
+  select pg_get_constraintdef(c.oid) into v_def
+  from pg_constraint c
+  where c.conname = 'activities_entity_check' and c.conrelid = 'crm.activities'::regclass;
+
+  -- Deux rendus possibles : ARRAY['a'::text, 'b'::text] (IN / ARRAY) ou '{a,b}'::text[] (littéral).
+  if v_def ~ '''\{[^}]*\}''' then
+    v_list := string_to_array(substring(v_def from '''\{([^}]*)\}'''), ',');
+  else
+    select coalesce(array_agg(m[1]), '{}') into v_list
+    from regexp_matches(coalesce(v_def, ''), '''([A-Za-z]+)''', 'g') as m;
+  end if;
+
+  if coalesce(cardinality(v_list), 0) < 10 then
+    raise exception 'activities_entity_check introuvable ou illisible (%) : migration interrompue', coalesce(v_def, 'absente');
+  end if;
+
+  v_list := array(select distinct btrim(x, ' "') from unnest(v_list || array['venues', 'venueOptions', 'expenses', 'outings', 'stays']) as x order by 1);
+
+  alter table crm.activities drop constraint activities_entity_check;
+  -- Même rendu que les autres migrations (ARRAY['a'::text, …]) : relisible par une migration suivante.
+  execute format(
+    'alter table crm.activities add constraint activities_entity_check check (entity = any (array[%s]))',
+    (select string_agg(quote_literal(x) || '::text', ', ') from unnest(v_list) as x));
+end;
+$$;

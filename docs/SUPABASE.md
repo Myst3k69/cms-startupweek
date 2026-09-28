@@ -155,7 +155,7 @@ NEXT_PUBLIC_CRM_DATA_MODE=supabase
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…
 SUPABASE_SECRET_KEY=sb_secret_…          # serveur uniquement (routes /api/*)
-ANTHROPIC_API_KEY=sk-ant-…               # serveur uniquement : assistant IA de sourcing de lieux (§ 5 septies)
+AI_GATEWAY_API_KEY=…                     # assistant IA de sourcing de lieux (§ 5 septies) — inutile sur Vercel si l'OIDC du projet est actif
 ```
 
 ✅ Renseignées en Production le 26/09/2026 (`SUPABASE_SECRET_KEY` pas encore : routes `/api/*` inactives). Les variables `NEXT_PUBLIC_*` sont intégrées **au build** : redéployer après les avoir modifiées. Saisir la **valeur** (`https://…supabase.co`), pas le nom de la variable : une adresse invalide affiche désormais un message explicite sur `/connexion` et `supabasePublic: false` dans `/api/health` (auparavant : page « This page couldn't load »).
@@ -426,7 +426,7 @@ Formation type : `supabase/data/academy_mvp_ia.sql` (généré par `scripts/acad
 
 ## 5 septies. Logistique des sessions et répertoire des lieux
 
-Migration `20260927100000_crm_session_logistics.sql` — **pas encore appliquée en production** (à appliquer avant de déployer l'interface correspondante : sans elle, le chargement signale 5 tables introuvables et l'enregistrement des infos pratiques d'une session échoue).
+Migration `20260928021344_crm_session_logistics.sql`, **appliquée en production le 28/09/2026** (avant le déploiement de l'interface) : 5 tables avec RLS et 4 policies chacune, colonnes `sessions.venue_id` / `logistics`, triggers `updated_at`, contrainte du journal étendue à 43 entités (dont `courseComments`, posée par la migration Academy Studio appliquée en production mais pas encore dans ce dépôt) ; scénario lieu → piste → devis → journal rejoué dans un bloc annulé, rien de conservé, `public.event` inchangé ; aucun nouvel avertissement des *advisors*.
 
 | Table | Rôle |
 | --- | --- |
@@ -439,21 +439,24 @@ Migration `20260927100000_crm_session_logistics.sql` — **pas encore appliquée
 
 - **Droits** : section « sessions » en lecture et en écriture (admin, pédagogie, formateur écrivent ; commercial et lecture lisent), mêmes policies que la migration 2. Rien n'est recopié vers `public.event` ni vers le site.
 - **Suppression d'une session** : ses pistes, devis, activités et séjours sont supprimés (cascade) ; supprimer un lieu est bloqué dans l'interface tant qu'il est utilisé.
-- **Journal** : la contrainte `activities_entity_check` est redéfinie avec les 5 nouvelles entités (`venues`, `venueOptions`, `expenses`, `outings`, `stays`). **Toute migration ultérieure qui la redéfinit doit reprendre la liste complète.**
+- **Journal** : la contrainte `activities_entity_check` est **étendue**, jamais réécrite : la migration relit les valeurs autorisées en base (quelle que soit la migration qui les a posées : Academy, Academy Studio…) et y ajoute `venues`, `venueOptions`, `expenses`, `outings`, `stays`. L'ordre d'application ne retire donc aucune entité ; les migrations futures qui ajoutent des entités devraient procéder de la même façon.
 - **Rétroplanning** : pas de table dédiée — ce sont des tâches `crm.tasks` rattachées à la session (`related = {entity: "events"}`, `notes` = « Rétroplanning logistique · <étape> »), visibles dans « Relances & tâches ».
 - **Testé localement** (PostgreSQL 16, émulation des rôles Supabase) : migration rejouable, écriture formateur, lecture seule commercial et lecture, `anon` refusé, unicité des séjours, cascades, triggers `updated_at`.
 
 ### Assistant IA de sourcing (`POST /api/lieux/recherche`)
 
-Claude (`claude-opus-5`, réflexion adaptative) avec l'outil de **recherche web** d'Anthropic : il cherche des lieux réels pour une destination, des dates et un nombre de personnes, puis rend au plus 6 suggestions (capacité, prix affiché ou estimé, disponibilité « à vérifier », sources). Les refus du modèle basculent automatiquement sur le modèle de repli recommandé par Anthropic (`fallbacks: "default"`).
+**Vercel AI Gateway + GPT-6 Luna** (`openai/gpt-6-luna`), via l'AI SDK : outil de **recherche web** natif d'OpenAI (`openai.tools.webSearch`, exécuté côté fournisseur) et sortie structurée validée par zod. L'assistant cherche des lieux réels pour une destination, des dates et un nombre de personnes, puis rend au plus 6 suggestions (capacité, prix affiché ou estimé, disponibilité « à vérifier », sources).
 
 ```
-ANTHROPIC_API_KEY=sk-ant-…     # serveur uniquement (Vercel : Production)
+# Sur Vercel : rien à configurer si l'OIDC du projet est actif (réglage par défaut,
+# Settings → Security → « Secure backend access with OIDC federation ») ; sinon, ou en local :
+AI_GATEWAY_API_KEY=…            # serveur uniquement (Vercel → AI Gateway → API Keys)
+VENUE_SEARCH_MODEL=openai/gpt-6-luna   # facultatif : autre modèle AI Gateway sans redéployer le code
 ```
 
 - **Accès** : membre connecté (jeton Supabase vérifié) ayant le droit d'écriture sur « sessions » ; 10 recherches par heure et par membre. En mode démo, la route ne répond qu'en développement local ; l'interface propose alors des exemples **fictifs** clairement signalés.
-- **Coût** : facturé à l'usage par Anthropic (jetons + recherches web, 8 recherches au plus par demande). Ordre de grandeur à vérifier sur la console Anthropic après les premières recherches.
-- **Limites** : prix et disponibilités trouvés en ligne sont indicatifs ; chaque suggestion ajoutée arrive au statut « Repéré » avec ses sources dans les notes. La route n'a **pas été testée avec une vraie clé** (aucune clé dans cet environnement) : la première recherche en production est à surveiller (`vercel logs`, entrée `[lieux/recherche]`). Durée : 1 à 3 min (`maxDuration = 300`).
+- **Coût** (tarifs publics AI Gateway au 28/09/2026) : GPT-6 Luna 0,10 $ / million de jetons en entrée et 0,50 $ en sortie ; recherche web 10 $ / 1 000 recherches. Soit quelques centimes par demande ; facturé sur les crédits AI Gateway de l'équipe Vercel.
+- **Limites** : prix et disponibilités trouvés en ligne sont indicatifs ; chaque suggestion ajoutée arrive au statut « Repéré » avec ses sources dans les notes. La route n'a **pas été testée avec un vrai appel** (ni clé ni OIDC dans cet environnement) : la première recherche en production est à surveiller (`vercel logs`, entrée `[lieux/recherche]`). Durée : 1 à 3 min (`maxDuration = 300`).
 
 ## 6. Brancher Stripe
 
