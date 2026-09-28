@@ -55,6 +55,8 @@ export const ENTITY_LABEL: Record<EntityName, string> = {
   assignments: "Livrable Academy",
   learnerConnections: "Connexion Academy",
   cohorts: "Cohorte Academy",
+  adCampaigns: "Campagne publicitaire",
+  experiments: "Test A/B",
   courseComments: "Commentaire de relecture",
 };
 
@@ -98,6 +100,10 @@ export function entityHref(entity: EntityName, id: string): string | undefined {
     case "lessonProgress":
     case "learnerConnections":
       return "/academy";
+    case "adCampaigns":
+      return `/marketing/campagnes/${id}`;
+    case "experiments":
+      return `/marketing/tests/${id}`;
     case "submissions":
       return "/demandes";
     case "deals":

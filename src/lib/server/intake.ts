@@ -184,7 +184,9 @@ const baseShape = {
   utm_source: optText(200),
   utm_medium: optText(200),
   utm_campaign: optText(200),
-  utm: optObject({ source: optText(200), medium: optText(200), campaign: optText(200), referrer: optText(500) }),
+  utm_content: optText(200),
+  utm_term: optText(200),
+  utm: optObject({ source: optText(200), medium: optText(200), campaign: optText(200), content: optText(200), term: optText(200), referrer: optText(500) }),
 };
 
 export const candidatureSchema = z.looseObject({
@@ -554,7 +556,7 @@ const CORE_KEYS = new Set([
   "email", "firstName", "lastName", "prenom", "nom", "contactFirstName", "contactLastName", "phone", "telephone",
   "message", "subject", "consentRGPD", "consentNewsletter", "consentRGPDDate", "consentNewsletterDate", "consent",
   "submittedAt", "origin", "ipAddress", "userAgent", "referrer", "utm", "utm_source", "utm_medium", "utm_campaign",
-  "leadId",
+  "utm_content", "utm_term", "leadId",
 ]);
 
 /** Champs spécifiques du formulaire → Record<string, string> (objets aplatis sur un niveau). */
@@ -740,6 +742,8 @@ function extractUtm(p: BasePayload): Utm | undefined {
     source: p.utm?.source ?? p.utm_source,
     medium: p.utm?.medium ?? p.utm_medium,
     campaign: p.utm?.campaign ?? p.utm_campaign,
+    content: p.utm?.content ?? p.utm_content,
+    term: p.utm?.term ?? p.utm_term,
     referrer: p.utm?.referrer ?? p.referrer,
   };
   const clean = Object.fromEntries(Object.entries(utm).filter(([, v]) => v)) as Utm;

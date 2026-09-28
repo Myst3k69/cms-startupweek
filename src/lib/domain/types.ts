@@ -86,6 +86,9 @@ export interface Utm {
   source?: string;
   medium?: string;
   campaign?: string;
+  /** utm_content : publicité / variante (ex. id de la publicité Meta) — attribution par création. */
+  content?: string;
+  term?: string;
   referrer?: string;
 }
 
@@ -1120,6 +1123,99 @@ export interface Cohort extends BaseEntity {
   notes?: string;
 }
 
+/* ───────────────────────────── Marketing (campagnes & A/B tests) ───────────────────────────── */
+
+export type AdPlatform = "meta" | "linkedin";
+export type CampaignObjective = "notoriete" | "trafic" | "leads" | "conversions" | "retargeting";
+export type CampaignStatus = "brouillon" | "active" | "en_pause" | "terminee";
+
+/** Publicité (création) d'une campagne : l'unité comparée par un A/B test de créas. */
+export interface AdCreative {
+  id: ID;
+  externalId?: string; // id de la publicité Meta (ad_id) ou urn:li:sponsoredCreative:… (clé de synchro)
+  name: string;
+  headline: string;
+  primaryText: string;
+  callToAction?: string;
+  imageUrl?: string;
+  format: "image" | "video" | "carrousel" | "texte";
+  active: boolean;
+}
+
+export interface AdCampaign extends BaseEntity {
+  name: string;
+  platform: AdPlatform;
+  externalId?: string; // id de la campagne dans la régie (clé de synchro)
+  objective: CampaignObjective;
+  status: CampaignStatus;
+  eventId?: ID; // session / événement promu
+  audience: string; // ciblage résumé (intérêts, lookalike, retargeting…)
+  startAt: ISODate;
+  endAt?: ISODate;
+  budgetCents: Cents; // budget total prévu (TTC régie)
+  dailyBudgetCents?: Cents;
+  /** Clé d'attribution : utm_campaign des liens de la campagne, relu sur les candidatures et demandes du site. */
+  utmCampaign: string;
+  landingUrl: string;
+  creatives: AdCreative[];
+  ownerId?: ID;
+  notes?: string;
+  lastSyncedAt?: ISODate; // dernière synchro API de la régie
+}
+
+/**
+ * Statistiques quotidiennes d'une campagne, par publicité quand la régie la fournit
+ * (alimentées par /api/ads/sync — lecture seule dans l'interface, comme TrafficDay).
+ */
+export interface AdStatDay {
+  id: ID;
+  campaignId: ID;
+  creativeId?: ID;
+  date: ISODate; // YYYY-MM-DD
+  spendCents: Cents;
+  impressions: number;
+  clicks: number;
+  leads: number; // conversions « lead » déclarées par la régie (formulaires instantanés, pixel / CAPI, conversions LinkedIn)
+}
+
+export type ExperimentChannel = "publicite" | "site" | "email";
+export type ExperimentStatus = "brouillon" | "en_cours" | "termine" | "abandonne";
+/** Métrique principale = taux « conversions / expositions » ; le couple dépend du canal. */
+export type ExperimentMetric = "ctr" | "taux_lead" | "conversion" | "ouverture" | "clic";
+
+export interface ExperimentVariant {
+  id: ID;
+  key: string; // « A » (contrôle), « B », « C »…
+  name: string;
+  description: string; // ce qui change : accroche, visuel, titre, objet…
+  creativeId?: ID; // publicité : création de la campagne liée (métriques lues dans AdStatDay)
+  weight: number; // % du trafic attribué (site, email)
+  exposures: number; // site : visiteurs exposés · email : envois
+  conversions: number;
+}
+
+export interface Experiment extends BaseEntity {
+  name: string;
+  /** Identifiant technique lu par le site (ex. « hero-sw0012 ») — unique. */
+  key: string;
+  hypothesis: string;
+  channel: ExperimentChannel;
+  status: ExperimentStatus;
+  metric: ExperimentMetric;
+  eventId?: ID;
+  campaignId?: ID; // publicité
+  templateId?: ID; // email
+  pageUrl?: string; // site : page testée
+  variants: ExperimentVariant[];
+  confidenceTarget: number; // 90 | 95 | 99 (%)
+  minDetectableEffect: number; // effet relatif minimal à détecter (%), dimensionne l'échantillon
+  startAt?: ISODate;
+  endAt?: ISODate;
+  winnerKey?: string;
+  conclusion?: string;
+  ownerId?: ID;
+}
+
 /* ───────────────────────────── Analytics & automatisations ───────────────────────────── */
 
 export interface TrafficDay {
@@ -1281,6 +1377,8 @@ export interface EntityMap {
   assignments: Assignment;
   learnerConnections: LearnerConnection;
   cohorts: Cohort;
+  adCampaigns: AdCampaign;
+  experiments: Experiment;
   courseComments: CourseComment;
 }
 

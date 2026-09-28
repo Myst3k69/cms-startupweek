@@ -5,6 +5,9 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type {
   Activity,
   ActivityKind,
+  AdCampaign,
+  AdStatDay,
+  Experiment,
   Collections,
   ContentStatDay,
   EntityMap,
@@ -62,6 +65,8 @@ export const ID_PREFIX: Record<EntityName, string> = {
   assignments: "liv",
   learnerConnections: "cnx",
   cohorts: "coh",
+  adCampaigns: "cmp",
+  experiments: "abt",
   courseComments: "rvc",
 };
 
@@ -86,6 +91,8 @@ export interface CrmState extends Collections {
   traffic: TrafficDay[];
   /** Audience quotidienne des articles du blog (mesurée sur le site). */
   contentStats: ContentStatDay[];
+  /** Statistiques quotidiennes des campagnes publicitaires (synchro API des régies, lecture seule). */
+  adStats: AdStatDay[];
 
   create: <K extends EntityName>(collection: K, data: NewEntity<K>, opts?: MutationOptions) => EntityMap[K];
   update: <K extends EntityName>(collection: K, id: ID, patch: Partial<EntityMap[K]>, opts?: MutationOptions) => void;
@@ -98,6 +105,8 @@ export interface CrmState extends Collections {
   hydrateRemote: (data: RemoteData, memberId: ID) => void;
   /** Mode supabase : vide les données (déconnexion, session expirée), avec un message éventuel. */
   clearRemote: (notice?: string) => void;
+  /** Mode supabase : recharge campagnes, tests A/B et statistiques (après une synchro des régies). */
+  replaceMarketing: (data: { adCampaigns: AdCampaign[]; experiments: Experiment[]; adStats: AdStatDay[] }) => void;
   tick: () => void;
   resetDemo: () => void;
 }
@@ -128,6 +137,8 @@ const ENTITY_LABEL: Partial<Record<EntityName, string>> = {
   enrollments: "Inscription Academy",
   assignments: "Livrable",
   cohorts: "Cohorte",
+  adCampaigns: "Campagne",
+  experiments: "Test A/B",
   courseComments: "Commentaire de relecture",
 };
 
@@ -161,9 +172,9 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 /** État vide : utilisé côté serveur et avant hydratation (le seed n'est généré que dans le navigateur). */
-function emptyState(): Collections & Pick<CrmState, "settings" | "activities" | "traffic" | "contentStats"> {
+function emptyState(): Collections & Pick<CrmState, "settings" | "activities" | "traffic" | "contentStats" | "adStats"> {
   const collections = Object.fromEntries((Object.keys(ID_PREFIX) as EntityName[]).map((k) => [k, []])) as unknown as Collections;
-  return { ...collections, settings: DEFAULT_SETTINGS, activities: [], traffic: [], contentStats: [] };
+  return { ...collections, settings: DEFAULT_SETTINGS, activities: [], traffic: [], contentStats: [], adStats: [] };
 }
 
 function freshSeed() {
@@ -259,6 +270,7 @@ export const useCrm = create<CrmState>()(
           activities: data.activities,
           traffic: data.traffic,
           contentStats: data.contentStats,
+          adStats: data.adStats,
           settings: { ...DEFAULT_SETTINGS, ...data.settings, dataMode: "supabase" },
           sessionUserId: memberId,
           authNotice: undefined,
@@ -266,6 +278,7 @@ export const useCrm = create<CrmState>()(
           now: Date.now(),
         }),
       clearRemote: (notice) => set({ ...emptyState(), sessionUserId: undefined, authNotice: notice, hydrated: true, now: Date.now() }),
+      replaceMarketing: ({ adCampaigns, experiments, adStats }) => set({ adCampaigns, experiments, adStats }),
       tick: () => set({ now: Date.now() }),
       resetDemo: () => {
         if (DATA_MODE === "supabase") return;
@@ -282,8 +295,8 @@ export const useCrm = create<CrmState>()(
       partialize: (s) => {
         if (DATA_MODE === "supabase") return {};
         // On ne persiste que les données (pas les fonctions, l'horloge ni les messages de connexion).
-        const { hydrated, now, authNotice, create, update, remove, log, updateSettings, login, logout, hydrateRemote, clearRemote, tick, resetDemo, ...data } = s;
-        void hydrated; void now; void authNotice; void create; void update; void remove; void log; void updateSettings; void login; void logout; void hydrateRemote; void clearRemote; void tick; void resetDemo;
+        const { hydrated, now, authNotice, create, update, remove, log, updateSettings, login, logout, hydrateRemote, clearRemote, replaceMarketing, tick, resetDemo, ...data } = s;
+        void hydrated; void now; void authNotice; void create; void update; void remove; void log; void updateSettings; void login; void logout; void hydrateRemote; void clearRemote; void replaceMarketing; void tick; void resetDemo;
         return data;
       },
       merge: (persisted, current) => {

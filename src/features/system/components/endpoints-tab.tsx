@@ -22,6 +22,9 @@ function CodeBlock({ code, label }: { code: string; label: string }) {
 const OTHER_ENDPOINTS = [
   { method: "POST", path: "/api/stripe/webhook", auth: "En-tête Stripe-Signature (STRIPE_WEBHOOK_SECRET, tolérance 5 min)", role: "Paiements Stripe → factures payées, acompte réglé ⇒ candidature « Inscrite »" },
   { method: "POST", path: "/api/qonto/sync", auth: "Authorization: Bearer CRON_SECRET (Vercel Cron)", role: "Import des transactions Qonto et rapprochement des virements" },
+  { method: "POST", path: "/api/ads/sync", auth: "Authorization: Bearer CRON_SECRET, ou session d'un membre (droit d'écriture Marketing)", role: "Synchro Meta Ads / LinkedIn Ads → campagnes, publicités et statistiques quotidiennes" },
+  { method: "GET", path: "/api/experiments", auth: "Public (clés des tests et pondérations, aucune donnée personnelle)", role: "A/B tests du site en cours — le site tire la variante de chaque visiteur" },
+  { method: "POST", path: "/api/experiments", auth: "Origines ALLOWED_ORIGINS, 60 événements / min par IP", role: "Exposition / conversion d'un visiteur (une fois par visiteur et par test)" },
   { method: "GET", path: "/api/health", auth: "Public (aucune donnée sensible)", role: "Supervision : base, email, Stripe, Qonto — remplace l'« Error workflow » n8n" },
 ];
 
@@ -128,7 +131,7 @@ ${SIGNATURE_HEADER}: sha256=5f0c…e91a
         <CardContent>
           <ul className="divide-y divide-border">
             {OTHER_ENDPOINTS.map((e) => (
-              <li key={e.path} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:gap-4">
+              <li key={`${e.method} ${e.path}`} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:gap-4">
                 <div className="flex min-w-0 items-center gap-2 sm:w-72 sm:shrink-0">
                   <Badge tone={e.method === "GET" ? "success" : "info"} className="font-mono">
                     {e.method}

@@ -18,6 +18,7 @@ export type Section =
   | "ressources"
   | "contenus"
   | "academy"
+  | "marketing"
   | "analytics"
   | "automatisations"
   | "parametres";
@@ -26,7 +27,7 @@ export type Access = "none" | "read" | "write";
 
 const ALL: Section[] = [
   "dashboard", "demandes", "contacts", "organisations", "pipeline", "relances", "emails", "candidatures", "projets",
-  "sessions", "intervenants", "qualiopi", "facturation", "ressources", "contenus", "academy", "analytics", "automatisations", "parametres",
+  "sessions", "intervenants", "qualiopi", "facturation", "ressources", "contenus", "academy", "marketing", "analytics", "automatisations", "parametres",
 ];
 
 function matrix(write: Section[], read: Section[]): Record<Section, Access> {
@@ -40,12 +41,12 @@ function matrix(write: Section[], read: Section[]): Record<Section, Access> {
 export const PERMISSIONS: Record<Role, Record<Section, Access>> = {
   admin: matrix(ALL, []),
   commercial: matrix(
-    ["dashboard", "demandes", "contacts", "organisations", "pipeline", "relances", "emails", "candidatures", "facturation"],
+    ["dashboard", "demandes", "contacts", "organisations", "pipeline", "relances", "emails", "candidatures", "facturation", "marketing"],
     ["projets", "sessions", "intervenants", "qualiopi", "ressources", "contenus", "academy", "analytics", "automatisations"],
   ),
   pedagogie: matrix(
     ["dashboard", "relances", "emails", "candidatures", "projets", "sessions", "intervenants", "qualiopi", "ressources", "contenus", "academy"],
-    ["demandes", "contacts", "organisations", "pipeline", "facturation", "analytics", "automatisations"],
+    ["demandes", "contacts", "organisations", "pipeline", "facturation", "marketing", "analytics", "automatisations"],
   ),
   // contacts en lecture : noms des participants pour l'émargement, les évaluations et les projets suivis.
   // academy en écriture : correction des livrables et suivi des apprenants.

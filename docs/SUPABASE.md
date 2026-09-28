@@ -42,6 +42,7 @@ Site ◄──────────────── lit ──────�
 | `supabase/migrations/20260926103336_crm_functions.sql` | Numérotation légale, paiements, places restantes, synchro CRM → site, vues |
 | `supabase/migrations/20260926103516_qualiopi_referentiel.sql` | 32 indicateurs Qualiopi |
 | `supabase/migrations/20260926122058_crm_auth_membership.sql` | `crm.claim_team_membership()` (rattachement du compte Auth au membre de même email vérifié) ; audit automatique limité aux écritures hors session d'un membre — appliquée le 26/09/2026 |
+| `supabase/migrations/20260928153217_crm_marketing.sql` | Marketing : `ad_campaigns`, `ad_stats`, `experiments`, `experiment_hits`, `crm.track_experiment()`, section de droits `marketing` — **appliquée le 28/09/2026** (§ 5 nonies) |
 | `src/lib/data/supabase.ts`, `src/lib/data/sync.ts` | Client navigateur (PKCE, schéma `crm`) ; chargement paginé et écritures ordonnées avec annulation en cas de refus |
 | `src/lib/auth/supabase-auth.ts`, `src/lib/store/remote-session.ts` | Lien magique, retour `/auth/callback`, membre de l'équipe, ouverture / fermeture de l'espace de travail |
 
@@ -469,6 +470,46 @@ VENUE_SEARCH_MODEL=openai/gpt-6-luna   # facultatif : modèle présélectionné 
 - **Coût** (tarifs publics AI Gateway au 28/09/2026) : GPT-6 Luna 0,10 $ / million de jetons en entrée et 0,50 $ en sortie ; recherche web 10 $ / 1 000 recherches. Avec GPT-6 Luna, le coût est surtout celui des recherches web : environ 0,10 à 0,15 $ par demande, jusqu'à environ 0,25 $ quand la recherche est élargie. Un autre modèle coûte selon son prix, affiché dans la liste ; facturé sur les crédits AI Gateway de l'équipe Vercel. Le nombre de recherches effectuées s'affiche sous les résultats.
 - **Limites** : prix et disponibilités trouvés en ligne sont indicatifs (Airbnb et Booking.com affichent rarement un prix sans dates saisies) ; chaque suggestion ajoutée arrive au statut « Repéré » avec ses sources, le site où elle a été trouvée et ses écarts éventuels dans les notes. Le nombre de recherches web et le minimum de 3 lieux sont demandés au modèle, sans garantie absolue. Première recherche réelle réussie en production le 28/09/2026 (version à une seule recherche). Durée : 1 à 3 min, jusqu'à 5 min si la recherche est élargie (`maxDuration = 300`).
 
+## 5 nonies. Marketing : campagnes, régies publicitaires, A/B tests
+
+Migration `20260928153217_crm_marketing.sql` — **appliquée en production le 28/09/2026** (version enregistrée `20260928153217`, fichier renommé en conséquence), avant le déploiement de l'interface : les tables restent vides jusque-là. Elle ne touche à aucune table du site et n'ajoute que des objets au schéma `crm`, plus le remplacement de `crm.section_access()` (section « marketing ») et l'**extension** de la contrainte `activities_entity_check` : les valeurs déjà autorisées sont relues puis complétées par `adCampaigns` / `experiments` (même procédé que la migration de logistique des sessions), rien n'est retiré quel que soit l'ordre d'application.
+
+| Objet | Rôle |
+| --- | --- |
+| `crm.ad_campaigns` | Campagne Meta / LinkedIn, ses publicités (`creatives` jsonb), la session promue, l'`utm_campaign` d'attribution. Clé de synchro `(platform, external_id)` |
+| `crm.ad_stats` | Dépense, impressions, clics, leads par jour, campagne et publicité. **Écrite uniquement par `/api/ads/sync`** (lecture seule pour l'équipe) |
+| `crm.experiments` | A/B tests (créas, pages du site, emails) ; trigger `experiments_keep_counts` : une modification depuis l'interface ne peut pas écraser les compteurs d'un test du site |
+| `crm.experiment_hits` + `crm.track_experiment()` | Une exposition / une conversion au plus par visiteur et par test, incrément atomique ; serveur uniquement |
+
+Droits (miroir de `src/lib/auth/permissions.ts`) : `admin` et `commercial` en écriture, `pedagogie` et `lecture` en consultation, `formateur` sans accès. La nouvelle version de `crm.section_access()` **reprend à l'identique** la version en production (celle de la migration Academy `20260926220123`, cf. avertissement du § 5 sexies) et y ajoute `marketing` : vérifié le 28/09/2026, les 96 combinaisons rôle × section hors marketing sont identiques à la production, et la matrice complète est identique à `PERMISSIONS` (100/100).
+
+**Tests locaux réalisés** (base PostgreSQL 16 neuve, toutes les migrations rejouées dans l'ordre de la production, Studio et logistique des sessions comprises — hors planifications `pg_cron`, extension absente en local) : migration rejouée deux fois (idempotente) ; journal : 45 entités autorisées, dont `courseComments`, les 5 entités de logistique et les 2 du marketing ; doublon de statistiques (même jour, même publicité, `creative_id` nul compris) refusé ; clé de test invalide refusée ; `track_experiment` : exposition comptée une fois par visiteur, conversion comptée sur la variante réellement vue, conversion sans exposition ignorée (`no_exposure`), variante / test inconnus refusés ; commercial : lecture et écriture des campagnes, écriture des statistiques refusée, renommage d'une variante d'un test en cours sans perte des compteurs ; pédagogie : lecture seule ; formateur : aucune ligne ; `experiment_hits` et `track_experiment` inaccessibles à `authenticated`.
+
+**Vérifié en production après application** : 4 tables avec RLS et 9 policies ; `authenticated` : lecture / écriture des campagnes et des tests, lecture seule des statistiques, aucun droit sur `experiment_hits` ; `track_experiment` exécutable par `service_role` uniquement ; journal : 45 entités autorisées (43 avant + `adCampaigns`, `experiments`), 99 lignes existantes conservées ; matrice `section_access()` = `PERMISSIONS` (100/100), lignes hors marketing inchangées. *Advisors* sécurité : seule nouveauté, `experiment_hits` « RLS sans policy » (INFO, voulu : table réservée au serveur, comme `site_salts`).
+
+### Synchro des régies (`/api/ads/sync`)
+
+1. **Meta** : Business Manager → Utilisateurs système → générer un jeton avec la permission `ads_read` sur le compte publicitaire → `META_ADS_ACCESS_TOKEN` ; `META_AD_ACCOUNT_ID` (`act_…`). Optionnel : `META_GRAPH_VERSION` (défaut `v25.0`).
+2. **LinkedIn** : application LinkedIn avec le produit *Advertising API* (portées `r_ads`, `r_ads_reporting`) → `LINKEDIN_ADS_ACCESS_TOKEN` (expire au bout de 60 jours : prévoir le renouvellement) ; `LINKEDIN_AD_ACCOUNT_ID` (identifiant numérique du compte). Optionnel : `LINKEDIN_API_VERSION` (`AAAAMM`, défaut `202609` ; une version est maintenue environ un an).
+3. Déclenchement : bouton **Synchroniser les régies** (membre avec droit d'écriture Marketing, jeton de session vérifié côté serveur) ou cron quotidien déclaré dans `vercel.json` : `/api/ads/sync?days=7` à 5 h 40 UTC. Le cron a besoin de `CRON_SECRET` dans Vercel (envoyé en `Authorization: Bearer …`) : sans jetons des régies il répond en dry-run ; avec des jetons mais sans `CRON_SECRET`, il est refusé (401) et rien n'est synchronisé. Sur l'offre Hobby de Vercel, l'heure d'exécution peut glisser dans l'heure.
+4. Fenêtre glissante de 7 jours par défaut (`?days=` jusqu'à 90, ou `?since=AAAA-MM-JJ` pour un historique) : les régies révisent leurs conversions quelques jours après coup ; l'upsert est idempotent.
+5. Une campagne créée dans la régie apparaît automatiquement (utm_campaign proposée à partir de son nom, à vérifier). Une campagne préparée dans le CRM est reliée en renseignant son identifiant de régie. La synchro ne modifie jamais les champs propres au CRM (session promue, utm_campaign, ciblage résumé, notes, responsable).
+
+**Non testé** : appels réels aux API Meta et LinkedIn (aucun compte de test) — les formats de requêtes et de réponses suivent la documentation officielle (Graph API Insights `level=ad`, LinkedIn `adAnalytics?q=statistics&pivots=List(CAMPAIGN,CREATIVE)`). Premier essai recommandé : `?days=3`, puis contrôle des totaux avec le gestionnaire de publicités.
+
+### Attribution
+
+Une candidature (ou une demande du site) est attribuée à une campagne quand son `utm_campaign` est celle de la campagne **et** qu'elle arrive entre la veille du lancement et 30 jours après la fin (dernier clic). Le formulaire du site transmet `utm_source`, `utm_medium`, `utm_campaign` et désormais `utm_content` / `utm_term` (`/api/intake`) : pour Meta, `utm_content={{ad.id}}` identifie la publicité. Le ROAS est calculé sur le CA **HT** des candidatures attribuées :
+
+- **facturé** (acomptes + soldes − avoirs) quand la candidature a au moins une facture émise dans le CRM ;
+- **estimé** pour un inscrit sans facture dans le CRM (facturation tenue dans un autre outil, par exemple Indy) : prix de l'offre choisie, sinon prix public de la session, convertis en HT selon les règles des factures (exonération de TVA comprise). Financement « gratuit » = 0. L'estimation ignore remises, prises en charge négociées et remboursements ; à l'écran, un ROAS qui en contient une partie est précédé de « ≈ » et le montant estimé est indiqué.
+
+### A/B tests des pages du site (`/api/experiments`)
+
+- `GET` : tests « site » en cours (clé, page, variantes et pondérations) — public, mis en cache 60 s.
+- `POST` `{ experiment, variant, visitorId, event: "exposure" | "conversion" }` : origines `ALLOWED_ORIGINS`, 60 événements / minute par IP. Le code d'intégration (tirage stable de la variante, envoi des événements) est affiché dans la fiche de chaque test.
+- Limite connue : un appel forgé hors navigateur reste possible (pas d'authentification du visiteur) ; le dédoublonnage par visiteur et le test de déséquilibre d'échantillon (SRM) affiché dans la fiche limitent l'impact.
+
 ## 6. Brancher Stripe
 
 1. Dashboard Stripe → Developers → Webhooks → *Add endpoint* : `https://cms-startupweek.vercel.app/api/stripe/webhook`.
@@ -607,6 +648,7 @@ Ne rien supprimer : **désactiver** (bouton *Active*) et garder 30 jours pour le
 | Formulaires | Remettre les URLs `N8N_WEBHOOK_*` dans le site et réactiver les 8 workflows. Effet immédiat. |
 | Synchro site | `alter table crm.sessions disable trigger sessions_site_sync; alter table crm.resources disable trigger resources_site_sync; alter table crm.applications disable trigger applications_capacity;` puis réactiver le polling n8n (il réécrit `public.event` depuis Airtable). |
 | Paiements | Désactiver l'endpoint dans Stripe ; retirer le cron Qonto de `vercel.json`. |
+| Régies publicitaires | Retirer le cron `/api/ads/sync` de `vercel.json` (ou les jetons `META_*` / `LINKEDIN_*` dans Vercel : la route passe en dry-run). Les données déjà synchronisées restent en lecture. |
 | Emails | Retirer `EMAIL_DISPATCH_SECRET` (ou les variables SMTP) dans Vercel : plus rien ne part, les emails restent en file « Programmé ». Revenir à n8n pour les formulaires : désactiver *Emails des formulaires du site*. |
 | Planificateur | `select cron.unschedule('crm-scheduler');` (plus de publication ni de rappel automatiques ; les contenus « Planifié » attendent) ; `select cron.unschedule('crm-cron-purge');` ; `drop extension pg_cron;` supprime toutes les tâches. |
 | Tout le CRM | `drop schema crm cascade;` — supprime tables, fonctions et triggers du CRM ; **aucune table `public.*` n'est modifiée structurellement** (seules leurs lignes ont pu être mises à jour par la synchro). Puis `supabase migration repair --status reverted 20260926103012 20260926103117 20260926103336 20260926103516`. |
