@@ -46,6 +46,8 @@ export async function GET(): Promise<Response> {
         email: isMailConfigured(),
         /** Secret de la route d'envoi appelée par la base (file d'emails). */
         emailDispatch: Boolean(env.EMAIL_DISPATCH_SECRET),
+        metaAds: Boolean(env.META_ADS_ACCESS_TOKEN && env.META_AD_ACCOUNT_ID),
+        linkedinAds: Boolean(env.LINKEDIN_ADS_ACCESS_TOKEN && env.LINKEDIN_AD_ACCOUNT_ID),
         cron: Boolean(env.CRON_SECRET),
       },
       time: new Date().toISOString(),

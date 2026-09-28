@@ -16,7 +16,8 @@ export interface Alert {
   category: "commercial" | "qualite" | "finance" | "programme";
 }
 
-type AlertInput = Pick<CrmState, "submissions" | "complaints" | "invoices" | "tasks" | "events" | "applications" | "speakers" | "contacts" | "settings" | "sessionUserId">;
+type AlertInput = Pick<CrmState, "submissions" | "complaints" | "invoices" | "tasks" | "events" | "applications" | "speakers" | "contacts" | "settings" | "sessionUserId"> &
+  Partial<Pick<CrmState, "adCampaigns">>;
 
 export function computeAlerts(s: AlertInput, now: number): Alert[] {
   const out: Alert[] = [];
@@ -97,6 +98,24 @@ export function computeAlerts(s: AlertInput, now: number): Alert[] {
         });
       }
     });
+
+  // Publicité qui continue de dépenser pour une session qui ne peut plus accueillir d'inscrits.
+  const eventsById = new Map(s.events.map((e) => [e.id, e]));
+  const wasted = (s.adCampaigns ?? []).filter((c) => {
+    const e = c.status === "active" && c.eventId ? eventsById.get(c.eventId) : undefined;
+    if (!e || e.kind === "webinaire") return false;
+    return e.status === "complet" || e.status === "annule" || daysUntil(e.startAt, now) <= 0 || daysUntil(e.registrationDeadline, now) < 0 || sessionStats(e, s.applications).remaining === 0;
+  });
+  if (wasted.length) {
+    out.push({
+      id: "ads-closed",
+      tone: "warning",
+      title: `${wasted.length} campagne${wasted.length > 1 ? "s" : ""} active${wasted.length > 1 ? "s" : ""} sur une session close`,
+      detail: `${wasted.map((c) => c.name).slice(0, 2).join(" · ")} — session complète, démarrée ou inscriptions closes`,
+      href: wasted.length === 1 ? `/marketing/campagnes/${wasted[0].id}` : "/marketing?onglet=campagnes",
+      category: "commercial",
+    });
+  }
 
   const noCv = s.speakers.filter((sp) => !sp.cvOnFile);
   if (noCv.length) {

@@ -9,7 +9,7 @@ import { DATA_MODE, getSupabase } from "@/lib/data/supabase";
 import { date, money } from "@/lib/format";
 import { useActions, useCollection } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
-import { demoSuggestions, type VenueSearchCriteria, type VenueSearchResponse, type VenueSuggestion } from "../../lib/venue-search";
+import { demoSuggestions, type VenueModel, type VenueModelsResponse, type VenueSearchCriteria, type VenueSearchResponse, type VenueSuggestion } from "../../lib/venue-search";
 import { toDateInput } from "../../lib/sessions";
 
 const KIND_CHOICES: VenueKind[] = ["villa", "domaine", "riad", "chalet", "chateau", "gite", "hotel"];
@@ -22,6 +22,18 @@ const REGIONS: { value: Region; label: string }[] = [
 const DAY = 86_400_000;
 
 const normName = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+
+const PROVIDERS: Record<string, string> = { openai: "OpenAI", anthropic: "Anthropic", google: "Google", meta: "Meta", mistral: "Mistral", deepseek: "DeepSeek", amazon: "Amazon", nvidia: "NVIDIA", cohere: "Cohere" };
+const providerLabel = (p: string) => PROVIDERS[p] ?? p.charAt(0).toUpperCase() + p.slice(1);
+const usd = (n?: number) => (n === undefined ? "?" : `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 3 })} $`);
+const priceLabel = (m: VenueModel) => `${usd(m.inputPerM)} / ${usd(m.outputPerM)} par M jetons`;
+
+/** En-tête d'authentification des routes /api/lieux/* (mode supabase). */
+async function authHeaders(): Promise<Record<string, string>> {
+  if (DATA_MODE !== "supabase") return {};
+  const token = (await getSupabase()?.auth.getSession())?.data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 /** Tiroir « Assistant de sourcing IA » : depuis le répertoire des lieux ou depuis une session (ajout direct au sourcing). */
 export function AiSourcingDrawer({ open, onClose, ev }: { open: boolean; onClose: () => void; ev?: EventSession }) {
@@ -45,6 +57,9 @@ function AiSourcingInner({ onClose, ev }: { onClose: () => void; ev?: EventSessi
   const [kinds, setKinds] = React.useState<VenueKind[]>(["villa", "domaine"]);
   const [mustHaves, setMustHaves] = React.useState<string[]>(["Salle de travail", "Wifi fibre"]);
   const [notes, setNotes] = React.useState("");
+  const [models, setModels] = React.useState<VenueModel[]>([]);
+  const [defaultModel, setDefaultModel] = React.useState("");
+  const [modelId, setModelId] = React.useState("");
 
   const [state, setState] = React.useState<"idle" | "loading" | "done">("idle");
   const [result, setResult] = React.useState<VenueSearchResponse | null>(null);
@@ -53,6 +68,39 @@ function AiSourcingInner({ onClose, ev }: { onClose: () => void; ev?: EventSessi
   const abort = React.useRef<AbortController | null>(null);
 
   React.useEffect(() => () => abort.current?.abort(), []);
+
+  // Modèles compatibles du catalogue AI Gateway ; sans liste (démo, catalogue injoignable), le serveur prend le modèle par défaut.
+  React.useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await fetch("/api/lieux/modeles", { headers: await authHeaders() });
+        const body = (await res.json().catch(() => null)) as VenueModelsResponse | null;
+        if (!alive || !body?.ok) return;
+        setModels(body.models);
+        setDefaultModel(body.defaultModel);
+        setModelId(body.defaultModel);
+      } catch {
+        // liste facultative
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const modelOptions = React.useMemo(() => {
+    const list = models.some((m) => m.id === defaultModel) || !defaultModel ? models : [{ id: defaultModel, name: defaultModel, provider: defaultModel.split("/")[0], search: "openai" as const }, ...models];
+    // Le groupe du modèle par défaut en tête de liste.
+    const first = defaultModel.split("/")[0];
+    return [...list.filter((m) => m.provider === first), ...list.filter((m) => m.provider !== first)].map((m) => ({
+      value: m.id,
+      group: providerLabel(m.provider),
+      label: `${m.name}${m.id === defaultModel ? " (par défaut)" : ""} — ${priceLabel(m)}${m.search === "perplexity" ? " · recherche Perplexity" : ""}`,
+    }));
+  }, [models, defaultModel]);
+  const selectedModel = models.find((m) => m.id === modelId);
+
   React.useEffect(() => {
     if (state !== "loading") return;
     const started = Date.now();
@@ -74,6 +122,7 @@ function AiSourcingInner({ onClose, ev }: { onClose: () => void; ev?: EventSessi
     mustHaves,
     notes: notes.trim() || undefined,
     exclude: venues.slice(0, 80).map((v) => `${v.name} (${v.city})`),
+    model: modelId || undefined,
   });
 
   const run = async () => {
@@ -89,11 +138,7 @@ function AiSourcingInner({ onClose, ev }: { onClose: () => void; ev?: EventSessi
     setDemo(false);
     setResult(null);
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (DATA_MODE === "supabase") {
-        const token = (await getSupabase()?.auth.getSession())?.data.session?.access_token;
-        if (token) headers.Authorization = `Bearer ${token}`;
-      }
+      const headers = { "Content-Type": "application/json", ...(await authHeaders()) };
       const res = await fetch("/api/lieux/recherche", { method: "POST", headers, body: JSON.stringify(criteria()), signal: ctrl.signal });
       const body = (await res.json().catch(() => null)) as VenueSearchResponse | null;
       setResult(body ?? { ok: false, error: "upstream", message: `Réponse inattendue du serveur (${res.status}).` });
@@ -227,6 +272,20 @@ function AiSourcingInner({ onClose, ev }: { onClose: () => void; ev?: EventSessi
               ))}
             </div>
           </div>
+          {modelOptions.length ? (
+            <FormField
+              label="Modèle IA"
+              htmlFor="ai-model"
+              className="sm:col-span-6"
+              hint={
+                selectedModel
+                  ? `Prix par million de jetons : entrée / sortie. Recherche web ${selectedModel.search === "openai" ? "native OpenAI (10 $ / 1 000 recherches)" : "Perplexity via AI Gateway (facturée en plus)"}.`
+                  : "Modèles d'AI Gateway compatibles avec la recherche web et la sortie structurée."
+              }
+            >
+              <Select id="ai-model" value={modelId} onChange={(e) => setModelId(e.target.value)} options={modelOptions} />
+            </FormField>
+          ) : null}
           <FormField label="Précisions" htmlFor="ai-notes" className="sm:col-span-6">
             <Textarea id="ai-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Vue mer, moins d'1 h de l'aéroport, calme, basse saison…" />
           </FormField>
@@ -284,7 +343,7 @@ function AiSourcingInner({ onClose, ev }: { onClose: () => void; ev?: EventSessi
               ) : null}
               {!demo ? (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {result.suggestions.length} lieu{result.suggestions.length > 1 ? "x" : ""} · {result.searches} recherche{result.searches > 1 ? "s" : ""} web. Prix et disponibilités sont des indications trouvées en ligne : à confirmer auprès des propriétaires.
+                  {result.suggestions.length} lieu{result.suggestions.length > 1 ? "x" : ""} · {result.searches} recherche{result.searches > 1 ? "s" : ""} web · modèle {result.model}. Prix et disponibilités sont des indications trouvées en ligne : à confirmer auprès des propriétaires.
                 </p>
               ) : null}
             </div>

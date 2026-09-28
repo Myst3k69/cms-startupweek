@@ -9,7 +9,7 @@
  *
  * Construction par modules (src/lib/data/seed/*), dans l'ordre des dépendances.
  */
-import type { Activity, Collections, ContentStatDay, Settings, TrafficDay } from "../domain/types";
+import type { Activity, AdStatDay, Collections, ContentStatDay, Settings, TrafficDay } from "../domain/types";
 import type { SeedContext } from "./seed/context";
 import { Clock, Rng } from "./seed/helpers";
 import { buildTeam } from "./seed/team";
@@ -25,6 +25,7 @@ import { buildLogistics } from "./seed/logistics";
 import { buildAutomations, buildContents } from "./seed/content";
 import { buildActivities, buildContentStats, buildTraffic } from "./seed/analytics";
 import { buildAcademy } from "./seed/academy";
+import { buildMarketing } from "./seed/marketing";
 
 /** À incrémenter à chaque évolution du jeu de démo (force la régénération du store local). */
 export const SEED_VERSION = 7;
@@ -34,6 +35,7 @@ export interface SeedData extends Collections {
   activities: Activity[];
   traffic: TrafficDay[];
   contentStats: ContentStatDay[];
+  adStats: AdStatDay[];
 }
 
 /** Graine fixe : les données ne dépendent que de `now` (pour les dates). */
@@ -82,11 +84,14 @@ function emptyData(): SeedData {
     assignments: [],
     learnerConnections: [],
     cohorts: [],
+    adCampaigns: [],
+    experiments: [],
     courseComments: [],
     settings: undefined as unknown as Settings, // renseigné par buildTeam
     activities: [],
     traffic: [],
     contentStats: [],
+    adStats: [],
   };
 }
 
@@ -112,6 +117,7 @@ export function buildSeed(now: number): SeedData {
   buildContents(ctx);
   buildAcademy(ctx); // formations, parcours, cohorte, inscriptions et progression (StartupWeek Academy)
   buildAutomations(ctx);
+  buildMarketing(ctx); // adCampaigns, adStats, experiments
   buildTraffic(ctx);
   buildContentStats(ctx); // après buildContents : audience quotidienne des articles du blog
   buildActivities(ctx);

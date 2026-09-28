@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Activity, CreditCard, Database, Globe, Mail, Workflow } from "lucide-react";
+import { Activity, CreditCard, Database, Globe, Mail, Target, Workflow } from "lucide-react";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Select, Switch, useToast } from "@/components/ui";
 import { useCrm } from "@/lib/store";
 import { useSession, useSettings } from "@/lib/hooks";
@@ -11,7 +11,7 @@ import type { Tone } from "@/lib/domain/constants";
 import type { Settings } from "@/lib/domain/types";
 import { CopyButton, useOrigin } from "../copy-button";
 
-type HealthServices = Partial<Record<"supabaseAdmin" | "supabasePublic" | "intakeSignature" | "allowedOriginsCustom" | "stripeWebhook" | "stripeApi" | "email" | "emailDispatch" | "cron", boolean>>;
+type HealthServices = Partial<Record<"supabaseAdmin" | "supabasePublic" | "intakeSignature" | "allowedOriginsCustom" | "stripeWebhook" | "stripeApi" | "email" | "emailDispatch" | "metaAds" | "linkedinAds" | "cron", boolean>>;
 interface Health {
   ok: boolean;
   mode: string;
@@ -119,6 +119,21 @@ export function IntegrationsTab() {
           onChange={(e) => toggle({ emailProvider: e.target.value as Settings["emailProvider"] }, "Fournisseur d'email mis à jour")}
           className="w-44"
         />
+      ),
+    },
+    {
+      key: "ads",
+      name: "Régies publicitaires",
+      icon: Target,
+      status: services ? (services.metaAds || services.linkedinAds ? { label: [services.metaAds && "Meta", services.linkedinAds && "LinkedIn"].filter(Boolean).join(" + "), tone: "success" } : { label: "Non configurées", tone: "neutral" }) : { label: "Lecture seule", tone: "info" },
+      description: "Synchro quotidienne des campagnes, publicités et statistiques Meta Ads et LinkedIn Ads (dépenses, impressions, clics, leads) vers le module Marketing.",
+      env: ["META_ADS_ACCESS_TOKEN", "META_AD_ACCOUNT_ID", "LINKEDIN_ADS_ACCESS_TOKEN", "LINKEDIN_AD_ACCOUNT_ID", "CRON_SECRET"],
+      health: ["metaAds", "linkedinAds"],
+      endpoint: "/api/ads/sync",
+      extra: (
+        <Link href="/marketing" className="text-xs font-medium text-accent-text hover:underline">
+          Campagnes et A/B tests →
+        </Link>
       ),
     },
     {

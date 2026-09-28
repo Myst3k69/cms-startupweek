@@ -18,6 +18,31 @@ export function Textarea({ className, ...props }: React.ComponentProps<"textarea
 export interface SelectOption {
   value: string;
   label: string;
+  /** Regroupe les options sous un intitulé (<optgroup>), dans l'ordre de première apparition. */
+  group?: string;
+}
+
+function renderOptions(options: SelectOption[]) {
+  const item = (o: SelectOption) => (
+    <option key={o.value} value={o.value}>
+      {o.label}
+    </option>
+  );
+  if (!options.some((o) => o.group)) return options.map(item);
+  const groups = new Map<string, SelectOption[]>();
+  for (const o of options) {
+    const key = o.group ?? "";
+    groups.set(key, [...(groups.get(key) ?? []), o]);
+  }
+  return [...groups].map(([label, os]) =>
+    label ? (
+      <optgroup key={label} label={label}>
+        {os.map(item)}
+      </optgroup>
+    ) : (
+      os.map(item)
+    ),
+  );
 }
 
 export function Select({
@@ -30,11 +55,7 @@ export function Select({
     <div className={cn("relative", className)}>
       <select className={cn(field, "h-9 appearance-none pr-8")} {...props}>
         {placeholder !== undefined ? <option value="">{placeholder}</option> : null}
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
+        {renderOptions(options)}
       </select>
       <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-faint" aria-hidden="true" />
     </div>

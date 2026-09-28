@@ -1,6 +1,6 @@
 # StartupWeek OS — CRM & back-office 100 % custom
 
-Le back-office de **StartupWeek** (bootcamp MVP 7 jours) : CRM, demandes entrantes, pipeline, relances, candidatures, sessions & émargement, projets des candidats, intervenants, **Qualiopi**, **facturation (acompte / solde, Stripe ; banque et comptabilité dans Indy)**, ressources, contenus du site, **StartupWeek Academy (e-learning)**, analytics et automatisations — pour remplacer Airtable + les workflows n8n.
+Le back-office de **StartupWeek** (bootcamp MVP 7 jours) : CRM, demandes entrantes, pipeline, relances, candidatures, sessions & émargement, projets des candidats, intervenants, **Qualiopi**, **facturation (acompte / solde, Stripe ; banque et comptabilité dans Indy)**, ressources, contenus du site, **StartupWeek Academy (e-learning)**, **marketing (campagnes Meta / LinkedIn, A/B tests, promotion des sessions)**, analytics et automatisations — pour remplacer Airtable + les workflows n8n.
 
 ➡️ Pourquoi et comment : **[docs/PROPOSITION.md](docs/PROPOSITION.md)** (analyse de l'existant, bénéfices, limites, plan de mise en production).
 ➡️ E-learning : **[docs/ACADEMY.md](docs/ACADEMY.md)** (création des formations, accès des candidats, API pour « Mon espace » du site, vente Stripe, formation type de 50 h).
@@ -19,7 +19,7 @@ Sur `/connexion`, choisissez un profil pour voir les droits changer :
 | Profil | Rôle | Accès |
 |---|---|---|
 | Aurélien Chiren | Admin | Tout |
-| Commerciale | `commercial` | Demandes, contacts, pipeline, relances, candidatures, facturation |
+| Commerciale | `commercial` | Demandes, contacts, pipeline, relances, candidatures, facturation, marketing |
 | Responsable pédagogique & qualité | `pedagogie` | Sessions, Qualiopi, candidatures, projets, contenus |
 | Formateur / mentor | `formateur` | Sessions (émargement, évaluations), projets ; lecture des contacts et candidatures |
 | Expert-comptable | `lecture` | Consultation |
@@ -37,6 +37,19 @@ Comme pour buildclub, la page d'accueil existe en **trois designs** activables p
 | **Studio** | Brief éditorial de la semaine : grands titres serif, récit généré depuis les données, grille bento (affiche de session, projet à la une, verbatim, saison, Qualiopi) |
 
 Priorité : paramètre `?home=cockpit|focus|studio` (partageable) → choix mémorisé (localStorage) → `cockpit`. Code : `src/features/home/`.
+
+## Marketing (`/marketing`)
+
+| Onglet | Contenu |
+|---|---|
+| **Vue d'ensemble** | Dépense, clics, leads déclarés par les régies **et** leads / inscriptions / CA réellement attribués dans le CRM (utm_campaign, dernier clic), coût par inscription, ROAS, comparaison Meta / LinkedIn, points d'attention calculés (campagne active sur une session close, budget consommé, coût par lead anormal, attribution cassée, test à conclure) |
+| **Campagnes** | Liste filtrable ; fiche avec publicités, courbes quotidiennes, leads attribués, paramètres d'URL à coller dans la régie |
+| **A/B tests** | Créas publicitaires (chiffres de la régie), pages du site (`/api/experiments`), objets / contenus d'emails ; test z contre le contrôle, taille d'échantillon calculée à l'avance, correction multi-variantes, contrôle SRM, conclusion tracée |
+| **Promotion des sessions** | Sessions publiques des 120 prochains jours : remplissage face à un repère, campagnes et contenus actifs, action conseillée |
+| **Audiences** | Segments (candidats non inscrits, alumni, Digital Starter Kit, newsletter, exclusion des inscrits) exportés pour Meta / LinkedIn — consentement marketing obligatoire, hachage SHA-256, export journalisé |
+| **Liens UTM** | Générateur et convention de nommage ; utm_campaign reçues sans campagne correspondante |
+
+Synchro API Meta Ads / LinkedIn Ads : `/api/ads/sync`, cron quotidien dans `vercel.json` — configuration dans [docs/SUPABASE.md § 5 nonies](docs/SUPABASE.md). ROAS : CA HT facturé dans le CRM, ou estimé au prix de l'offre / de la session pour un inscrit facturé dans un autre outil (affiché « ≈ »).
 
 ## Scripts
 
@@ -57,7 +70,7 @@ src/
   app/print/…            documents imprimables A4 (facture, devis, convention, convocation, attestation, émargement, programme, livret d'accueil)
   app/api/…              intake des formulaires du site, webhook Stripe, health, recherche de lieux (IA)
   components/            ui (primitives), charts, layout (AppShell, ⌘K, alertes), shared
-  features/<domaine>/    home, crm, programmes, qualiopi, documents, billing, site, academy, analytics, system
+  features/<domaine>/    home, crm, programmes, qualiopi, documents, billing, site, academy, marketing, analytics, system
   lib/domain/            types (contrat de données), constantes, sélecteurs, actions métier, alertes
   lib/store/             store zustand (CRUD générique + journal d'activité)
   lib/data/              seed de démo, référentiel Qualiopi, synchro Supabase
@@ -74,9 +87,10 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 
 | Élément | État |
 |---|---|
-| Interface complète (18 sections, 35 pages back-office, 7 documents imprimables, 4 routes API) | ✅ fonctionnelle en mode démo |
+| Interface complète (20 sections, 42 pages back-office, 7 documents imprimables, 11 routes API) | ✅ fonctionnelle en mode démo |
 | Automatisations (acompte à l'acceptation, inscription au paiement, solde, emails, tâches, convocations, accusés de réclamation, garde de capacité) | ✅ exécutées côté client en démo — chaîne complète vérifiée dans le navigateur |
 | Qualité | ✅ `pnpm typecheck`, `pnpm lint`, `pnpm build` sans erreur ; 53 écrans vérifiés en clair / sombre / mobile 390 px (aucune erreur console, aucun débordement) |
+| Marketing (campagnes, A/B tests, audiences, promotion des sessions) | ✅ interface et données de démo ; migration `20260928153217` **appliquée en production le 28/09/2026** (tables vides tant que l'interface n'est pas déployée) ; synchro Meta / LinkedIn écrite d'après la documentation officielle, **non testée avec de vrais comptes** |
 | Schéma SQL, RLS, triggers, vues | ✅ appliqués sur le projet Supabase « startupweek » le 26/09/2026 et vérifiés sur la vraie base (empreintes identiques au test local, tables du site inchangées, scénario facture / paiement / synchro `public.event` / droits exécuté puis annulé) — schéma `crm` vide |
 | Connexion de l'équipe (mode `supabase`) | ✅ lien magique Supabase Auth (PKCE), chargement des données depuis la base, écritures ordonnées avec annulation si la base refuse — testé de bout en bout en local (PostgREST + faux service Auth + Chromium) ; migration `20260926122058` (rattachement automatique des membres, journal sans doublon) **appliquée en production le 26/09/2026** |
 | Bascule effective sur Supabase | ✅ le 26/09/2026 : schéma `crm` exposé, URL de redirection, variables Vercel, deux administrateurs ; première connexion réelle réussie — voir [docs/SUPABASE.md § 3-4](docs/SUPABASE.md). Emails déclenchés depuis l'interface pas encore réellement envoyés |
@@ -87,4 +101,4 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 | StartupWeek Academy (e-learning) | ✅ 26-27/09/2026 : **Academy** (gestion : formations, parcours, apprenants, livrables, cohortes, sessions liées, certificat FOAD) et **Studio** (création : édition sur place sans Markdown visible, vue stagiaire en 3 directions artistiques, fiche catalogue, circuit de relecture brouillon → relecture → validée → publiée avec commentaires et vérifications bloquantes) ; accès automatique des inscrits, API apprenant (Mon espace du site) et vente Stripe testées de bout en bout en local ; migrations `crm_academy` et `crm_academy_studio` **appliquées en production** ; formation type « Construire son MVP avec l'IA » (50 h) — [docs/ACADEMY.md](docs/ACADEMY.md) |
 | Documents légaux (convention, CGV, attestation) | ⚠️ modèles à faire valider juridiquement (voir le point L.6353-6 dans la proposition) |
 | Logistique des sessions (onglet « Logistique » : lieu & sourcing, devis & paiements fournisseurs, activités, intervenants, chambres & arrivées, infos pratiques, rétroplanning) + répertoire « Lieux » + livret d'accueil | ✅ en démo (vérifié dans le navigateur, clair / sombre / mobile 390 px) ; migration `20260928021344` **appliquée en production le 28/09/2026** — [docs/SUPABASE.md § 5 octies](docs/SUPABASE.md) |
-| Assistant IA de sourcing de lieux (`/api/lieux/recherche`, Vercel AI Gateway + GPT-6 Luna, recherche web) | ✅ en production (OIDC Vercel), première recherche réelle réussie le 28/09/2026 ; recherche approfondie (plateformes de location, lieux de séminaire, recherches générales) et seconde recherche élargie si moins de 3 lieux : ✍️ écrite, testée avec un modèle simulé ; `AI_GATEWAY_API_KEY` en local ; exemples fictifs en démo |
+| Assistant IA de sourcing de lieux (`/api/lieux/recherche`, Vercel AI Gateway + GPT-6 Luna, recherche web) | ✅ en production (OIDC Vercel), première recherche réelle réussie le 28/09/2026 ; recherche approfondie (plateformes de location, lieux de séminaire, recherches générales) et seconde recherche élargie si moins de 3 lieux : ✍️ écrite, testée avec un modèle simulé ; choix du modèle parmi les modèles compatibles d'AI Gateway (Perplexity Search pour les modèles non OpenAI) : ✍️ écrit, catalogue réel vérifié ; `AI_GATEWAY_API_KEY` en local ; exemples fictifs en démo |
