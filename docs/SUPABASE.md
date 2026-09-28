@@ -42,7 +42,7 @@ Site ◄──────────────── lit ──────�
 | `supabase/migrations/20260926103336_crm_functions.sql` | Numérotation légale, paiements, places restantes, synchro CRM → site, vues |
 | `supabase/migrations/20260926103516_qualiopi_referentiel.sql` | 32 indicateurs Qualiopi |
 | `supabase/migrations/20260926122058_crm_auth_membership.sql` | `crm.claim_team_membership()` (rattachement du compte Auth au membre de même email vérifié) ; audit automatique limité aux écritures hors session d'un membre — appliquée le 26/09/2026 |
-| `supabase/migrations/20260928040000_crm_marketing.sql` | Marketing : `ad_campaigns`, `ad_stats`, `experiments`, `experiment_hits`, `crm.track_experiment()`, section de droits `marketing` — **écrite, non appliquée** (§ 5 septies) |
+| `supabase/migrations/20260928153217_crm_marketing.sql` | Marketing : `ad_campaigns`, `ad_stats`, `experiments`, `experiment_hits`, `crm.track_experiment()`, section de droits `marketing` — **appliquée le 28/09/2026** (§ 5 nonies) |
 | `src/lib/data/supabase.ts`, `src/lib/data/sync.ts` | Client navigateur (PKCE, schéma `crm`) ; chargement paginé et écritures ordonnées avec annulation en cas de refus |
 | `src/lib/auth/supabase-auth.ts`, `src/lib/store/remote-session.ts` | Lien magique, retour `/auth/callback`, membre de l'équipe, ouverture / fermeture de l'espace de travail |
 
@@ -470,7 +470,7 @@ VENUE_SEARCH_MODEL=openai/gpt-6-luna   # facultatif : autre modèle AI Gateway s
 
 ## 5 nonies. Marketing : campagnes, régies publicitaires, A/B tests
 
-Migration `20260928040000_crm_marketing.sql` — **écrite et testée en local (PostgreSQL 16), pas encore appliquée en production**. Horodatée après la dernière migration appliquée (`20260928021344_crm_session_logistics`), la CLI l'applique sans `--include-all`. Elle ne touche à aucune table du site et n'ajoute que des objets au schéma `crm`, plus le remplacement de `crm.section_access()` (section « marketing ») et l'**extension** de la contrainte `activities_entity_check` : les valeurs déjà autorisées sont relues puis complétées par `adCampaigns` / `experiments` (même procédé que la migration de logistique des sessions), rien n'est retiré quel que soit l'ordre d'application.
+Migration `20260928153217_crm_marketing.sql` — **appliquée en production le 28/09/2026** (version enregistrée `20260928153217`, fichier renommé en conséquence), avant le déploiement de l'interface : les tables restent vides jusque-là. Elle ne touche à aucune table du site et n'ajoute que des objets au schéma `crm`, plus le remplacement de `crm.section_access()` (section « marketing ») et l'**extension** de la contrainte `activities_entity_check` : les valeurs déjà autorisées sont relues puis complétées par `adCampaigns` / `experiments` (même procédé que la migration de logistique des sessions), rien n'est retiré quel que soit l'ordre d'application.
 
 | Objet | Rôle |
 | --- | --- |
@@ -483,7 +483,7 @@ Droits (miroir de `src/lib/auth/permissions.ts`) : `admin` et `commercial` en é
 
 **Tests locaux réalisés** (base PostgreSQL 16 neuve, toutes les migrations rejouées dans l'ordre de la production, Studio et logistique des sessions comprises — hors planifications `pg_cron`, extension absente en local) : migration rejouée deux fois (idempotente) ; journal : 45 entités autorisées, dont `courseComments`, les 5 entités de logistique et les 2 du marketing ; doublon de statistiques (même jour, même publicité, `creative_id` nul compris) refusé ; clé de test invalide refusée ; `track_experiment` : exposition comptée une fois par visiteur, conversion comptée sur la variante réellement vue, conversion sans exposition ignorée (`no_exposure`), variante / test inconnus refusés ; commercial : lecture et écriture des campagnes, écriture des statistiques refusée, renommage d'une variante d'un test en cours sans perte des compteurs ; pédagogie : lecture seule ; formateur : aucune ligne ; `experiment_hits` et `track_experiment` inaccessibles à `authenticated`.
 
-**Appliquer** : SQL Editor ou `supabase db push` (§ 2), puis relancer le chargement du back-office (les nouvelles tables sont lues à la connexion).
+**Vérifié en production après application** : 4 tables avec RLS et 9 policies ; `authenticated` : lecture / écriture des campagnes et des tests, lecture seule des statistiques, aucun droit sur `experiment_hits` ; `track_experiment` exécutable par `service_role` uniquement ; journal : 45 entités autorisées (43 avant + `adCampaigns`, `experiments`), 99 lignes existantes conservées ; matrice `section_access()` = `PERMISSIONS` (100/100), lignes hors marketing inchangées. *Advisors* sécurité : seule nouveauté, `experiment_hits` « RLS sans policy » (INFO, voulu : table réservée au serveur, comme `site_salts`).
 
 ### Synchro des régies (`/api/ads/sync`)
 
