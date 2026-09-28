@@ -43,6 +43,7 @@ Site ◄──────────────── lit ──────�
 | `supabase/migrations/20260926103516_qualiopi_referentiel.sql` | 32 indicateurs Qualiopi |
 | `supabase/migrations/20260926122058_crm_auth_membership.sql` | `crm.claim_team_membership()` (rattachement du compte Auth au membre de même email vérifié) ; audit automatique limité aux écritures hors session d'un membre — appliquée le 26/09/2026 |
 | `supabase/migrations/20260928153217_crm_marketing.sql` | Marketing : `ad_campaigns`, `ad_stats`, `experiments`, `experiment_hits`, `crm.track_experiment()`, section de droits `marketing` — **appliquée le 28/09/2026** (§ 5 nonies) |
+| `supabase/migrations/20260928161713_crm_drop_bank_reconciliation.sql` | Retrait du rapprochement bancaire (banque tenue dans Indy) : `crm.bank_transactions`, `payments.bank_transaction_id`, `settings.qonto_connected` — **appliquée le 28/09/2026** (§ 7) |
 | `src/lib/data/supabase.ts`, `src/lib/data/sync.ts` | Client navigateur (PKCE, schéma `crm`) ; chargement paginé et écritures ordonnées avec annulation en cas de refus |
 | `src/lib/auth/supabase-auth.ts`, `src/lib/store/remote-session.ts` | Lien magique, retour `/auth/callback`, membre de l'équipe, ouverture / fermeture de l'espace de travail |
 
@@ -534,7 +535,7 @@ La facturation, la comptabilité et le compte pro sont tenus dans **Indy** : Ind
 
 - Indy ne propose pas d'API publique documentée : aucun appel automatique n'est possible depuis le CRM.
 - Les paiements reçus par virement ou par lien de paiement Indy sont saisis dans le CRM depuis la fiche de la facture (« Enregistrer un paiement ») ; Stripe reste branché par webhook (§ 6).
-- Migration **`20260928170000_crm_drop_bank_reconciliation.sql`** — **écrite, non appliquée** (horodatée après la migration marketing `20260928153217`, déjà appliquée ; si elle est appliquée depuis l'outil Supabase, renommer le fichier avec la version enregistrée) : supprime `crm.bank_transactions` (vide au 28/09/2026), la colonne `crm.payments.bank_transaction_id` et `crm.settings.qonto_connected`. Garde-fou : elle s'arrête sans rien modifier si la table contient des lignes. **Ordre** : déployer le code d'abord (il ne lit plus ces objets), puis appliquer la migration.
+- Migration **`20260928161713_crm_drop_bank_reconciliation.sql`** — **appliquée en production le 28/09/2026**, après le déploiement du code qui ne lit plus ces objets : supprime `crm.bank_transactions` (vide), la colonne `crm.payments.bank_transaction_id` et `crm.settings.qonto_connected`. Garde-fou : elle s'arrête sans rien modifier si la table contient des lignes ; rejouable (requête dynamique, `if exists`). Vérifié après application : table et colonnes absentes, paiement et ligne de réglages conservés, `/api/health` à `ok`.
 - Import des factures Indy : **reporté** (une seule facture de vente au 28/09/2026, sans lien avec une candidature). À reconsidérer quand le volume le justifiera, à partir de l'export CSV « Factures » d'Indy (Paramètres → Exports). D'ici là, une facture Indy peut être ressaisie dans le CRM si elle doit y être suivie ; pour le ROAS du Marketing, le CA des inscrits sans facture dans le CRM est estimé.
 
 ---
