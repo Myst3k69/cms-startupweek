@@ -1,10 +1,10 @@
 /**
  * Facturation : devis B2B, factures (acompte 30 % à l'inscription, solde à J-30 — CGV), avoirs,
- * paiements (Stripe / virement Qonto / OPCO) et relevé bancaire Qonto à rapprocher.
+ * paiements (Stripe / virement / OPCO).
  *
  * Numérotation légale : F-AAAA-NNNN et D-AAAA-NNNN, séquentielles sans trou par année, dans l'ordre d'émission.
  */
-import type { BankTransaction, Invoice, InvoiceKind, LineItem, Payment, PaymentMethod, QuoteStatus } from "../../domain/types";
+import type { Invoice, InvoiceKind, LineItem, Payment, PaymentMethod, QuoteStatus } from "../../domain/types";
 import { type SeedContext, stamps } from "./context";
 import { DAY, HOUR, MIN, htFromTtc, linesTotalCents, pad, sortBy, stripeFee } from "./helpers";
 import { evId } from "./events";
@@ -150,7 +150,7 @@ export function buildBilling(ctx: SeedContext): void {
         issuedTs: plan.refund.avoirTs,
         dueTs: plan.refund.avoirTs,
         lines,
-        payments: [{ ts: plan.refund.refundTs, cents: linesTotalCents(lines), method: plan.method, status: "rembourse", reference: plan.method === "stripe" ? `re_3Q${r.alnum(21)}` : `qonto_tx_${r.hex(16)}` }],
+        payments: [{ ts: plan.refund.refundTs, cents: linesTotalCents(lines), method: plan.method, status: "rembourse", reference: plan.method === "stripe" ? `re_3Q${r.alnum(21)}` : `VIR-${r.digits(10)}` }],
         forcedStatus: "payee",
         notes: "Remboursement intégral de l'acompte (désistement plus de 30 jours avant la session, conformément aux CGV).",
       });
@@ -204,13 +204,13 @@ export function buildBilling(ctx: SeedContext): void {
   const vLines = verdalysLines();
   invoices.push({ key: "b2b:verdalys", kind: "facture", orgId: ORG.verdalys, contactId: mainContactOf(ctx, ORG.verdalys), eventId: evId("IS-0001"), quoteKey: "q:verdalys", issuedTs: clock.real("2026-06-26", 9, 30), dueTs: clock.real("2026-07-26", 12, 0), lines: vLines, method: "virement", payments: [{ ts: clock.real("2026-07-24", 10, 5), cents: linesTotalCents(vLines), method: "virement" }] });
 
-  // Lyon Start Up — promo septembre 2026 : facture partiellement réglée (le solde vient d'arriver sur Qonto, à rapprocher).
+  // Lyon Start Up — promo septembre 2026 : facture partiellement réglée (seconde échéance attendue).
   const lsuLines = () => [line("Masterclass « MVP no-code en 7 jours » — promotion septembre 2026", 2, 180000), line("Jury de sélection et entretiens (≈ 100 candidats)", 1, 250000), line("Accompagnement Startup Ready des 5 lauréats", 5, 48000)];
   quotes.push({ key: "q:lsu", status: "accepte", orgId: ORG.lyonStartUp, contactId: mainContactOf(ctx, ORG.lyonStartUp), dealId: DEAL.lyonStartUp, issuedTs: clock.real("2026-08-12", 15, 0), validDays: 30, lines: lsuLines(), sentTs: clock.real("2026-08-12", 15, 10), acceptedTs: clock.real("2026-08-20", 11, 30), invoiceKey: "b2b:lsu" });
   const lLines = lsuLines();
   invoices.push({ key: "b2b:lsu", kind: "facture", orgId: ORG.lyonStartUp, contactId: mainContactOf(ctx, ORG.lyonStartUp), quoteKey: "q:lsu", issuedTs: clock.real("2026-09-01", 9, 0), dueTs: clock.real("2026-10-01", 12, 0), lines: lLines, method: "virement", payments: [{ ts: clock.real("2026-09-15", 9, 50), cents: Math.round(linesTotalCents(lLines) / 2), method: "virement" }], notes: "Paiement en deux fois accordé (50 % à réception, 50 % à 30 jours)." });
 
-  // Ynov — Startup Village janvier 2027 (60 étudiants) : acompte émis, virement reçu hier (à rapprocher).
+  // Ynov — Startup Village janvier 2027 (60 étudiants) : acompte émis, virement attendu.
   const ynovLines = () => [line("Startup Village — 4 jours / 3 nuits, hébergement et restauration inclus (prix par étudiant)", 60, 39000), line("Coordination pédagogique, jury et logistique", 1, 150000)];
   quotes.push({ key: "q:ynov", status: "accepte", orgId: ORG.ynov, contactId: ynov, dealId: DEAL.ynovSv, eventId: evId("SV-0002"), issuedTs: clock.real("2026-09-04", 10, 0), validDays: 30, lines: ynovLines(), sentTs: clock.real("2026-09-04", 10, 20), acceptedTs: clock.real("2026-09-15", 16, 40), invoiceKey: "b2b:ynov:acompte" });
   const ynovHt = 60 * 39000 + 150000;
@@ -285,7 +285,7 @@ export function buildBilling(ctx: SeedContext): void {
         receivedAt: clock.iso(ts),
         method: p.method,
         status,
-        reference: p.reference ?? (p.method === "stripe" ? `pi_3Q${r.alnum(21)}` : p.method === "virement" ? `qonto_tx_${r.hex(16)}` : `OPCO-${r.digits(8)}`),
+        reference: p.reference ?? (p.method === "stripe" ? `pi_3Q${r.alnum(21)}` : p.method === "virement" ? `VIR-${r.digits(10)}` : `OPCO-${r.digits(8)}`),
         feeCents: p.method === "stripe" ? stripeFee(p.cents) : undefined,
       });
       paid += p.cents;
@@ -328,114 +328,4 @@ export function buildBilling(ctx: SeedContext): void {
     const main = sortBy(own.filter((i) => i.kind !== "avoir"), (i) => Date.parse(i.issuedAt)).at(-1);
     app.invoiceId = main?.id;
   }
-
-  buildBank(ctx, invoiceRows, payments);
-}
-
-/* ───────────────────────────── Relevé bancaire (Qonto + virements Stripe) ───────────────────────────── */
-
-function buildBank(ctx: SeedContext, invoices: Invoice[], payments: Payment[]): void {
-  const { clock } = ctx;
-  const r = ctx.rng.fork("bank");
-  const windowStart = clock.rel(-100, 0, 0); // flux Qonto synchronisé depuis ~100 jours
-  const txs: (Omit<BankTransaction, "id" | "createdAt" | "updatedAt"> & { ts: number })[] = [];
-  const invById = new Map(invoices.map((i) => [i.id, i]));
-  const counterpartyOf = (inv: Invoice) => {
-    if (inv.orgId) return ctx.data.organizations.find((o) => o.id === inv.orgId)!.name.toUpperCase();
-    const c = ctx.data.contacts.find((x) => x.id === inv.contactId)!;
-    return `${c.firstName} ${c.lastName}`.toUpperCase();
-  };
-  const links: [BankTransaction["paymentId"], number][] = [];
-
-  // Crédits Qonto : virements et règlements financeurs.
-  for (const p of payments) {
-    const ts = Date.parse(p.receivedAt);
-    if (ts < windowStart || p.status !== "reussi" || (p.method !== "virement" && p.method !== "opco")) continue;
-    const inv = invById.get(p.invoiceId)!;
-    txs.push({ ts: ts + r.between(1, 20) * HOUR, bookedAt: "", label: `VIR SEPA RECU /DE ${counterpartyOf(inv)} /MOTIF ${inv.number}`, counterparty: counterpartyOf(inv), amountCents: p.amountCents, reference: inv.number, source: "qonto", status: "rapproche", matchedInvoiceId: inv.id, paymentId: p.id });
-    links.push([p.id, txs.length - 1]);
-  }
-
-  // Virements Stripe hebdomadaires (net des frais et des remboursements).
-  const stripePays = payments.filter((p) => p.method === "stripe" && Date.parse(p.receivedAt) >= windowStart - 7 * DAY);
-  const payoutDay = (ts: number) => {
-    // Versement le mardi suivant (≥ J+2).
-    let d = Math.floor((ts + 2 * DAY) / DAY) * DAY;
-    while (new Date(d).getUTCDay() !== 2) d += DAY;
-    return d;
-  };
-  const groups = new Map<number, Payment[]>();
-  for (const p of stripePays) {
-    const d = payoutDay(Date.parse(p.receivedAt));
-    if (d < windowStart || d > clock.now - 6 * HOUR) continue;
-    groups.set(d, [...(groups.get(d) ?? []), p]);
-  }
-  const payoutDays = [...groups.keys()].sort((a, b) => a - b);
-  for (const d of payoutDays) {
-    const list = groups.get(d)!;
-    const net = list.reduce((acc, p) => acc + (p.status === "rembourse" ? -p.amountCents : p.amountCents - (p.feeCents ?? 0)), 0);
-    const isLast = d === payoutDays[payoutDays.length - 1] && d > clock.now - 3 * DAY;
-    txs.push({ ts: d + 6 * HOUR, bookedAt: "", label: "STRIPE PAYOUT", counterparty: "Stripe Technology Europe Ltd", amountCents: net, reference: `po_1Q${r.alnum(20)}`, source: "stripe_payout", status: isLast ? "a_rapprocher" : "rapproche" });
-    for (const p of list) links.push([p.id, txs.length - 1]);
-  }
-
-  // Crédits récents non rapprochés (matchables par montant / référence).
-  const find = (pred: (i: Invoice) => boolean) => invoices.find(pred);
-  const lateBalance = find((i) => i.kind === "solde" && i.status === "en_retard" && i.remindersSent === 1);
-  if (lateBalance) {
-    const due = sumDue(lateBalance);
-    txs.push({ ts: clock.ago(20 * HOUR), bookedAt: "", label: `VIR SEPA RECU /DE ${counterpartyOf(lateBalance)} /MOTIF SOLDE ${lateBalance.number}`, counterparty: counterpartyOf(lateBalance), amountCents: due, reference: lateBalance.number, source: "qonto", status: "a_rapprocher" });
-  }
-  const lsu = find((i) => i.orgId === ORG.lyonStartUp && i.status === "partielle");
-  if (lsu) txs.push({ ts: clock.ago(28 * HOUR), bookedAt: "", label: `VIR SEPA RECU /DE LYON START UP /MOTIF ${lsu.number} 2E ECHEANCE`, counterparty: "LYON START UP", amountCents: sumDue(lsu), reference: lsu.number, source: "qonto", status: "a_rapprocher" });
-  const ynov = find((i) => i.orgId === ORG.ynov && i.kind === "acompte");
-  if (ynov) txs.push({ ts: clock.ago(26 * HOUR), bookedAt: "", label: "VIR SEPA RECU /DE YNOV CAMPUS /MOTIF ACOMPTE STARTUP VILLAGE", counterparty: "YNOV CAMPUS", amountCents: sumDue(ynov), source: "qonto", status: "a_rapprocher" });
-  const akto = find((i) => i.funder?.name === "AKTO" && i.paidCents === 0);
-  if (akto) txs.push({ ts: clock.ago(44 * HOUR), bookedAt: "", label: `VIR SEPA RECU /DE AKTO /REF ${akto.funder!.agreementRef}`, counterparty: "AKTO", amountCents: sumDue(akto), reference: akto.funder!.agreementRef, source: "qonto", status: "a_rapprocher" });
-  const partial = find((i) => i.kind === "solde" && i.status === "partielle");
-  if (partial) txs.push({ ts: clock.ago(3 * DAY + 5 * HOUR), bookedAt: "", label: `VIR INST RECU /DE ${counterpartyOf(partial)}`, counterparty: counterpartyOf(partial), amountCents: sumDue(partial), source: "qonto", status: "a_rapprocher" });
-
-  // Débits (hors factures clients).
-  const debits: [string, string, number, number][] = [
-    ["VIR VILLA ADRIATICA SPLIT — SOLDE LOCATION SW-0010", "VILLA ADRIATICA", -680000, clock.real("2026-08-10", 10, 0)],
-    ["VIR ACOMPTE LOCATION VILLA COSTA DEL SOL — SW-0011", "COSTA SOL RENTALS SL", -390000, clock.real("2026-09-02", 11, 0)],
-    ["CB TRANSAVIA — BILLETS INTERVENANTS SW-0010", "TRANSAVIA", -124000, clock.real("2026-08-18", 20, 12)],
-    ["VIR JULIE MARCHAND — FACTURE INTERVENTION SW-0010", "JULIE MARCHAND", -195000, clock.real("2026-09-16", 9, 30)],
-    ["VIR SOFIA MARTINEZ — FACTURE INTERVENTION SW-0010", "SOFIA MARTINEZ", -120000, clock.real("2026-09-17", 9, 30)],
-    ["VIR THOMAS NGUYEN — FACTURE INTERVENTION SW-0009", "THOMAS NGUYEN", -180000, clock.real("2026-06-24", 9, 30)],
-    ["PRLV SEPA URSSAF", "URSSAF ILE-DE-FRANCE", -185000, clock.real("2026-08-05", 7, 0)],
-    ["PRLV SEPA URSSAF", "URSSAF ILE-DE-FRANCE", -185000, clock.real("2026-09-05", 7, 0)],
-    ["VIR CABINET GARNIER & ASSOCIES — HONORAIRES T2", "CABINET GARNIER & ASSOCIES", -54000, clock.real("2026-07-15", 10, 0)],
-  ];
-  for (const month of ["2026-07", "2026-08", "2026-09"]) {
-    debits.push([`PRLV SEPA META PLATFORMS IRELAND — ADS ${month}`, "META PLATFORMS IRELAND LTD", -r.between(62000, 145000), clock.real(`${month}-03`, 6, 0)]);
-    debits.push(["PRLV SEPA GOOGLE WORKSPACE", "GOOGLE IRELAND LTD", -8640, clock.real(`${month}-02`, 6, 0)]);
-    debits.push(["CB SUPABASE INC", "SUPABASE", -2500, clock.real(`${month}-12`, 3, 0)]);
-    debits.push(["PRLV QONTO — ABONNEMENT BUSINESS", "QONTO", -2900, clock.real(`${month}-01`, 5, 0)]);
-  }
-  for (const [label, counterparty, amount, ts] of debits) {
-    if (ts < windowStart || ts > clock.now) continue;
-    txs.push({ ts, bookedAt: "", label, counterparty, amountCents: amount, source: "qonto", status: "ignore" });
-  }
-  txs.push({ ts: clock.ago(2 * DAY + 3 * HOUR), bookedAt: "", label: "PRLV SEPA NOTION LABS INC", counterparty: "NOTION LABS", amountCents: -9600, source: "qonto", status: "a_rapprocher" });
-
-  const ordered = txs.map((t, i) => ({ t, i })).sort((a, b) => a.t.ts - b.t.ts);
-  const idOf = new Map<number, string>();
-  ctx.data.bankTransactions = ordered.map(({ t, i }, n) => {
-    const id = `btx_${pad(n + 1)}`;
-    idOf.set(i, id);
-    const { ts, ...rest } = t;
-    const booked = clock.past(ts, 10 * MIN);
-    return { id, ...stamps(ctx, booked), ...rest, bookedAt: clock.iso(booked) };
-  });
-  const paymentsById = new Map(payments.map((p) => [p.id, p]));
-  for (const [paymentId, idx] of links) {
-    const p = paymentId ? paymentsById.get(paymentId) : undefined;
-    if (p) p.bankTransactionId = idOf.get(idx);
-  }
-}
-
-/** Reste à payer TTC d'une facture. */
-function sumDue(inv: Invoice): number {
-  return linesTotalCents(inv.lines) - inv.paidCents;
 }

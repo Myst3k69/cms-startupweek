@@ -21,11 +21,10 @@ function CodeBlock({ code, label }: { code: string; label: string }) {
 
 const OTHER_ENDPOINTS = [
   { method: "POST", path: "/api/stripe/webhook", auth: "En-tête Stripe-Signature (STRIPE_WEBHOOK_SECRET, tolérance 5 min)", role: "Paiements Stripe → factures payées, acompte réglé ⇒ candidature « Inscrite »" },
-  { method: "POST", path: "/api/qonto/sync", auth: "Authorization: Bearer CRON_SECRET (Vercel Cron)", role: "Import des transactions Qonto et rapprochement des virements" },
   { method: "POST", path: "/api/ads/sync", auth: "Authorization: Bearer CRON_SECRET, ou session d'un membre (droit d'écriture Marketing)", role: "Synchro Meta Ads / LinkedIn Ads → campagnes, publicités et statistiques quotidiennes" },
   { method: "GET", path: "/api/experiments", auth: "Public (clés des tests et pondérations, aucune donnée personnelle)", role: "A/B tests du site en cours — le site tire la variante de chaque visiteur" },
   { method: "POST", path: "/api/experiments", auth: "Origines ALLOWED_ORIGINS, 60 événements / min par IP", role: "Exposition / conversion d'un visiteur (une fois par visiteur et par test)" },
-  { method: "GET", path: "/api/health", auth: "Public (aucune donnée sensible)", role: "Supervision : base, email, Stripe, Qonto — remplace l'« Error workflow » n8n" },
+  { method: "GET", path: "/api/health", auth: "Public (aucune donnée sensible)", role: "Supervision : base, email, Stripe, régies — remplace l'« Error workflow » n8n" },
 ];
 
 export function EndpointsTab() {

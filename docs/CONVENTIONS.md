@@ -8,7 +8,7 @@ Même philosophie que `buildclub` : `features/<domaine>/`, primitives UI neutres
 src/
   app/(crm)/<section>/page.tsx      Server Component minimal : metadata + rend le composant client de la feature, enveloppé dans <Guard section="…">
   app/print/<doc>/[id]/page.tsx     Documents imprimables (facture, convention, attestation, émargement…)
-  app/api/…                         Route handlers (intake formulaires, Stripe, Qonto, health)
+  app/api/…                         Route handlers (intake formulaires, Stripe, health)
   components/ui/                    Primitives (Button, Badge, Card, DataTable, Kanban, Modal, Drawer, Tabs, StatCard…)
   components/charts/                Graphiques SVG maison (LineChart, ColumnChart, BarList, DonutChart, Funnel, Sparkline, CalendarHeatmap)
   components/shared/                Liens d'entités (ContactLink, SessionLink…), ActivityTimeline, StatusSelect

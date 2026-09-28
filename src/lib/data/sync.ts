@@ -41,7 +41,6 @@ export const TABLES: Record<EntityName, string> = {
   quotes: "quotes",
   invoices: "invoices",
   payments: "payments",
-  bankTransactions: "bank_transactions",
   resources: "resources",
   contents: "contents",
   automations: "automation_rules",

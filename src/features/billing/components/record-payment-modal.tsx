@@ -13,13 +13,13 @@ import { centsToInput, dateInputToIso, isoDateInput, parseAmountToCents } from "
 const schema = z.object({
   amount: z.number({ message: "Montant invalide" }).int().positive("Le montant doit être positif"),
   method: z.enum(["stripe", "virement", "opco", "cb_terminal", "cheque"]),
-  reference: z.string().trim().min(2, "Référence obligatoire (pi_…, id Qonto, n° d'accord OPCO…)"),
+  reference: z.string().trim().min(2, "Référence obligatoire (pi_…, référence du virement, n° d'accord OPCO…)"),
   date: z.string().min(10, "Date obligatoire"),
 });
 
 const REF_PLACEHOLDER: Record<PaymentMethod, string> = {
   stripe: "pi_3Q…",
-  virement: "Id transaction Qonto",
+  virement: "Référence ou libellé du virement",
   opco: "N° d'accord de prise en charge",
   cb_terminal: "N° de ticket",
   cheque: "N° de chèque",

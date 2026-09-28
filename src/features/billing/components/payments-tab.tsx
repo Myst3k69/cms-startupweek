@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Landmark } from "lucide-react";
 import { useCollection, useLookup, useNow } from "@/lib/hooks";
 import { PAYMENT_METHODS, PAYMENT_STATUSES, labelOf } from "@/lib/domain/constants";
 import type { Payment } from "@/lib/domain/types";
@@ -67,7 +66,6 @@ export function PaymentsTab() {
         header: "Référence",
         render: (p) => (
           <span className="inline-flex max-w-44 items-center gap-1 truncate font-mono text-[11px] text-muted-foreground" title={p.reference}>
-            {p.bankTransactionId ? <Landmark className="size-3 shrink-0 text-accent-text" aria-label="Rapproché avec une transaction Qonto" /> : null}
             <span className="truncate">{p.reference || "—"}</span>
           </span>
         ),
@@ -126,7 +124,7 @@ export function PaymentsTab() {
         onRowClick={(p) => router.push(`/facturation/factures/${p.invoiceId}`)}
         exportName={`paiements-startupweek-${date(new Date(now).toISOString(), "yyyy-MM-dd")}`}
         emptyTitle="Aucun paiement"
-        emptyDescription="Les paiements Stripe arrivent par webhook ; les virements Qonto via le rapprochement bancaire."
+        emptyDescription="Les paiements Stripe arrivent par webhook ; les virements et les règlements des financeurs sont saisis depuis la facture."
       />
     </div>
   );

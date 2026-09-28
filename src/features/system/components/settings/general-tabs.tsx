@@ -178,7 +178,7 @@ export function BillingTab() {
         </div>
         <Switch checked={draft.vatExempt} onChange={(v) => set("vatExempt", v)} disabled={!editable} label="Exonération de TVA" />
       </div>
-      <FormField label="IBAN (Qonto)" htmlFor="st-iban" error={errors.iban} hint="Affiché sur les factures pour les virements">
+      <FormField label="IBAN" htmlFor="st-iban" error={errors.iban} hint="Affiché sur les factures pour les virements">
         <Input id="st-iban" value={draft.iban} disabled={!editable} onChange={(e) => set("iban", e.target.value)} className="font-mono" />
       </FormField>
       <FormField label="Pénalités de retard et indemnité forfaitaire" htmlFor="st-pen" error={errors.latePenaltyText}>

@@ -68,7 +68,7 @@ export function JournalTab() {
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <Sparkles className="size-4 text-accent-text" aria-hidden="true" />
         <span>
-          <span className="tabular font-medium text-foreground">{number(last7)}</span> exécution{last7 > 1 ? "s" : ""} automatique{last7 > 1 ? "s" : ""} sur 7 jours · formulaires, webhooks Stripe/Qonto, triggers et règles — sans intervention humaine.
+          <span className="tabular font-medium text-foreground">{number(last7)}</span> exécution{last7 > 1 ? "s" : ""} automatique{last7 > 1 ? "s" : ""} sur 7 jours · formulaires, webhook Stripe, triggers et règles — sans intervention humaine.
         </span>
       </p>
       <DataTable

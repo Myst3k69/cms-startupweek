@@ -4,7 +4,6 @@
  */
 import type {
   Application,
-  BankTransaction,
   Contact,
   EventSession,
   ID,
@@ -185,8 +184,9 @@ export function reminderInfo(inv: Invoice, now: number) {
   return { daysLate, level, next, nextAt, nextDue: !!next && daysLate >= next.day };
 }
 
-/* ───────────────────────────── Rapprochement bancaire ───────────────────────────── */
+/* ───────────────────────────── Saisie ───────────────────────────── */
 
+/** Texte comparable : sans accents, minuscules, ponctuation remplacée par des espaces. */
 export function normalizeText(s: string) {
   return s
     .normalize("NFD")
@@ -196,110 +196,7 @@ export function normalizeText(s: string) {
     .trim();
 }
 
-/** Numéros de facture cités dans un libellé (« F2026-42 », « F-2026-0042 »…) normalisés en F-AAAA-NNNN. */
-export function extractInvoiceNumbers(text: string, prefix: string) {
-  const esc = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`(?:^|[^A-Za-z0-9])${esc}[\\s._-]?(\\d{4})[\\s._-]?(\\d{1,5})(?![0-9])`, "gi");
-  const out = new Set<string>();
-  for (const m of text.matchAll(re)) out.add(`${prefix}-${m[1]}-${m[2].padStart(4, "0")}`);
-  return [...out];
-}
-
-export type Confidence = "elevee" | "moyenne" | "faible";
-
-export interface MatchSuggestion {
-  invoice: Invoice;
-  score: number;
-  confidence: Confidence;
-  reasons: string[];
-  amountMatches: boolean;
-}
-
-export function confidenceOf(score: number): Confidence {
-  return score >= 75 ? "elevee" : score >= 45 ? "moyenne" : "faible";
-}
-
-export const CONFIDENCE_LABEL: Record<Confidence, { label: string; tone: "success" | "warning" | "neutral" }> = {
-  elevee: { label: "Confiance élevée", tone: "success" },
-  moyenne: { label: "Confiance moyenne", tone: "warning" },
-  faible: { label: "Confiance faible", tone: "neutral" },
-};
-
-/**
- * Suggestions de facture pour un crédit bancaire, par score :
- * numéro de facture cité (+55), réf. d'accord OPCO (+50), montant = reste dû (+35), nom du client (+20/25),
- * mention acompte/solde (+8), paiement partiel plausible (+8).
- */
-export function suggestMatches(tx: BankTransaction, invoices: Invoice[], lk: Pick<BillingLookups, "contacts" | "orgs">, prefix: string, limit = 3): MatchSuggestion[] {
-  if (tx.amountCents <= 0) return [];
-  const haystack = `${tx.label} ${tx.reference ?? ""} ${tx.counterparty}`;
-  const text = ` ${normalizeText(haystack)} `;
-  const cited = extractInvoiceNumbers(haystack, prefix);
-  const has = (word?: string) => {
-    const w = word ? normalizeText(word) : "";
-    return w.length >= 3 && text.includes(` ${w} `);
-  };
-  const out: MatchSuggestion[] = [];
-  for (const inv of invoices) {
-    if (!isCollectible(inv)) continue;
-    const balance = invoiceBalance(inv);
-    const reasons: string[] = [];
-    let score = 0;
-    const numberHit = cited.includes(inv.number);
-    if (numberHit) {
-      score += 55;
-      reasons.push(`Numéro ${inv.number} cité`);
-    }
-    const amountMatches = tx.amountCents === balance;
-    if (amountMatches) {
-      score += 35;
-      reasons.push("Montant = reste dû");
-    }
-    const org = inv.orgId ? lk.orgs.get(inv.orgId) : undefined;
-    const c = inv.contactId ? lk.contacts.get(inv.contactId) : undefined;
-    let nameHit = false;
-    if (org && (has(org.name) || org.name.split(/\s+/).some((w) => w.length >= 5 && has(w)))) {
-      score += 25;
-      nameHit = true;
-      reasons.push(`Client « ${org.name} »`);
-    } else if (c && has(c.lastName)) {
-      score += has(c.firstName) ? 25 : 20;
-      nameHit = true;
-      reasons.push(`Nom « ${c.firstName} ${c.lastName} »`);
-    }
-    const ref = inv.funder?.agreementRef;
-    if (ref && ref.length >= 4 && text.includes(` ${normalizeText(ref)} `)) {
-      score += 50;
-      reasons.push(`Accord ${inv.funder!.name} n° ${ref}`);
-    } else if (!nameHit && inv.funder && has(inv.funder.name)) {
-      score += 20;
-      reasons.push(`Financeur « ${inv.funder.name} »`);
-    }
-    if ((inv.kind === "acompte" && text.includes(" acompte ")) || (inv.kind === "solde" && text.includes(" solde "))) {
-      score += 8;
-      reasons.push(`Mention « ${inv.kind} »`);
-    }
-    if (!amountMatches && tx.amountCents < balance && (numberHit || nameHit)) {
-      score += 8;
-      reasons.push("Paiement partiel possible");
-    }
-    if (score < 30) continue;
-    const s = numberHit && amountMatches ? 99 : Math.min(97, score);
-    out.push({ invoice: inv, score: s, confidence: confidenceOf(s), reasons, amountMatches });
-  }
-  return out.sort((a, b) => b.score - a.score).slice(0, limit);
-}
-
-/* ───────────────────────────── Import CSV Qonto ───────────────────────────── */
-
-export interface ParsedBankRow {
-  bookedAt: string;
-  label: string;
-  amountCents: number;
-  reference?: string;
-  counterparty: string;
-}
-
+/** Montant saisi (« 1 234,56 », « 1234.56 », « 1.234,56 € ») → centimes, ou null si illisible. */
 export function parseAmountToCents(raw: string): number | null {
   const cleaned = raw.replace(/[\s  €]/g, "").replace(/'/g, "");
   if (!cleaned) return null;
@@ -307,59 +204,6 @@ export function parseAmountToCents(raw: string): number | null {
   const normalized = cleaned.includes(",") ? cleaned.replace(/\./g, "").replace(",", ".") : cleaned;
   if (!/^[-+]?\d+(\.\d+)?$/.test(normalized)) return null;
   return Math.round(Number(normalized) * 100);
-}
-
-function parseDate(raw: string): string | null {
-  const s = raw.trim();
-  let y: number, m: number, d: number;
-  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-  const fr = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/.exec(s);
-  if (iso) [y, m, d] = [Number(iso[1]), Number(iso[2]), Number(iso[3])];
-  else if (fr) [d, m, y] = [Number(fr[1]), Number(fr[2]), Number(fr[3].length === 2 ? `20${fr[3]}` : fr[3])];
-  else return null;
-  const dt = new Date(y, m - 1, d, 12, 0, 0);
-  if (Number.isNaN(dt.getTime()) || dt.getMonth() !== m - 1) return null;
-  return dt.toISOString();
-}
-
-/** Contrepartie devinée depuis un libellé bancaire (« VIR SEPA JEAN DUPONT - F-2026-0042 » → « JEAN DUPONT »). */
-export function guessCounterparty(label: string) {
-  // Format Qonto : « VIR SEPA RECU /DE LYON START UP /MOTIF F-2026-0042 »
-  const qonto = /\/DE\s+(.+?)\s*(?:\/|$)/i.exec(label);
-  if (qonto) return qonto[1].trim();
-  const stripped = label
-    .replace(/^\s*(vir(ement)?\.?\s*)?(sepa\s*)?(inst(antan[ée])?\s*)?(re[çc]u\s*)?(de\s+)?/i, "")
-    .split(/\s[-–—|/]\s|\s(?:ref|réf)\b|\s(?=F-?\d{4})/i)[0]
-    .trim();
-  return stripped || label.trim();
-}
-
-/** Parse un export CSV Qonto simplifié : `date;libellé;montant[;référence]` (séparateur ; ou tabulation). */
-export function parseBankCsv(input: string): { rows: ParsedBankRow[]; errors: string[] } {
-  const rows: ParsedBankRow[] = [];
-  const errors: string[] = [];
-  input
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .forEach((line, i) => {
-      const cells = line.split(/;|\t/).map((c) => c.trim().replace(/^"|"$/g, ""));
-      if (cells.length < 3) {
-        errors.push(`Ligne ${i + 1} : 3 colonnes attendues (date;libellé;montant)`);
-        return;
-      }
-      const [rawDate, label, rawAmount, reference] = cells;
-      const bookedAt = parseDate(rawDate);
-      const amountCents = parseAmountToCents(rawAmount);
-      if (!bookedAt || amountCents === null) {
-        // En-tête éventuel : ignoré silencieusement.
-        if (i === 0 && !bookedAt) return;
-        errors.push(`Ligne ${i + 1} : ${!bookedAt ? "date invalide" : "montant invalide"}`);
-        return;
-      }
-      rows.push({ bookedAt, label, amountCents, reference: reference || undefined, counterparty: guessCounterparty(label) });
-    });
-  return { rows, errors };
 }
 
 /* ───────────────────────────── Numérotation ───────────────────────────── */

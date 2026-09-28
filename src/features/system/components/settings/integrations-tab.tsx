@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Activity, CreditCard, Database, Globe, Landmark, Mail, Target, Workflow } from "lucide-react";
+import { Activity, CreditCard, Database, Globe, Mail, Target, Workflow } from "lucide-react";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Select, Switch, useToast } from "@/components/ui";
 import { useCrm } from "@/lib/store";
 import { useSession, useSettings } from "@/lib/hooks";
@@ -11,7 +11,7 @@ import type { Tone } from "@/lib/domain/constants";
 import type { Settings } from "@/lib/domain/types";
 import { CopyButton, useOrigin } from "../copy-button";
 
-type HealthServices = Partial<Record<"supabaseAdmin" | "supabasePublic" | "intakeSignature" | "allowedOriginsCustom" | "stripeWebhook" | "stripeApi" | "qonto" | "email" | "emailDispatch" | "metaAds" | "linkedinAds" | "cron", boolean>>;
+type HealthServices = Partial<Record<"supabaseAdmin" | "supabasePublic" | "intakeSignature" | "allowedOriginsCustom" | "stripeWebhook" | "stripeApi" | "email" | "emailDispatch" | "metaAds" | "linkedinAds" | "cron", boolean>>;
 interface Health {
   ok: boolean;
   mode: string;
@@ -80,17 +80,6 @@ export function IntegrationsTab() {
       endpoint: "/api/stripe/webhook",
       control: <Switch checked={settings.stripeConnected} disabled={!editable} onChange={(v) => toggle({ stripeConnected: v }, v ? "Stripe marqué connecté" : "Stripe déconnecté")} label="Stripe connecté" />,
       extra: <p className="text-xs text-muted-foreground">Événements : checkout.session.completed, payment_intent.succeeded, charge.refunded.</p>,
-    },
-    {
-      key: "qonto",
-      name: "Qonto",
-      icon: Landmark,
-      status: settings.qontoConnected ? { label: "Connecté", tone: "success" } : { label: "Non connecté", tone: "neutral" },
-      description: "Import quotidien des transactions (Vercel Cron) et rapprochement automatique des virements avec les factures.",
-      env: ["QONTO_ORGANIZATION_SLUG", "QONTO_SECRET_KEY", "QONTO_BANK_ACCOUNT_ID", "CRON_SECRET"],
-      health: ["qonto", "cron"],
-      endpoint: "/api/qonto/sync",
-      control: <Switch checked={settings.qontoConnected} disabled={!editable} onChange={(v) => toggle({ qontoConnected: v }, v ? "Qonto marqué connecté" : "Qonto déconnecté")} label="Qonto connecté" />,
     },
     {
       key: "email",

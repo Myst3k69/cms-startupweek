@@ -5,7 +5,7 @@ export const AUTOMATION_TRIGGER_LABEL: Record<AutomationTrigger, string> = {
   candidature_statut: "Changement de statut d'une candidature",
   devis_statut: "Changement de statut d'un devis",
   facture_echeance: "Échéance de facture",
-  paiement_recu: "Paiement reçu (Stripe / Qonto)",
+  paiement_recu: "Paiement reçu (Stripe ou saisi)",
   session_date: "Date relative à une session (J-x / J+x)",
   reclamation_recue: "Réclamation reçue",
   evaluation_recue: "Évaluation reçue",
@@ -36,7 +36,6 @@ export const ENTITY_LABEL: Record<EntityName, string> = {
   quotes: "Devis",
   invoices: "Facture",
   payments: "Paiement",
-  bankTransactions: "Transaction bancaire",
   resources: "Ressource",
   contents: "Contenu",
   automations: "Automatisation",
@@ -137,7 +136,6 @@ export function entityHref(entity: EntityName, id: string): string | undefined {
     case "invoices":
       return `/facturation/factures/${id}`;
     case "payments":
-    case "bankTransactions":
       return "/facturation";
     case "resources":
       return "/ressources";

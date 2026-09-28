@@ -420,7 +420,6 @@ function buildTasks(ctx: SeedContext): void {
     const who = inv.orgId ? ctx.data.organizations.find((o) => o.id === inv.orgId)!.name : nameOf(inv.contactId);
     add({ title: `Relancer le paiement de la facture ${inv.number} (${who})`, kind: "paiement", priority: inv.status === "en_retard" ? "urgente" : "haute", due: inv.status === "en_retard" ? clock.rel(-1, 17) : clock.rel(2, 11), assigneeId: U.lea, related: ref("invoices", inv.id), sequenceId: inv.status === "en_retard" ? "seq_facture" : undefined, automated: inv.status === "en_retard", notes: inv.status === "en_retard" ? "Solde exigible à J-30 : sans règlement, la place peut être remise en vente (CGV)." : undefined });
   }
-  add({ title: "Rapprocher les transactions Qonto en attente", kind: "admin", priority: "normale", due: clock.rel(0, 18), assigneeId: U.aurelien, automated: true, notes: "Plusieurs virements reçus correspondent à des factures ouvertes (montant ou référence identiques)." });
 
   // 5. Qualiopi.
   for (const a of ctx.data.improvementActions.filter((x) => x.status === "a_faire" || x.status === "en_cours")) {

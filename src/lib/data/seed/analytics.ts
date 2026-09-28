@@ -193,7 +193,7 @@ export function buildActivities(ctx: SeedContext): void {
 
   for (const p of data.payments) {
     const inv = invoicesById.get(p.invoiceId)!;
-    const how = p.method === "stripe" ? "Stripe" : p.method === "virement" ? "virement Qonto" : "financeur";
+    const how = p.method === "stripe" ? "Stripe" : p.method === "virement" ? "virement" : "financeur";
     if (p.status === "rembourse") add(Date.parse(p.receivedAt), "paiement", "invoices", inv.id, `Remboursement de ${eur(p.amountCents)} effectué (avoir ${inv.number})`, "usr_lea", { amountCents: p.amountCents });
     else add(Date.parse(p.receivedAt), "paiement", "invoices", inv.id, `Paiement reçu : ${eur(p.amountCents)} — ${inv.number} (${how})`, undefined, { amountCents: p.amountCents, method: p.method });
   }
@@ -247,9 +247,6 @@ export function buildActivities(ctx: SeedContext): void {
     add(Date.parse(m.sentAt!), "email", m.related?.entity ?? "emails", m.related?.id ?? m.id, `Email « ${m.subject} » envoyé à ${m.to}`);
   }
   // Synchronisations système.
-  for (let d = 1; d <= 29; d += 7) {
-    add(clock.now - d * DAY - 3 * HOUR, "systeme", "bankTransactions", data.bankTransactions.at(-1)?.id ?? "btx_0001", `Rapprochement Qonto : ${r.between(3, 9)} transactions rapprochées automatiquement`);
-  }
   add(clock.now - 2 * HOUR, "systeme", "events", "ev_sw0012", "Site synchronisé : 13 sessions publiées, places restantes recalculées");
 
   const ordered = sortBy(acts, (a) => -a.ts).slice(0, 200);

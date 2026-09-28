@@ -1,6 +1,6 @@
 # StartupWeek OS — CRM & back-office 100 % custom
 
-Le back-office de **StartupWeek** (bootcamp MVP 7 jours) : CRM, demandes entrantes, pipeline, relances, candidatures, sessions & émargement, projets des candidats, intervenants, **Qualiopi**, **facturation (acompte / solde, Stripe, Qonto)**, ressources, contenus du site, **StartupWeek Academy (e-learning)**, **marketing (campagnes Meta / LinkedIn, A/B tests, promotion des sessions)**, analytics et automatisations — pour remplacer Airtable + les workflows n8n.
+Le back-office de **StartupWeek** (bootcamp MVP 7 jours) : CRM, demandes entrantes, pipeline, relances, candidatures, sessions & émargement, projets des candidats, intervenants, **Qualiopi**, **facturation (acompte / solde, Stripe ; banque et comptabilité dans Indy)**, ressources, contenus du site, **StartupWeek Academy (e-learning)**, **marketing (campagnes Meta / LinkedIn, A/B tests, promotion des sessions)**, analytics et automatisations — pour remplacer Airtable + les workflows n8n.
 
 ➡️ Pourquoi et comment : **[docs/PROPOSITION.md](docs/PROPOSITION.md)** (analyse de l'existant, bénéfices, limites, plan de mise en production).
 ➡️ E-learning : **[docs/ACADEMY.md](docs/ACADEMY.md)** (création des formations, accès des candidats, API pour « Mon espace » du site, vente Stripe, formation type de 50 h).
@@ -68,7 +68,7 @@ Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind CSS v4 (tok
 src/
   app/(crm)/…            une route par section (Server Component minimal + <Guard section>)
   app/print/…            documents imprimables A4 (facture, devis, convention, convocation, attestation, émargement, programme, livret d'accueil)
-  app/api/…              intake des formulaires du site, webhook Stripe, synchro Qonto, health, recherche de lieux (IA)
+  app/api/…              intake des formulaires du site, webhook Stripe, health, recherche de lieux (IA)
   components/            ui (primitives), charts, layout (AppShell, ⌘K, alertes), shared
   features/<domaine>/    home, crm, programmes, qualiopi, documents, billing, site, academy, marketing, analytics, system
   lib/domain/            types (contrat de données), constantes, sélecteurs, actions métier, alertes
@@ -96,7 +96,7 @@ docs/                    PROPOSITION, CONVENTIONS, SUPABASE
 | Bascule effective sur Supabase | ✅ le 26/09/2026 : schéma `crm` exposé, URL de redirection, variables Vercel, deux administrateurs ; première connexion réelle réussie — voir [docs/SUPABASE.md § 3-4](docs/SUPABASE.md). Emails déclenchés depuis l'interface pas encore réellement envoyés |
 | Import des données Airtable | ✅ 26/09/2026 : 13 sessions et 2 ressources (le reste n'était que des tests) ; synchro n8n des sessions coupée, le CRM publie le site — [docs/SUPABASE.md § 8](docs/SUPABASE.md). Formulaires du site encore vers Airtable (phase 2) |
 | Analytics du site (trafic + statistiques par article) | ✅ 26/09/2026 : mesure sans cookie écrite par le site dans `crm.traffic_days` / `crm.content_stats_days` (migration `20260926220247` appliquée en production) — [docs/SUPABASE.md § 5 quinquies](docs/SUPABASE.md). Les chiffres arrivent dès le déploiement du site (`/api/event`) ; posts LinkedIn / Instagram / newsletter : saisie manuelle |
-| Endpoints `/api/intake`, Stripe, Qonto | ✍️ écrits et testés en local (*dry-run* sans variables d'environnement) — à tester en préproduction avec les vraies API |
+| Endpoints `/api/intake`, Stripe | ✍️ écrits et testés en local (*dry-run* sans variables d'environnement) — à tester en préproduction avec les vraies API |
 | Envoi réel des emails (Resend) | ⏳ prévu côté serveur (intake) ; les emails déclenchés depuis l'interface sont journalisés en démo |
 | StartupWeek Academy (e-learning) | ✅ 26-27/09/2026 : **Academy** (gestion : formations, parcours, apprenants, livrables, cohortes, sessions liées, certificat FOAD) et **Studio** (création : édition sur place sans Markdown visible, vue stagiaire en 3 directions artistiques, fiche catalogue, circuit de relecture brouillon → relecture → validée → publiée avec commentaires et vérifications bloquantes) ; accès automatique des inscrits, API apprenant (Mon espace du site) et vente Stripe testées de bout en bout en local ; migrations `crm_academy` et `crm_academy_studio` **appliquées en production** ; formation type « Construire son MVP avec l'IA » (50 h) — [docs/ACADEMY.md](docs/ACADEMY.md) |
 | Documents légaux (convention, CGV, attestation) | ⚠️ modèles à faire valider juridiquement (voir le point L.6353-6 dans la proposition) |
