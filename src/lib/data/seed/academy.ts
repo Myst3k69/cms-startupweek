@@ -75,6 +75,33 @@ export function buildAcademy(ctx: SeedContext): void {
   addCourse(ctx, mvp, clock.rel(-70));
   addCourse(ctx, iterationLabDraft(), clock.rel(-12));
 
+  /* ── Studio : Iteration Lab envoyée en relecture, avec les remarques du relecteur ── */
+  const lab = data.courses.find((c) => c.id === "crs_iteration_lab")!;
+  Object.assign(lab, { status: "relecture", reviewerId: U.aurelien, reviewRequestedAt: clock.iso(clock.rel(-2)) });
+  const labLessons = data.lessons.filter((l) => l.courseId === lab.id).sort((a, b) => a.position - b.position);
+  const remarks: [number, number, string, boolean][] = [
+    [0, 0, "Commencer par le résultat attendu à la fin de la leçon : l'apprenant doit savoir pourquoi il lit.", false],
+    [0, 1, "Donner un exemple chiffré de tableau de bord (Créno) plutôt qu'une liste d'indicateurs.", false],
+    [1, 0, "Le quiz teste la mémoire, pas la compréhension : proposer une mise en situation.", false],
+    [0, 0, "Titre trop long, raccourci.", true],
+  ];
+  remarks.forEach(([li, bi, body, resolved], i) => {
+    const lesson = labLessons[li];
+    const block = lesson?.blocks[bi];
+    if (!lesson) return;
+    data.courseComments.push({
+      id: `rvc_${String(i + 1).padStart(3, "0")}`,
+      courseId: lab.id,
+      lessonId: lesson.id,
+      blockId: block?.id,
+      authorId: U.aurelien,
+      body,
+      resolvedAt: resolved ? clock.iso(clock.rel(-1)) : undefined,
+      resolvedBy: resolved ? U.karim : undefined,
+      ...stamps(ctx, clock.rel(-2, 10 + i)),
+    });
+  });
+
   data.academyPaths.push({
     id: "pth_fondateur_ia",
     title: "Parcours Fondateur IA",

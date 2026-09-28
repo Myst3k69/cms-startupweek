@@ -5,9 +5,9 @@ import Link from "next/link";
 import { ArrowDown, ArrowUp, Pencil, Plus, Route, Trash2, X } from "lucide-react";
 import { Badge, Button, Checkbox, EmptyState, FormField, Input, Modal, Select, StatusBadge, Switch, Textarea, useToast } from "@/components/ui";
 import { useActions, useCollection, useLookup, useSession } from "@/lib/hooks";
-import { COURSE_STATUSES, PERSONAS, labelOf } from "@/lib/domain/constants";
+import { COURSE_STATUSES, PATH_STATUSES, PERSONAS, labelOf } from "@/lib/domain/constants";
 import { formatDuration, slugify } from "@/lib/domain/academy";
-import type { AcademyPath, CourseStatus, ID, Persona } from "@/lib/domain/types";
+import type { AcademyPath, ID, PathStatus, Persona } from "@/lib/domain/types";
 import { money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { DaScope } from "./da";
@@ -62,7 +62,7 @@ function PathModal({ path, onClose }: { path: AcademyPath | "new"; onClose: () =
             <Input id="pth-title" value={d.title} onChange={(e) => set("title", e.target.value)} />
           </FormField>
           <FormField label="Statut" htmlFor="pth-status">
-            <Select id="pth-status" value={d.status} onChange={(e) => set("status", e.target.value as CourseStatus)} options={COURSE_STATUSES} />
+            <Select id="pth-status" value={d.status} onChange={(e) => set("status", e.target.value as PathStatus)} options={PATH_STATUSES} />
           </FormField>
         </div>
         <FormField label="Description" htmlFor="pth-desc">

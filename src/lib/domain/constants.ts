@@ -1,4 +1,5 @@
 import type {
+  PathStatus,
   ActionStatus,
   ApplicationStatus,
   AssignmentStatus,
@@ -601,10 +602,14 @@ export const CHANNELS = opts<Channel>({
 
 export const COURSE_STATUSES = opts<CourseStatus>({
   brouillon: ["Brouillon", "neutral"],
-  relecture: ["Relecture", "violet"],
+  relecture: ["En relecture", "violet"],
+  validee: ["Validée", "info"],
   publiee: ["Publiée", "success"],
   archivee: ["Archivée", "neutral"],
 });
+
+/** Parcours : pas d'étape « validée » (pas de relecture de contenu propre). */
+export const PATH_STATUSES = COURSE_STATUSES.filter((o): o is Option<PathStatus> => o.value !== "validee");
 
 export const COURSE_LEVELS = opts<CourseLevel>({
   debutant: "Débutant",

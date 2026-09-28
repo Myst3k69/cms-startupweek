@@ -26,6 +26,8 @@ export function getAcademyRepo(): AcademyRepo {
       learnerConnections: s.learnerConnections,
       invoices: s.invoices,
       payments: s.payments,
+      settings: s.settings,
+      resources: s.resources,
     });
   }
   return demo;

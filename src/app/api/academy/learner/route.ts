@@ -6,6 +6,9 @@
  *   { ts, action: "overview", email }
  *   { ts, action: "lesson", email, enrollmentId, lessonId }
  *   { ts, action: "track", email, enrollmentId, event: { type: "heartbeat" | "complete_lesson" | "quiz" | "checklist" | "submit", … } }
+ *   { ts, action: "set_persona", email, enrollmentId, persona }
+ *   { ts, action: "certificate", email, enrollmentId }
+ *   { ts, action: "preview", courseSlug, lessonId, persona? }   (leçon en accès libre, sans compte)
  * `email` = email VÉRIFIÉ de l'utilisateur connecté au site (Supabase Auth du site).
  * Contrat détaillé : docs/ACADEMY.md.
  */
@@ -32,7 +35,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const parsed = LearnerRequestSchema.safeParse(json);
   if (!parsed.success) return Response.json({ ok: false, error: "VALIDATION_ERROR", issues: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) }, { status: 400 });
-  const key = "email" in parsed.data ? parsed.data.email : "catalog";
+  const key = "email" in parsed.data ? parsed.data.email : parsed.data.action;
   const rate = limiter.take(key);
   if (!rate.ok) return Response.json({ ok: false, error: "RATE_LIMITED" }, { status: 429, headers: { "Retry-After": String(rate.retryAfterSec) } });
 

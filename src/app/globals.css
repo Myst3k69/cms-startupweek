@@ -136,6 +136,37 @@
   }
 }
 
+/* ── Studio : édition sur place (rendu identique à la lecture apprenant) ── */
+.studio-rich { font-size: 15px; line-height: 1.7; color: var(--foreground); min-height: 1.7em; }
+.studio-rich > :first-child { margin-top: 0; }
+.studio-rich > :last-child { margin-bottom: 0; }
+.studio-rich h1, .studio-rich h2 { font-family: var(--font-grotesk), var(--font-inter), sans-serif; font-size: 1.25rem; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; margin: 1.6rem 0 0.5rem; }
+.studio-rich h3 { font-size: 1.05rem; font-weight: 600; margin: 1.3rem 0 0.4rem; }
+.studio-rich h4 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); margin: 1.1rem 0 0.3rem; }
+.studio-rich p, .studio-rich div { margin: 0 0 0.75rem; }
+.studio-rich ul, .studio-rich ol { margin: 0 0 0.75rem; padding-left: 1.3rem; }
+.studio-rich ul { list-style: disc; }
+.studio-rich ol { list-style: decimal; }
+.studio-rich li { margin: 0.2rem 0; }
+.studio-rich strong, .studio-rich b { font-weight: 600; }
+.studio-rich a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px; }
+.studio-rich code { font-family: var(--font-mono-face), ui-monospace, monospace; font-size: 0.85em; background: var(--surface-2); border-radius: 4px; padding: 0.05em 0.3em; }
+.studio-rich pre { font-family: var(--font-mono-face), ui-monospace, monospace; font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem 1rem; margin: 0 0 0.9rem; overflow-x: auto; }
+.studio-rich blockquote { border-left: 3px solid var(--border-strong); padding-left: 0.9rem; color: var(--muted-foreground); margin: 0 0 0.9rem; }
+.studio-rich aside { border-radius: 10px; padding: 0.7rem 0.9rem; margin: 0 0 0.9rem; font-size: 14px; line-height: 1.55; }
+.studio-rich aside[data-callout="info"] { background: var(--info-soft); color: var(--info-text); }
+.studio-rich aside[data-callout="tip"], .studio-rich aside[data-callout="success"] { background: var(--success-soft); color: var(--success-text); }
+.studio-rich aside[data-callout="warning"] { background: var(--warning-soft); color: var(--warning-text); }
+.studio-rich table { display: block; overflow-x: auto; border-collapse: collapse; font-size: 13.5px; line-height: 1.5; margin: 0 0 0.9rem; max-width: 100%; }
+.studio-rich th, .studio-rich td { border-bottom: 1px solid var(--border); padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; min-width: 7rem; }
+.studio-rich th { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted-foreground); }
+.studio-rich hr { border: 0; border-top: 1px solid var(--border); margin: 1.2rem 0; }
+.studio-rich figure img { border-radius: 8px; max-width: 100%; }
+.studio-rich figcaption { font-size: 12px; color: var(--muted-foreground); }
+.studio-rich[contenteditable="true"]:empty::before, .studio-plain[contenteditable]:empty::before { content: attr(data-placeholder); color: var(--faint); pointer-events: none; }
+.studio-rich[contenteditable="true"]:hover, .studio-plain[contenteditable]:not([contenteditable="false"]):hover { background: var(--accent-soft); border-radius: 6px; }
+.studio-rich[contenteditable="true"]:focus, .studio-plain[contenteditable]:not([contenteditable="false"]):focus { background: transparent; box-shadow: 0 0 0 2px var(--accent-soft-strong); border-radius: 6px; }
+
 @keyframes sw-page-in {
   from {
     opacity: 0;
