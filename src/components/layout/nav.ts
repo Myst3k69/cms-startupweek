@@ -5,6 +5,7 @@ import {
   FileText,
   FolderKanban,
   GraduationCap,
+  PenLine,
   Inbox,
   KanbanSquare,
   LayoutDashboard,
@@ -70,7 +71,8 @@ export const NAV: NavGroup[] = [
   {
     label: "StartupWeek Academy",
     items: [
-      { href: "/academy", label: "Academy", icon: GraduationCap, section: "academy", keywords: "e-learning formations cours parcours leçons apprenants elearning" },
+      { href: "/academy", label: "Academy", icon: GraduationCap, section: "academy", keywords: "e-learning formations parcours apprenants inscriptions cohortes livrables elearning" },
+      { href: "/studio", label: "Studio", icon: PenLine, section: "academy", keywords: "création contenu leçons éditeur relecture publication catalogue formations" },
     ],
   },
   {

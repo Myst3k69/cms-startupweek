@@ -76,6 +76,7 @@ function emptyData(): SeedData {
     assignments: [],
     learnerConnections: [],
     cohorts: [],
+    courseComments: [],
     settings: undefined as unknown as Settings, // renseigné par buildTeam
     activities: [],
     traffic: [],

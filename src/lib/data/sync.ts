@@ -54,6 +54,7 @@ export const TABLES: Record<EntityName, string> = {
   assignments: "academy_assignments",
   learnerConnections: "academy_connections",
   cohorts: "academy_cohorts",
+  courseComments: "academy_comments",
 };
 
 type Row = Record<string, unknown>;

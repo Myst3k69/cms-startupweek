@@ -706,7 +706,9 @@ export interface ContentMeta {
  * suivent les formations dans « Mon espace » du site, qui lit et écrit via l'API
  * /api/academy/learner/* (voir docs/ACADEMY.md).
  */
-export type CourseStatus = "brouillon" | "relecture" | "publiee" | "archivee";
+/** Circuit du Studio : brouillon → relecture → validee (contenu approuvé) → publiee ; archivee à tout moment. */
+export type CourseStatus = "brouillon" | "relecture" | "validee" | "publiee" | "archivee";
+export type PathStatus = Exclude<CourseStatus, "validee">;
 export type CourseLevel = "debutant" | "intermediaire" | "avance";
 
 export interface Course extends BaseEntity {
@@ -740,6 +742,11 @@ export interface Course extends BaseEntity {
   certificateMinProgress: number; // % de leçons terminées pour le certificat de réalisation
   stripePriceId?: string; // prix Stripe (sinon prix calculé depuis priceCents)
   publishedAt?: ISODate;
+  // Circuit de relecture (Studio)
+  reviewerId?: ID; // relecteur désigné (membre de l'équipe)
+  reviewRequestedAt?: ISODate;
+  validatedAt?: ISODate;
+  validatedBy?: ID;
 }
 
 export interface CourseModule extends BaseEntity {
@@ -846,7 +853,7 @@ export interface AcademyPath extends BaseEntity {
   title: string;
   slug: string;
   description: string;
-  status: CourseStatus;
+  status: PathStatus;
   personas: Persona[];
   courseIds: ID[]; // ordre du parcours
   priceCents: Cents; // TTC (0 = non vendu seul)
@@ -924,6 +931,17 @@ export interface LearnerConnection extends BaseEntity {
   durationSeconds: number;
   lessonIds: ID[];
   device?: string;
+}
+
+/** Commentaire de relecture (Studio) : sur la formation, une leçon ou un bloc précis. */
+export interface CourseComment extends BaseEntity {
+  courseId: ID;
+  lessonId?: ID;
+  blockId?: ID; // toujours avec lessonId
+  authorId?: ID;
+  body: string;
+  resolvedAt?: ISODate;
+  resolvedBy?: ID;
 }
 
 /** Cohorte : groupe d'apprenants d'une école / entreprise (accès collectif). */
@@ -1094,6 +1112,7 @@ export interface EntityMap {
   assignments: Assignment;
   learnerConnections: LearnerConnection;
   cohorts: Cohort;
+  courseComments: CourseComment;
 }
 
 export type EntityName = keyof EntityMap;

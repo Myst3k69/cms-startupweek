@@ -69,7 +69,7 @@ export function NewCourseModal({ open, onClose }: { open: boolean; onClose: () =
     onClose();
     setTitle("");
     setSubtitle("");
-    router.push(`/academy/formations/${course.id}`);
+    router.push(`/studio/${course.id}`);
   };
 
   return (

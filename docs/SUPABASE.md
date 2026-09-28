@@ -423,6 +423,12 @@ Testé avant application sur PostgreSQL 16 (émulation Supabase) + PostgREST 12.
 
 Formation type : `supabase/data/academy_mvp_ia.sql` (généré par `scripts/academy-sql.ts`, idempotent, statut « relecture »), **insérée en production le 26/09/2026** : fichier récupéré par la base au commit `065b349` (pg_net), empreinte MD5 `ae17ff58593827d19c36ff867a0b12e4` vérifiée avant exécution, puis réponse HTTP supprimée. Résultat : `crs_mvp_ia` « Construire son MVP avec l'IA » en relecture, 10 modules, 65 leçons, 3 000 min, 391 blocs (texte, prompts et questions identiques à la source : 418 850 et 36 074 caractères, 165 questions), liée aux 13 sessions SW-0011 → SW-0023, auteurs : les 2 administrateurs. Les 12 blocs « ressource » ont été retirés (les ressources de démo n'existent pas en base) : à rajouter depuis l'éditeur une fois les fichiers déposés dans *Ressources*. *Advisors* après application : aucune alerte de sécurité liée à Academy ; performance : INFO seulement (index encore inutilisés, 5 clés étrangères rarement utilisées sans index). Contrat de l'API apprenant, vente et variables : [ACADEMY.md](ACADEMY.md).
 
+## 5 septies. Studio Academy (relecture)
+
+Migration `20260927214847_crm_academy_studio.sql`, **appliquée en production le 27/09/2026** : statut de formation « validee » ajouté à `academy_courses_status_check` (circuit brouillon → relecture → validee → publiee, archivee), colonnes `reviewer_id`, `review_requested_at`, `validated_at`, `validated_by` (membres de l'équipe, `on delete set null`), table `crm.academy_comments` (commentaire sur une formation, une leçon ou un bloc ; `block_id` exige `lesson_id` ; corps de 1 à 4 000 caractères ; résolu / rouvert), RLS section `academy` (4 policies), entité `courseComments` ajoutée à `activities_entity_check` (liste reprise de la production). Vérifié après application : contraintes, 4 colonnes, RLS active, `anon` sans droit. Testé avant sur la base locale (SQL et PostgREST 12.2.3 avec un jeton de membre) : formateur écrit / résout, commercial lit sans écrire, compte non rattaché et `anon` refusés, statut inconnu refusé.
+
+> **Attention pour les prochaines migrations** : toute nouvelle version de `activities_entity_check` doit garder `courseComments` (en plus des entités Academy listées au § 5 sexies).
+
 ## 6. Brancher Stripe
 
 1. Dashboard Stripe → Developers → Webhooks → *Add endpoint* : `https://cms-startupweek.vercel.app/api/stripe/webhook`.
