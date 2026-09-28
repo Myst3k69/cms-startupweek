@@ -491,7 +491,7 @@ La facturation, la comptabilité et le compte pro sont tenus dans **Indy** : Ind
 
 - Indy ne propose pas d'API publique documentée : aucun appel automatique n'est possible depuis le CRM.
 - Les paiements reçus par virement ou par lien de paiement Indy sont saisis dans le CRM depuis la fiche de la facture (« Enregistrer un paiement ») ; Stripe reste branché par webhook (§ 6).
-- Migration **`20260928030000_crm_drop_bank_reconciliation.sql`** — **écrite, non appliquée** : supprime `crm.bank_transactions` (vide au 28/09/2026), la colonne `crm.payments.bank_transaction_id` et `crm.settings.qonto_connected`. Garde-fou : elle s'arrête sans rien modifier si la table contient des lignes. **Ordre** : déployer le code d'abord (il ne lit plus ces objets), puis appliquer la migration.
+- Migration **`20260928170000_crm_drop_bank_reconciliation.sql`** — **écrite, non appliquée** (horodatée après la migration marketing `20260928153217`, déjà appliquée ; si elle est appliquée depuis l'outil Supabase, renommer le fichier avec la version enregistrée) : supprime `crm.bank_transactions` (vide au 28/09/2026), la colonne `crm.payments.bank_transaction_id` et `crm.settings.qonto_connected`. Garde-fou : elle s'arrête sans rien modifier si la table contient des lignes. **Ordre** : déployer le code d'abord (il ne lit plus ces objets), puis appliquer la migration.
 - Import des factures Indy : **reporté** (une seule facture de vente au 28/09/2026, sans lien avec une candidature). À reconsidérer quand le volume le justifiera, à partir de l'export CSV « Factures » d'Indy (Paramètres → Exports). D'ici là, une facture Indy peut être ressaisie dans le CRM si elle doit y être suivie ; pour le ROAS du Marketing, le CA des inscrits sans facture dans le CRM est estimé.
 
 ---
